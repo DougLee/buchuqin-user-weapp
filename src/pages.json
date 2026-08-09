@@ -1,0 +1,18 @@
+{
+  "pages": [
+    { "path": "pages/index/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/category/index", "style": { "navigationBarTitleText": "选点好吃的" } },
+    { "path": "pages/cart/index", "style": { "navigationBarTitleText": "寝室购物袋" } },
+    { "path": "pages/orders/index", "style": { "navigationBarTitleText": "我的订单" } },
+    { "path": "pages/profile/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/product/detail", "style": { "navigationBarTitleText": "商品详情" } },
+    { "path": "pages/checkout/index", "style": { "navigationBarTitleText": "确认订单" } },
+    { "path": "pages/orders/detail", "style": { "navigationBarTitleText": "订单进度" } },
+    { "path": "pages/address/index", "style": { "navigationBarTitleText": "寝室地址" } },
+    { "path": "pages/coupons/index", "style": { "navigationBarTitleText": "我的优惠券" } }
+  ],
+  "tabBar": { "color":"#7a6a63", "selectedColor":"#e84325", "backgroundColor":"#fffdf9", "borderStyle":"white", "list":[
+    {"pagePath":"pages/index/index","text":"首页"},{"pagePath":"pages/category/index","text":"分类"},{"pagePath":"pages/cart/index","text":"购物袋"},{"pagePath":"pages/orders/index","text":"订单"},{"pagePath":"pages/profile/index","text":"我的"}
+  ]},
+  "globalStyle": { "navigationBarTextStyle":"black", "navigationBarTitleText":"不出寝食社", "navigationBarBackgroundColor":"#fff8ef", "backgroundColor":"#fff8ef", "backgroundTextStyle":"dark" }
+}
