@@ -9,7 +9,11 @@
     { "path": "pages/checkout/index", "style": { "navigationBarTitleText": "确认订单" } },
     { "path": "pages/orders/detail", "style": { "navigationBarTitleText": "订单进度" } },
     { "path": "pages/address/index", "style": { "navigationBarTitleText": "寝室地址" } },
-    { "path": "pages/coupons/index", "style": { "navigationBarTitleText": "我的优惠券" } }
+    { "path": "pages/address/edit", "style": { "navigationBarTitleText": "添加寝室" } },
+    { "path": "pages/coupons/index", "style": { "navigationBarTitleText": "我的优惠券" } },
+    { "path": "pages/messages/index", "style": { "navigationBarTitleText": "消息中心" } },
+    { "path": "pages/after-sales/index", "style": { "navigationBarTitleText": "退款与售后" } },
+    { "path": "pages/after-sales/apply", "style": { "navigationBarTitleText": "申请售后" } }
   ],
   "tabBar": { "color":"#7a6a63", "selectedColor":"#e84325", "backgroundColor":"#fffdf9", "borderStyle":"white", "list":[
     {"pagePath":"pages/index/index","text":"首页"},{"pagePath":"pages/category/index","text":"分类"},{"pagePath":"pages/cart/index","text":"购物袋"},{"pagePath":"pages/orders/index","text":"订单"},{"pagePath":"pages/profile/index","text":"我的"}
