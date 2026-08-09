@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import{computed,ref}from'vue';import{onLoad}from'@dcloudio/uni-app';import{api}from'../../api';import type{Address,Cart}from'../../types'
+import{computed,ref}from'vue';import{onShow}from'@dcloudio/uni-app';import{api}from'../../api';import type{Address,Cart}from'../../types'
 interface Settlement{productAmount:number;deliveryFee:number;discount:number;payableAmount:number}
 const address=ref<Address>(),cart=ref<Cart>(),mode=ref<'instant'|'scheduled'>('instant'),slot=ref('20:00-21:00'),settlement=ref<Settlement>(),submitting=ref(false),slots=ref<Array<{id:string;label:string;available:boolean}>>([])
 const payload=computed<Record<string,unknown>>(()=>({addressId:address.value?.id,deliveryMode:mode.value,deliverySlot:mode.value==='scheduled'?slot.value:undefined,couponId:'coupon-001'}))
 async function refresh(){settlement.value=await api.checkout(payload.value)}
-onLoad(async()=>{const[a,c,s]=await Promise.all([api.addresses(),api.cart(),api.slots()]);address.value=a[0];cart.value=c;slots.value=s;await refresh()})
+onShow(async()=>{const[a,c,s]=await Promise.all([api.addresses(),api.cart(),api.slots()]);const selected=uni.getStorageSync('selectedAddressId');address.value=a.find(item=>item.id===selected)||a[0];cart.value=c;slots.value=s;await refresh()})
 async function setMode(value:'instant'|'scheduled'){mode.value=value;await refresh()}
 async function selectSlot(label:string,available:boolean){if(!available)return;slot.value=label;await refresh()}
 async function submit(){if(submitting.value)return;submitting.value=true;try{const created=await api.createOrder(payload.value);const paid=await api.payOrder(created.id);uni.redirectTo({url:`/pages/orders/detail?id=${paid.id}`})}finally{submitting.value=false}}
