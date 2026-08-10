@@ -15,8 +15,8 @@
     { "path": "pages/after-sales/index", "style": { "navigationBarTitleText": "退款与售后" } },
     { "path": "pages/after-sales/apply", "style": { "navigationBarTitleText": "申请售后" } }
   ],
-  "tabBar": { "color":"#7a6a63", "selectedColor":"#e84325", "backgroundColor":"#fffdf9", "borderStyle":"white", "list":[
+  "tabBar": { "color":"#747b76", "selectedColor":"#18a84c", "backgroundColor":"#ffffff", "borderStyle":"white", "list":[
     {"pagePath":"pages/index/index","text":"首页"},{"pagePath":"pages/category/index","text":"分类"},{"pagePath":"pages/cart/index","text":"购物袋"},{"pagePath":"pages/orders/index","text":"订单"},{"pagePath":"pages/profile/index","text":"我的"}
   ]},
-  "globalStyle": { "navigationBarTextStyle":"black", "navigationBarTitleText":"不出寝食社", "navigationBarBackgroundColor":"#fff8ef", "backgroundColor":"#fff8ef", "backgroundTextStyle":"dark" }
+  "globalStyle": { "navigationBarTextStyle":"black", "navigationBarTitleText":"不出寝食社", "navigationBarBackgroundColor":"#ffffff", "backgroundColor":"#f7f9f7", "backgroundTextStyle":"dark" }
 }
