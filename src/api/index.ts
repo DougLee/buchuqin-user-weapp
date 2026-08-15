@@ -4,12 +4,13 @@ import type {
   AfterSale,
   Cart,
   Category,
-  Coupon,
+  CouponBundle,
   Notification,
   Order,
   Product,
   Refund,
   Settlement,
+  UserCoupon,
 } from "../types";
 interface PageResult<T> {
   items: T[];
@@ -49,7 +50,9 @@ export const api = {
   addresses: () => request<Address[]>("/addresses"),
   addAddress: (data: Record<string, unknown>) =>
     request<Address>("/addresses", { method: "POST", data }),
-  coupons: () => request<Coupon[]>("/coupons"),
+  coupons: () => request<CouponBundle>("/coupons"),
+  claimCoupon: (couponId: string) =>
+    request<UserCoupon>(`/coupons/${couponId}/claim`, { method: "POST" }),
   slots: () =>
     request<Array<{ id: string; label: string; available: boolean }>>(
       "/delivery/slots",

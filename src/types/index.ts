@@ -69,6 +69,21 @@ export interface Coupon {
   threshold: number;
   status: string;
   expiresAt: string;
+  total?: number;
+  remain?: number;
+}
+export type UserCouponStatus = "claimed" | "locked" | "used" | "released";
+export interface UserCoupon {
+  id: string;
+  userId: string;
+  couponId: string;
+  status: UserCouponStatus;
+  claimedAt: string;
+  coupon: Coupon;
+}
+export interface CouponBundle {
+  claimable: Coupon[];
+  mine: UserCoupon[];
 }
 export interface Notification {
   id: string;

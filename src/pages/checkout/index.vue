@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
-import type { Address, Cart } from "../../types";
+import type { Address, Cart, UserCoupon } from "../../types";
 interface Settlement {
   productAmount: number;
   deliveryFee: number;
@@ -16,18 +16,27 @@ const address = ref<Address>(),
   settlement = ref<Settlement>(),
   submitting = ref(false),
   slots = ref<Array<{ id: string; label: string; available: boolean }>>([]);
-const coupon = ref<{ id: string; name: string; amount: number } | null>(null);
+const usableCoupons = ref<UserCoupon[]>([]),
+  selectedCouponId = ref<string>();
+const selectedCoupon = computed(
+  () =>
+    usableCoupons.value.find((item) => item.id === selectedCouponId.value) ??
+    null,
+);
 const payload = computed<Record<string, unknown>>(() => ({
   addressId: address.value?.id,
   deliveryMode: mode.value,
   deliverySlot: mode.value === "scheduled" ? slot.value : undefined,
-  couponId: coupon.value?.id,
+  couponId: selectedCoupon.value?.id,
 }));
+function meetsThreshold(item: UserCoupon) {
+  return (cart.value?.productAmount ?? 0) >= item.coupon.threshold;
+}
 async function refresh() {
   settlement.value = await api.checkout(payload.value);
 }
 onShow(async () => {
-  const [a, c, s, coupons] = await Promise.all([
+  const [a, c, s, bundle] = await Promise.all([
     api.addresses(),
     api.cart(),
     api.slots(),
@@ -37,11 +46,17 @@ onShow(async () => {
   address.value = a.find((item) => item.id === selected) || a[0];
   cart.value = c;
   slots.value = s;
-  coupon.value =
-    coupons.find(
-      (item) =>
-        item.status === "available" && c.productAmount >= item.threshold,
-    ) ?? null;
+  const now = Date.now();
+  usableCoupons.value = bundle.mine.filter(
+    (item) =>
+      (item.status === "claimed" || item.status === "released") &&
+      new Date(item.coupon.expiresAt).getTime() > now,
+  );
+  // 默认选用抵扣最多的可用券
+  const best = usableCoupons.value
+    .filter(meetsThreshold)
+    .sort((x, y) => y.coupon.amount - x.coupon.amount)[0];
+  selectedCouponId.value = best?.id;
   await refresh();
 });
 async function setMode(value: "instant" | "scheduled") {
@@ -51,6 +66,17 @@ async function setMode(value: "instant" | "scheduled") {
 async function selectSlot(label: string, available: boolean) {
   if (!available) return;
   slot.value = label;
+  await refresh();
+}
+async function chooseCoupon(item: UserCoupon | null) {
+  if (item && !meetsThreshold(item)) {
+    uni.showToast({
+      title: `满 ${item.coupon.threshold} 元才能用这张券`,
+      icon: "none",
+    });
+    return;
+  }
+  selectedCouponId.value = item?.id;
   await refresh();
 }
 async function submit() {
@@ -121,13 +147,41 @@ async function submit() {
           >¥{{ (line.product.price * line.quantity).toFixed(2) }}</text
         ></view
       ></view
+    ><view class="section-title"
+      ><text class="section-title__main">优惠券</text></view
+    ><view class="coupon-list card"
+      ><view
+        class="coupon-opt"
+        :class="{ 'coupon-opt--active': !selectedCouponId }"
+        @tap="chooseCoupon(null)"
+        ><text class="coupon-opt__name">不使用优惠券</text
+        ><text class="coupon-opt__mark">✓</text></view
+      ><view
+        v-for="item in usableCoupons"
+        :key="item.id"
+        class="coupon-opt"
+        :class="{
+          'coupon-opt--active': selectedCouponId === item.id,
+          'coupon-opt--disabled': !meetsThreshold(item),
+        }"
+        @tap="chooseCoupon(item)"
+        ><view class="coupon-opt__info"
+          ><text class="coupon-opt__name">{{ item.coupon.name }}</text
+          ><text class="coupon-opt__desc"
+          >满 {{ item.coupon.threshold }} 元可用 · 可省 ¥{{ item.coupon.amount }}
+          元</text
+          ></view
+        ><text class="coupon-opt__mark">✓</text></view
+      ><view v-if="!usableCoupons.length" class="coupon-opt coupon-opt--empty"
+        ><text>暂无可用优惠券，去「我的 → 优惠券」领一张</text></view
+      ></view
     ><view v-if="settlement" class="bill card"
       ><view
         ><text>商品金额</text><text>¥{{ settlement.productAmount }}</text></view
       ><view
         ><text>配送费</text><text>¥{{ settlement.deliveryFee }}</text></view
       ><view class="bill__coupon"
-        ><text>{{ coupon?.name || "暂无可用优惠券" }}</text
+        ><text>{{ selectedCoupon?.coupon.name || "未使用优惠券" }}</text
         ><text>−¥{{ settlement.discount }}</text></view
       ><view class="bill__total"
         ><text>合计</text><text>¥{{ settlement.payableAmount }}</text></view
@@ -238,6 +292,61 @@ async function submit() {
 .bill {
   margin-top: 22rpx;
   padding: 26rpx;
+}
+.coupon-list {
+  padding: 6rpx 26rpx;
+}
+.coupon-opt {
+  min-height: 104rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  border-bottom: 2rpx solid $line;
+}
+.coupon-opt:last-child {
+  border-bottom: none;
+}
+.coupon-opt__info {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+.coupon-opt__name {
+  font-weight: 800;
+}
+.coupon-opt__desc {
+  font-size: 22rpx;
+  color: #667069;
+}
+.coupon-opt__mark {
+  width: 44rpx;
+  height: 44rpx;
+  border: 2rpx solid $line;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.coupon-opt--active {
+  .coupon-opt__name {
+    color: $primary-dark;
+  }
+  .coupon-opt__mark {
+    background: $primary;
+    border-color: $primary;
+  }
+}
+.coupon-opt--disabled {
+  opacity: 0.5;
+}
+.coupon-opt--empty {
+  color: #667069;
+  font-size: 24rpx;
+  justify-content: center;
 }
 .bill > view {
   display: flex;
