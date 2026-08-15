@@ -1,22 +1,74 @@
 {
   "pages": [
     { "path": "pages/index/index", "style": { "navigationStyle": "custom" } },
-    { "path": "pages/category/index", "style": { "navigationBarTitleText": "选点好吃的" } },
-    { "path": "pages/cart/index", "style": { "navigationBarTitleText": "寝室购物袋" } },
-    { "path": "pages/orders/index", "style": { "navigationBarTitleText": "我的订单" } },
+    {
+      "path": "pages/category/index",
+      "style": { "navigationBarTitleText": "选点好吃的" }
+    },
+    {
+      "path": "pages/cart/index",
+      "style": { "navigationBarTitleText": "寝室购物袋" }
+    },
+    {
+      "path": "pages/orders/index",
+      "style": { "navigationBarTitleText": "我的订单" }
+    },
     { "path": "pages/profile/index", "style": { "navigationStyle": "custom" } },
-    { "path": "pages/product/detail", "style": { "navigationBarTitleText": "商品详情" } },
-    { "path": "pages/checkout/index", "style": { "navigationBarTitleText": "确认订单" } },
-    { "path": "pages/orders/detail", "style": { "navigationBarTitleText": "订单进度" } },
-    { "path": "pages/address/index", "style": { "navigationBarTitleText": "寝室地址" } },
-    { "path": "pages/address/edit", "style": { "navigationBarTitleText": "添加寝室" } },
-    { "path": "pages/coupons/index", "style": { "navigationBarTitleText": "我的优惠券" } },
-    { "path": "pages/messages/index", "style": { "navigationBarTitleText": "消息中心" } },
-    { "path": "pages/after-sales/index", "style": { "navigationBarTitleText": "退款与售后" } },
-    { "path": "pages/after-sales/apply", "style": { "navigationBarTitleText": "申请售后" } }
+    {
+      "path": "pages/product/detail",
+      "style": { "navigationBarTitleText": "商品详情" }
+    },
+    {
+      "path": "pages/checkout/index",
+      "style": { "navigationBarTitleText": "确认订单" }
+    },
+    {
+      "path": "pages/orders/detail",
+      "style": { "navigationBarTitleText": "订单进度" }
+    },
+    {
+      "path": "pages/address/index",
+      "style": { "navigationBarTitleText": "寝室地址" }
+    },
+    {
+      "path": "pages/address/edit",
+      "style": { "navigationBarTitleText": "添加寝室" }
+    },
+    {
+      "path": "pages/coupons/index",
+      "style": { "navigationBarTitleText": "我的优惠券" }
+    },
+    {
+      "path": "pages/messages/index",
+      "style": { "navigationBarTitleText": "消息中心" }
+    },
+    {
+      "path": "pages/after-sales/index",
+      "style": { "navigationBarTitleText": "退款与售后" }
+    },
+    {
+      "path": "pages/after-sales/apply",
+      "style": { "navigationBarTitleText": "申请售后" }
+    }
   ],
-  "tabBar": { "color":"#747b76", "selectedColor":"#18a84c", "backgroundColor":"#ffffff", "borderStyle":"white", "list":[
-    {"pagePath":"pages/index/index","text":"首页"},{"pagePath":"pages/category/index","text":"分类"},{"pagePath":"pages/cart/index","text":"购物袋"},{"pagePath":"pages/orders/index","text":"订单"},{"pagePath":"pages/profile/index","text":"我的"}
-  ]},
-  "globalStyle": { "navigationBarTextStyle":"black", "navigationBarTitleText":"不出寝食社", "navigationBarBackgroundColor":"#ffffff", "backgroundColor":"#f7f9f7", "backgroundTextStyle":"dark" }
+  "tabBar": {
+    "color": "#747b76",
+    "selectedColor": "#18a84c",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "首页" },
+      { "pagePath": "pages/category/index", "text": "分类" },
+      { "pagePath": "pages/cart/index", "text": "购物袋" },
+      { "pagePath": "pages/orders/index", "text": "订单" },
+      { "pagePath": "pages/profile/index", "text": "我的" }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "不出寝食社",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f7f9f7",
+    "backgroundTextStyle": "dark"
+  }
 }

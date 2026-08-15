@@ -1,3 +1,70 @@
-import type{ApiResult}from'../types';const BASE_URL='http://localhost:3000/api/v1';type RequestOptions=Omit<UniApp.RequestOptions,'url'>
-function isApiResult<T>(value:unknown):value is ApiResult<T>{return typeof value==='object'&&value!==null&&'code'in value&&'data'in value}
-export async function request<T>(path:string,options:RequestOptions={}):Promise<T>{const token=uni.getStorageSync('token')as string;return new Promise((resolve,reject)=>{uni.request({...options,url:`${BASE_URL}${path}`,header:{'content-type':'application/json',...(token?{Authorization:`Bearer ${token}`} :{}),...(options.header||{})},success(res){if(isApiResult<T>(res.data)&&res.statusCode>=200&&res.statusCode<300&&res.data.code===0){resolve(res.data.data);return}const message=isApiResult<T>(res.data)?res.data.message:'服务返回了无法识别的响应';uni.showToast({title:message||'请求失败',icon:'none'});reject(new Error(message))},fail(error){uni.showToast({title:'服务暂时不可用',icon:'none'});reject(error)}})})}
+import type { ApiResult } from "../types";
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
+type RequestOptions = Omit<UniApp.RequestOptions, "url">;
+function isApiResult<T>(value: unknown): value is ApiResult<T> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "code" in value &&
+    "data" in value
+  );
+}
+let loginPromise: Promise<string> | undefined;
+async function ensureToken(path: string) {
+  const cached = uni.getStorageSync("token") as string;
+  if (cached || path.startsWith("/auth/")) return cached;
+  loginPromise ??= new Promise<string>((resolve, reject) =>
+    uni.request({
+      url: `${BASE_URL}/auth/test-login`,
+      method: "POST",
+      data: { identity: "user" },
+      header: { "content-type": "application/json" },
+      success(res) {
+        if (isApiResult<{ token: string }>(res.data) && res.statusCode < 300) {
+          uni.setStorageSync("token", res.data.data.token);
+          resolve(res.data.data.token);
+        } else reject(new Error("登录失败"));
+      },
+      fail: reject,
+    }),
+  ).finally(() => (loginPromise = undefined));
+  return loginPromise;
+}
+export async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  const token = await ensureToken(path);
+  return new Promise((resolve, reject) => {
+    uni.request({
+      ...options,
+      url: `${BASE_URL}${path}`,
+      header: {
+        "content-type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.header || {}),
+      },
+      success(res) {
+        if (
+          isApiResult<T>(res.data) &&
+          res.statusCode >= 200 &&
+          res.statusCode < 300 &&
+          res.data.code === 0
+        ) {
+          resolve(res.data.data);
+          return;
+        }
+        const message = isApiResult<T>(res.data)
+          ? res.data.message
+          : "服务返回了无法识别的响应";
+        uni.showToast({ title: message || "请求失败", icon: "none" });
+        reject(new Error(message));
+      },
+      fail(error) {
+        uni.showToast({ title: "服务暂时不可用", icon: "none" });
+        reject(error);
+      },
+    });
+  });
+}
