@@ -115,13 +115,31 @@ button {
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
-@media (min-width: 768px) {
+@media (min-width: 560px) {
+  /* 宽屏下以手机宽度居中呈现 */
+  html,
+  body {
+    background: #e8ebe7;
+  }
+  uni-app,
+  uni-page,
+  uni-page-body,
+  uni-page-refresh {
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  uni-app {
+    min-height: 100vh;
+    background: $paper;
+    box-shadow: 0 0 32rpx rgba(21, 75, 38, 0.16);
+  }
   .page {
-    max-width: 750px;
+    max-width: 480px;
     margin: 0 auto;
   }
   .uni-tabbar {
-    max-width: 750px;
+    max-width: 480px;
     left: 50% !important;
     transform: translateX(-50%);
   }
