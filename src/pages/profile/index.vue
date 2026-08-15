@@ -1,13 +1,36 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
-import type { Coupon } from "../../types";
-const coupons = ref<Coupon[]>([]),
+import { useSessionStore } from "../../stores/session";
+import type { Address } from "../../types";
+const session = useSessionStore(),
+  addresses = ref<Address[]>([]),
+  usableCouponCount = ref(0),
   unread = ref(0);
+const defaultAddress = computed(
+  () => addresses.value.find((item) => item.isDefault) || addresses.value[0],
+);
+const roomSummary = computed(() =>
+  defaultAddress.value
+    ? `${defaultAddress.value.buildingName} · ${defaultAddress.value.room}`
+    : "",
+);
 onShow(async () => {
-  coupons.value = await api.coupons();
-  unread.value = (await api.notifications()).filter((n) => !n.read).length;
+  await session.ensureLogin();
+  const [addressList, bundle, notifications] = await Promise.all([
+    api.addresses(),
+    api.coupons(),
+    api.notifications(),
+  ]);
+  addresses.value = addressList;
+  const now = Date.now();
+  usableCouponCount.value = bundle.mine.filter(
+    (item) =>
+      (item.status === "claimed" || item.status === "released") &&
+      new Date(item.coupon.expiresAt).getTime() > now,
+  ).length;
+  unread.value = notifications.filter((n) => !n.read).length;
 });
 const go = (url: string) => uni.navigateTo({ url });
 </script>
@@ -16,30 +39,38 @@ const go = (url: string) => uni.navigateTo({ url });
     ><view class="profile__top"
       ><view class="avatar">寝</view
       ><view
-        ><text class="name">湖工大小橙</text
-        ><text class="muted">湖北工业大学 · 西区 5 栋 612</text></view
+        ><text class="name">{{ session.user?.nickname || "同学" }}</text
+        ><text class="muted"
+        >{{
+          defaultAddress
+            ? defaultAddress.campusName +
+              " · " +
+              defaultAddress.buildingName +
+              " " +
+              defaultAddress.room
+            : "湖北工业大学"
+        }}</text
+        ></view
       ></view
     ><view class="motto">“ 今天不出寝，<br />想吃的照样有。 ”</view
     ><view class="stats card"
       ><view
-        ><text class="stats__value">{{ coupons.length }}</text
-        ><text class="muted">优惠券</text></view
+        ><text class="stats__value">{{ usableCouponCount }}</text
+        ><text class="muted">可用优惠券</text></view
       ><view
-        ><text class="stats__value">612</text
-        ><text class="muted">默认寝室</text></view
-      ><view
-        ><text class="stats__value">30'</text
-        ><text class="muted">最快送达</text></view
+        ><text class="stats__value">{{ addresses.length }}</text
+        ><text class="muted">寝室地址</text></view
       ></view
     ><view class="menu card"
       ><view @tap="go('/pages/messages/index')"
         ><text>消息中心</text
         ><text>{{ unread ? unread + " 条未读" : "全部已读" }}　›</text></view
       ><view @tap="go('/pages/address/index')"
-        ><text>寝室地址</text><text>西区 5 栋 · 612　›</text></view
+        ><text>寝室地址</text
+        ><text>{{ roomSummary || "去添加" }}　›</text></view
       ><view @tap="go('/pages/coupons/index')"
         ><text>我的优惠券</text
-        ><text>{{ coupons.length }} 张可用　›</text></view
+        ><text>{{ usableCouponCount }} 张可用　›</text></view
       ><view @tap="go('/pages/after-sales/index')"
         ><text>售后与退款</text><text>查看记录　›</text></view
       ><view @tap="uni.makePhoneCall({ phoneNumber: '4008002026' })"
@@ -92,7 +123,7 @@ const go = (url: string) => uni.navigateTo({ url });
 }
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   padding: 28rpx 10rpx;
   text-align: center;
 }
