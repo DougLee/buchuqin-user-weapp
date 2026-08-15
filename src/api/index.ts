@@ -1,4 +1,4 @@
-import { request } from "./request";
+import { request, toAbsoluteUrl, uploadImage } from "./request";
 import type {
   Address,
   AfterSale,
@@ -53,6 +53,8 @@ export const api = {
   coupons: () => request<CouponBundle>("/coupons"),
   claimCoupon: (couponId: string) =>
     request<UserCoupon>(`/coupons/${couponId}/claim`, { method: "POST" }),
+  uploadImage,
+  toAbsoluteUrl,
   slots: () =>
     request<Array<{ id: string; label: string; available: boolean }>>(
       "/delivery/slots",

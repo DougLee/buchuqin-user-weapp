@@ -1,6 +1,11 @@
 import type { ApiResult } from "../types";
-const BASE_URL =
+export const BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
+const ORIGIN = BASE_URL.replace(/\/api\/v1\/?$/, "");
+/** 后端返回的相对资源路径（如 /api/v1/uploads/xx.jpg）拼成可访问的完整地址 */
+export function toAbsoluteUrl(url: string): string {
+  return /^https?:\/\//.test(url) ? url : `${ORIGIN}${url}`;
+}
 type RequestOptions = Omit<UniApp.RequestOptions, "url">;
 function isApiResult<T>(value: unknown): value is ApiResult<T> {
   return (
@@ -67,4 +72,59 @@ export async function request<T>(
       },
     });
   });
+}
+interface UploadResult {
+  url: string;
+}
+/** 上传图片到 /files/images（≤5MB、image/*），返回后端持久化的相对 URL */
+export async function uploadImage(filePath: string): Promise<string> {
+  const token = await ensureToken("/files/images");
+  const url = `${BASE_URL}/files/images`;
+  // #ifdef H5
+  const blob = await (await fetch(filePath)).blob();
+  const form = new FormData();
+  form.append("file", blob, "proof.jpg");
+  const response = await fetch(url, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: form,
+  });
+  const body = (await response.json()) as ApiResult<UploadResult>;
+  if (!response.ok || body.code !== 0) {
+    uni.showToast({ title: body.message || "图片上传失败", icon: "none" });
+    throw new Error(body.message || "图片上传失败");
+  }
+  return body.data.url;
+  // #endif
+  // #ifndef H5
+  return new Promise<string>((resolve, reject) => {
+    uni.uploadFile({
+      url,
+      filePath,
+      name: "file",
+      header: token ? { Authorization: `Bearer ${token}` } : {},
+      success(res) {
+        try {
+          const body = JSON.parse(res.data) as ApiResult<UploadResult>;
+          if (
+            res.statusCode >= 200 &&
+            res.statusCode < 300 &&
+            body.code === 0
+          ) {
+            resolve(body.data.url);
+            return;
+          }
+          throw new Error(body.message || "图片上传失败");
+        } catch (error) {
+          uni.showToast({ title: "图片上传失败", icon: "none" });
+          reject(error instanceof Error ? error : new Error("图片上传失败"));
+        }
+      },
+      fail(error) {
+        uni.showToast({ title: "服务暂时不可用", icon: "none" });
+        reject(error);
+      },
+    });
+  });
+  // #endif
 }

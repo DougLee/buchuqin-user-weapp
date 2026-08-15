@@ -4,6 +4,7 @@ import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
 const orderId = ref(""),
   submitting = ref(false),
+  uploading = ref(false),
   form = reactive({
     type: "quality",
     description: "商品存在质量问题，希望退款",
@@ -13,16 +14,29 @@ onLoad((q) => {
   orderId.value = String(q?.orderId || "");
 });
 async function chooseProof() {
+  if (uploading.value) return;
   const result = await uni.chooseImage({
-    count: 3,
+    count: 3 - form.images.length,
     sizeType: ["compressed"],
     sourceType: ["album", "camera"],
   });
-  form.images = Array.isArray(result.tempFilePaths)
+  const paths = Array.isArray(result.tempFilePaths)
     ? result.tempFilePaths
     : [result.tempFilePaths];
+  uploading.value = true;
+  try {
+    // 选中即上传，提交时只发送已持久化的 URL
+    const urls = await Promise.all(paths.map((p) => api.uploadImage(p)));
+    form.images = [...form.images, ...urls];
+  } finally {
+    uploading.value = false;
+  }
 }
 async function submit() {
+  if (uploading.value) {
+    uni.showToast({ title: "凭证还在上传中，稍等一下", icon: "none" });
+    return;
+  }
   if (form.description.length < 5) {
     uni.showToast({ title: "请详细描述问题", icon: "none" });
     return;
@@ -70,12 +84,16 @@ async function submit() {
           ><image
             v-for="image in form.images"
             :key="image"
-            :src="image"
+            :src="api.toAbsoluteUrl(image)"
             mode="aspectFill" /></template
-        ><text v-else>拍照或从相册选择（至少 1 张）</text></view
+        ><text v-else>{{ uploading ? "凭证上传中…" : "拍照或从相册选择（至少 1 张）" }}</text></view
       ></view
-    ><button class="primary-btn" :disabled="submitting" @tap="submit">
-      {{ submitting ? "正在提交…" : "提交售后申请" }}
+    ><button
+      class="primary-btn"
+      :disabled="submitting || uploading"
+      @tap="submit"
+    >
+      {{ submitting ? "正在提交…" : uploading ? "凭证上传中…" : "提交售后申请" }}
     </button></view
   >
 </template>
