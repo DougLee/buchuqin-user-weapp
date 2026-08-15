@@ -7,7 +7,7 @@
   "transformPx": false,
   "h5": {
     "title": "不出寝食社",
-    "router": { "base": "/h5/user/" }
+    "router": { "base": "/h5/user/m/" }
   },
   /* 5+App特有相关 */
   "app-plus": {
