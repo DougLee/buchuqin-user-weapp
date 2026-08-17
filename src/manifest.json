@@ -1,5 +1,6 @@
 {
   "name": "不出寝食社",
+  /* 待道哥提供正式 appid，勿编造占位值 */
   "appid": "",
   "description": "",
   "versionName": "1.0.0",
@@ -54,6 +55,7 @@
   "quickapp": {},
   /* 小程序特有相关 */
   "mp-weixin": {
+    /* 待道哥提供正式 appid（微信公众平台注册后下发），勿编造占位值 */
     "appid": "",
     "setting": {
       "urlCheck": false

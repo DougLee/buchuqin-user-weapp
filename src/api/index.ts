@@ -5,10 +5,12 @@ import type {
   Cart,
   Category,
   CouponBundle,
+  LoginResult,
   Notification,
   Order,
   Product,
   Refund,
+  SessionUser,
   Settlement,
   UserCoupon,
 } from "../types";
@@ -20,10 +22,22 @@ interface PageResult<T> {
 }
 export const api = {
   login: () =>
-    request<{ token: string; user: Record<string, string> }>(
-      "/auth/test-login",
-      { method: "POST", data: { identity: "user" } },
-    ),
+    request<LoginResult>("/auth/test-login", {
+      method: "POST",
+      data: { identity: "user" },
+    }),
+  /** 微信小程序登录（后端未配置 WX_* 时 501，request.ts 已负责回退 test-login） */
+  wechatLogin: (code: string) =>
+    request<LoginResult>("/auth/wechat-login", {
+      method: "POST",
+      data: { code },
+    }),
+  /** 绑定手机号（简化版：直接传号；真实实现需小程序手机号授权码，见后端 TODO） */
+  bindPhone: (phone: string) =>
+    request<{ id: string; phone: string }>("/auth/phone", {
+      method: "POST",
+      data: { phone },
+    }),
   home: () =>
     request<{
       campus: { name: string };

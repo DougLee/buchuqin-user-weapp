@@ -7,7 +7,9 @@ import type { Address } from "../../types";
 const session = useSessionStore(),
   addresses = ref<Address[]>([]),
   usableCouponCount = ref(0),
-  unread = ref(0);
+  unread = ref(0),
+  editingNickname = ref(false),
+  nicknameInput = ref("");
 const defaultAddress = computed(
   () => addresses.value.find((item) => item.isDefault) || addresses.value[0],
 );
@@ -33,13 +35,58 @@ onShow(async () => {
   unread.value = notifications.filter((n) => !n.read).length;
 });
 const go = (url: string) => uni.navigateTo({ url });
+function startEditNickname() {
+  nicknameInput.value =
+    session.nickname === "微信用户" ? "" : session.nickname;
+  editingNickname.value = true;
+}
+function saveNickname() {
+  if (!nicknameInput.value.trim()) {
+    uni.showToast({ title: "昵称不能为空", icon: "none" });
+    return;
+  }
+  session.setNickname(nicknameInput.value);
+  editingNickname.value = false;
+  uni.showToast({ title: "昵称已更新（仅本机生效）", icon: "none" });
+}
+async function bindPhone() {
+  const res = await uni.showModal({
+    title: "绑定手机号",
+    editable: true,
+    placeholderText: "用于配送联系",
+  });
+  if (!res.confirm) return;
+  const phone = (res.content || "").trim();
+  if (!/^1\d{10}$/.test(phone)) {
+    uni.showToast({ title: "手机号格式不正确", icon: "none" });
+    return;
+  }
+  await session.bindPhone(phone);
+  uni.showToast({ title: "手机号已绑定", icon: "success" });
+}
 </script>
 <template>
   <view class="page profile"
     ><view class="profile__top"
       ><view class="avatar">寝</view
       ><view
-        ><text class="name">{{ session.user?.nickname || "同学" }}</text
+        ><view v-if="editingNickname" class="nickname-edit"
+          ><input
+            v-model="nicknameInput"
+            class="nickname-edit__input"
+            :focus="true"
+            maxlength="12"
+            placeholder="给自己起个名字"
+            confirm-type="done"
+            @confirm="saveNickname"
+          /><text class="nickname-edit__save" @tap="saveNickname"
+            >保存</text
+          ></view
+        ><view v-else class="name-row" @tap="startEditNickname"
+          ><text class="name">{{ session.nickname || "同学" }}</text
+          ><text class="name-row__edit">{{
+            session.needsNickname ? "点此设置昵称" : "改昵称"
+          }}</text></view
         ><text class="muted"
         >{{
           defaultAddress
@@ -65,6 +112,9 @@ const go = (url: string) => uni.navigateTo({ url });
       ><view @tap="go('/pages/messages/index')"
         ><text>消息中心</text
         ><text>{{ unread ? unread + " 条未读" : "全部已读" }}　›</text></view
+      ><view @tap="bindPhone"
+        ><text>手机号</text
+        ><text>{{ session.user?.phone || "未绑定" }}　›</text></view
       ><view @tap="go('/pages/address/index')"
         ><text>寝室地址</text
         ><text>{{ roomSummary || "去添加" }}　›</text></view
@@ -112,6 +162,47 @@ const go = (url: string) => uni.navigateTo({ url });
   font-size: 38rpx;
   font-weight: 900;
   margin-bottom: 8rpx;
+}
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  margin-bottom: 8rpx;
+}
+.name-row .name {
+  margin-bottom: 0;
+}
+.name-row__edit {
+  font-size: 21rpx;
+  color: $primary-dark;
+  background: $primary-soft;
+  border-radius: 16rpx;
+  padding: 4rpx 12rpx;
+  white-space: nowrap;
+}
+.nickname-edit {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  margin-bottom: 8rpx;
+}
+.nickname-edit__input {
+  width: 260rpx;
+  height: 60rpx;
+  background: #fff;
+  border: 2rpx solid $primary;
+  border-radius: 16rpx;
+  padding: 0 16rpx;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+.nickname-edit__save {
+  color: #fff;
+  background: $primary;
+  border-radius: 16rpx;
+  padding: 8rpx 20rpx;
+  font-size: 23rpx;
+  font-weight: 800;
 }
 .motto {
   color: $primary-dark;

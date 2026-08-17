@@ -62,6 +62,19 @@ export interface ApiResult<T> {
   data: T;
   timestamp: string;
 }
+/** 登录后的会话用户（test-login 与 wechat-login 统一口径，avatar 等字段可缺省） */
+export interface SessionUser {
+  id: string;
+  campusId?: string;
+  role?: string;
+  nickname: string;
+  phone?: string;
+  avatar?: string;
+}
+export interface LoginResult {
+  token: string;
+  user: SessionUser;
+}
 export interface Coupon {
   id: string;
   name: string;

@@ -1,4 +1,4 @@
-import type { ApiResult } from "../types";
+import type { ApiResult, LoginResult } from "../types";
 export const BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
 const ORIGIN = BASE_URL.replace(/\/api\/v1\/?$/, "");
@@ -15,26 +15,83 @@ function isApiResult<T>(value: unknown): value is ApiResult<T> {
     "data" in value
   );
 }
+/** 低层 POST：不走统一 request（避免触发 ensureToken 递归），保留状态码供登录回退判断 */
+function post(
+  path: string,
+  data: Record<string, unknown>,
+): Promise<{ status: number; body: unknown }> {
+  return new Promise((resolve, reject) =>
+    uni.request({
+      url: `${BASE_URL}${path}`,
+      method: "POST",
+      data,
+      header: { "content-type": "application/json" },
+      success(res) {
+        resolve({ status: res.statusCode, body: res.data });
+      },
+      fail: reject,
+    }),
+  );
+}
+function tokenFrom(body: unknown): string {
+  if (isApiResult<LoginResult>(body)) return body.data.token;
+  throw new Error("登录失败");
+}
+/** 演示登录通道（本地/H5/微信登录未配置时的回退兜底） */
+async function testLogin(): Promise<string> {
+  const { status, body } = await post("/auth/test-login", {
+    identity: "user",
+  });
+  if (status >= 300) throw new Error("登录失败");
+  return tokenFrom(body);
+}
+// #ifdef MP-WEIXIN
+/** 后端 WX_APPID/WX_SECRET 未配置时返回 501"微信登录未配置"，需回退 test-login */
+class WechatLoginNotConfigured extends Error {}
+function wxLoginCode(): Promise<string> {
+  return new Promise((resolve, reject) =>
+    uni.login({
+      provider: "weixin",
+      success(res) {
+        if (res.code) resolve(res.code);
+        else reject(new Error("uni.login 未返回 code"));
+      },
+      fail: reject,
+    }),
+  );
+}
+async function wechatLogin(): Promise<string> {
+  const code = await wxLoginCode();
+  const { status, body } = await post("/auth/wechat-login", { code });
+  if (status === 501) throw new WechatLoginNotConfigured();
+  if (status >= 300) throw new Error("微信登录失败");
+  return tokenFrom(body);
+}
+// #endif
+/** 登录通道选择：微信小程序先走 wechat-login（501 未配置则回退演示通道）；H5 等无 uni.login 的环境直接 test-login */
+function loginFlow(): Promise<string> {
+  // #ifdef MP-WEIXIN
+  return wechatLogin().catch((error) => {
+    // 演示环境（后端未配置 WX_*，返回 501）不破坏：静默回退 test-login
+    if (error instanceof WechatLoginNotConfigured)
+      console.info("[auth] 微信登录未配置，回退演示登录通道");
+    else console.warn("[auth] 微信登录失败，回退演示登录通道", error);
+    return testLogin();
+  });
+  // #endif
+  // #ifndef MP-WEIXIN
+  return testLogin();
+  // #endif
+}
 let loginPromise: Promise<string> | undefined;
 async function ensureToken(path: string, force = false) {
   const cached = uni.getStorageSync("token") as string;
   if (!force && (cached || path.startsWith("/auth/"))) return cached;
   if (force) uni.removeStorageSync("token");
-  loginPromise ??= new Promise<string>((resolve, reject) =>
-    uni.request({
-      url: `${BASE_URL}/auth/test-login`,
-      method: "POST",
-      data: { identity: "user" },
-      header: { "content-type": "application/json" },
-      success(res) {
-        if (isApiResult<{ token: string }>(res.data) && res.statusCode < 300) {
-          uni.setStorageSync("token", res.data.data.token);
-          resolve(res.data.data.token);
-        } else reject(new Error("登录失败"));
-      },
-      fail: reject,
-    }),
-  ).finally(() => (loginPromise = undefined));
+  loginPromise ??= loginFlow().then((token) => {
+    uni.setStorageSync("token", token);
+    return token;
+  }).finally(() => (loginPromise = undefined));
   return loginPromise;
 }
 export async function request<T>(
