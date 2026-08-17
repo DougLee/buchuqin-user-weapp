@@ -42,6 +42,8 @@ const banners = [
   {
     id: "fresh",
     theme: "green",
+    // 复活原首页 hero 大图（c87ff6f 引入、892f382 移除引用），作首帧 Banner 背景真图
+    image: "/static/home-hero-v3.webp",
     tag: "今日爆款",
     title: "零食饮料 寝室直达",
     sub: "楼下自提柜 · 熄灯前都能送",
@@ -95,6 +97,12 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
       indicator-active-color="#ffffff"
       ><swiper-item v-for="banner in banners" :key="banner.id"
         ><view class="hero__slide" :class="`hero__slide--${banner.theme}`"
+          ><image
+            v-if="'image' in banner"
+            class="hero__bg"
+            :src="banner.image"
+            mode="aspectFill"
+          /><view class="hero__mask" v-if="'image' in banner"></view
           ><text class="hero__tag">{{ banner.tag }}</text
           ><text class="hero__title">{{ banner.title }}</text
           ><text class="hero__sub">{{ banner.sub }}</text></view
@@ -225,6 +233,7 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
   box-shadow: 0 12rpx 32rpx rgba(21, 117, 54, 0.1);
 }
 .hero__slide {
+  position: relative;
   width: 100%;
   height: 100%;
   box-sizing: border-box;
@@ -232,6 +241,28 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
   display: flex;
   flex-direction: column;
   justify-content: center;
+  overflow: hidden;
+}
+/* 真图 Banner：背景图铺满 + 底部深色渐变遮罩，文字置顶保证可读 */
+.hero__bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.hero__mask {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(7, 40, 20, 0.05) 0%,
+    rgba(7, 40, 20, 0.35) 55%,
+    rgba(7, 40, 20, 0.72) 100%
+  );
+}
+.hero__slide > text {
+  position: relative;
+  z-index: 1;
 }
 .hero__slide--green {
   background: linear-gradient(120deg, #07883b 0%, #25b95a 60%, #41ce69 100%);
