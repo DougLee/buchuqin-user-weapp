@@ -3,7 +3,7 @@
     { "path": "pages/index/index", "style": { "navigationStyle": "custom" } },
     {
       "path": "pages/category/index",
-      "style": { "navigationBarTitleText": "选点好吃的" }
+      "style": { "navigationBarTitleText": "商品" }
     },
     {
       "path": "pages/cart/index",
@@ -61,7 +61,7 @@
     "borderStyle": "white",
     "list": [
       { "pagePath": "pages/index/index", "text": "首页" },
-      { "pagePath": "pages/category/index", "text": "分类" },
+      { "pagePath": "pages/category/index", "text": "商品" },
       { "pagePath": "pages/orders/index", "text": "订单" },
       { "pagePath": "pages/profile/index", "text": "我的" }
     ]

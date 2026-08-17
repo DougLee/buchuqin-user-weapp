@@ -58,6 +58,8 @@ export const api = {
       categories: Category[];
       hotProducts: Product[];
     }>("/home"),
+  /** 商品分类列表（IK97FA：分类页直连，替代 /home 聚合里的分类字段） */
+  categories: () => request<Category[]>("/categories"),
   products: async (categoryId = "all", keyword = "") =>
     (
       await request<PageResult<Product>>(

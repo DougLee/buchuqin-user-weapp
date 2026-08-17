@@ -2,21 +2,25 @@
 import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
-import ProductCard from "../../components/ProductCard.vue";
 import { useCartStore } from "../../stores/cart";
+import { fenToYuan } from "../../utils/money";
 import type { Category, Product } from "../../types";
+const ALL = { id: "all", name: "全部" };
 const active = ref("all"),
   keyword = ref(""),
   categories = ref<Category[]>([]),
   products = ref<Product[]>([]),
   cart = useCartStore();
 async function load() {
-  const h = await api.home();
-  categories.value = h.categories;
   products.value = await api.products(active.value, keyword.value);
 }
 onShow(async () => {
   await cart.load();
+  try {
+    categories.value = await api.categories();
+  } catch {
+    categories.value = (await api.home()).categories;
+  }
   await load();
 });
 async function pick(id: string) {
@@ -25,6 +29,9 @@ async function pick(id: string) {
 }
 const open = (id: string) =>
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
+const currentName = () =>
+  [ALL, ...categories.value].find((c) => c.id === active.value)?.name ||
+  "全部商品";
 </script>
 <template>
   <view class="page"
@@ -35,40 +42,65 @@ const open = (id: string) =>
         confirm-type="search"
         @confirm="load"
       /><button @tap="load">搜索</button></view
-    ><scroll-view scroll-x class="tabs"
-      ><view class="tabs__inner"
+    ><view class="body"
+      ><scroll-view scroll-y class="side"
         ><view
-          v-for="c in categories"
+          v-for="c in [ALL, ...categories]"
           :key="c.id"
-          class="tab"
-          :class="{ 'tab--active': active === c.id }"
+          class="side__item"
+          :class="{ 'side__item--active': active === c.id }"
           @tap="pick(c.id)"
           >{{ c.name }}</view
-        ></view
-      ></scroll-view
-    ><view class="result"
-      ><text class="result__title">{{
-        categories.find((c) => c.id === active)?.name || "全部商品"
-      }}</text
-      ><text class="muted">{{ products.length }} 件可送到寝</text></view
-    ><view class="grid"
-      ><ProductCard
-        v-for="p in products"
-        :key="p.id"
-        :product="p"
-        :quantity="cart.quantity(p.id)"
-        @add="cart.set($event, cart.quantity($event.id) + 1)"
-        @open="open" /></view
+        ></scroll-view
+      ><scroll-view scroll-y class="main"
+        ><view class="main__title">{{ currentName() }}</view
+        ><view v-if="!products.length" class="main__empty muted"
+          >这个分类暂时没货，去看看别的吧</view
+        ><view
+          v-for="p in products"
+          :key="p.id"
+          class="item card"
+          @tap="open(p.id)"
+          ><image
+            class="item__image"
+            :src="p.image"
+            mode="aspectFit"
+            :alt="p.name"
+          /><view class="item__main"
+            ><text class="item__name">{{ p.name }}</text
+            ><text class="item__sub">{{ p.subtitle }}</text
+            ><view class="item__bottom"
+              ><text class="price"
+                ><text class="price__symbol">¥</text
+                >{{ fenToYuan(p.price) }}</text
+              ><button
+                class="add"
+                aria-label="加入购物车"
+                @tap.stop="cart.set(p, cart.quantity(p.id) + 1)"
+              >
+                {{ cart.quantity(p.id) ? cart.quantity(p.id) : "＋" }}
+              </button></view
+            ></view
+          ></view
+        ></scroll-view
+      ></view
   ></view>
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding-bottom: 0;
+}
 .search {
   height: 88rpx;
   display: flex;
   align-items: center;
   padding: 0 8rpx 0 26rpx;
   border: 3rpx solid $primary;
+  flex-shrink: 0;
 }
 .search input {
   flex: 1;
@@ -83,43 +115,103 @@ const open = (id: string) =>
   font-size: 24rpx;
   padding: 0 30rpx;
 }
-.tabs {
-  white-space: nowrap;
-  margin: 28rpx 0;
-}
-.tabs__inner {
+.body {
+  flex: 1;
   display: flex;
-  gap: 14rpx;
+  gap: 20rpx;
+  margin-top: 24rpx;
+  min-height: 0;
 }
-.tab {
-  min-height: 72rpx;
-  padding: 14rpx 30rpx;
-  border-radius: 36rpx;
-  background: #fff;
-  border: 2rpx solid $line;
-  font-weight: 700;
+.side {
+  width: 196rpx;
+  flex-shrink: 0;
+  height: 100%;
+  background: $surface;
+  border-radius: 28rpx;
+  border: 2rpx solid rgba(32, 74, 45, 0.07);
+}
+.side__item {
+  min-height: 96rpx;
   display: flex;
   align-items: center;
+  justify-content: center;
+  padding: 12rpx 16rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: $ink;
+  text-align: center;
+  border-left: 8rpx solid transparent;
 }
-.tab--active {
+.side__item--active {
+  background: $primary-soft;
+  color: $primary-dark;
+  border-left-color: $primary;
+}
+.main {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+}
+.main__title {
+  font-size: 34rpx;
+  font-weight: 900;
+  margin: 6rpx 4rpx 20rpx;
+}
+.main__empty {
+  text-align: center;
+  padding: 80rpx 0;
+  font-size: 26rpx;
+}
+.item {
+  display: flex;
+  padding: 18rpx;
+  margin-bottom: 18rpx;
+  border-radius: 24rpx;
+}
+.item__image {
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: 20rpx;
+  background: $primary-soft;
+  flex-shrink: 0;
+}
+.item__main {
+  flex: 1;
+  margin-left: 18rpx;
+  min-width: 0;
+}
+.item__name {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 800;
+  line-height: 1.4;
+}
+.item__sub {
+  display: block;
+  color: $muted;
+  font-size: 20rpx;
+  margin-top: 4rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16rpx;
+}
+.add {
+  margin: 0;
+  width: 58rpx;
+  height: 58rpx;
+  line-height: 54rpx;
+  padding: 0;
+  border-radius: 50%;
   background: $primary;
   color: #fff;
-  border-color: $primary;
-  box-shadow: 0 8rpx 18rpx rgba(37, 185, 90, 0.2);
-}
-.result {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin: 26rpx 0;
-}
-.result__title {
-  font-size: 38rpx;
   font-weight: 900;
-}
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18rpx;
+  font-size: 32rpx;
+  box-shadow: none;
 }
 </style>
