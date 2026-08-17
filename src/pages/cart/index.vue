@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onShow } from "@dcloudio/uni-app";
 import { useCartStore } from "../../stores/cart";
+import { fenToYuan } from "../../utils/money";
 const cart = useCartStore();
 onShow(() => cart.load());
 const checkout = () => {
@@ -36,7 +37,7 @@ const checkout = () => {
             ><text class="line__name">{{ line.product.name }}</text
             ><text class="line__sub">{{ line.product.subtitle }}</text
             ><view class="line__bottom"
-              ><text class="price">¥{{ line.product.price }}</text
+              ><text class="price">¥{{ fenToYuan(line.product.price) }}</text
               ><view class="counter"
                 ><button @tap="cart.set(line.product, line.quantity - 1)">
                   −</button
@@ -52,7 +53,7 @@ const checkout = () => {
       ><view class="settlement safe-bottom"
         ><view
           ><text class="muted">合计</text
-          ><text class="total">¥{{ cart.cart.productAmount }}</text></view
+          ><text class="total">¥{{ fenToYuan(cart.cart.productAmount) }}</text></view
         ><button class="primary-btn" @tap="checkout">去结算</button></view
       ></template
     ></view

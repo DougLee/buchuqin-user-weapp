@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { fenToYuan } from "../../utils/money";
 import { startPayFlow } from "../../utils/payment";
 import type { Order } from "../../types";
 const orderId = ref(""),
@@ -103,10 +104,11 @@ function afterSale() {
       ><view v-for="line in order.items" :key="line.product.id"
         ><text>{{ line.product.name }} × {{ line.quantity }}</text
         ><text
-          >¥{{ (line.product.price * line.quantity).toFixed(2) }}</text
+          >¥{{ fenToYuan(line.product.price * line.quantity) }}</text
         ></view
       ><view class="summary__total"
-        ><text>实付</text><text>¥{{ order.payableAmount }}</text></view
+        ><text>实付</text
+        ><text>¥{{ fenToYuan(order.payableAmount) }}</text></view
       ></view
     ><button
       v-if="order.status === 'pending-payment'"

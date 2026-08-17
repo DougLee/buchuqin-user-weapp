@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { onHide, onShow, onUnload } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { fenToYuan } from "../../utils/money";
 import { startPayFlow } from "../../utils/payment";
 import type { Order } from "../../types";
 /** 与后端支付超时关单保持一致（15 分钟，Cron + 懒执行） */
@@ -104,7 +105,9 @@ onUnload(stopTicker);
         ></view
       ><view class="order__bottom"
         ><text>{{ order.estimatedArrival }}</text
-        ><text class="order__price">实付 ¥{{ order.payableAmount }}</text></view
+        ><text class="order__price"
+          >实付 ¥{{ fenToYuan(order.payableAmount) }}</text
+        ></view
       ><view
         v-if="order.status === 'pending-payment'"
         class="order__pay"

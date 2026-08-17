@@ -2,8 +2,10 @@
 import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { fenToYuan } from "../../utils/money";
 import { startPayFlow } from "../../utils/payment";
 import type { Address, Cart, UserCoupon } from "../../types";
+/** 结算金额字段单位均为分（契约 API-3），展示统一经 fenToYuan */
 interface Settlement {
   productAmount: number;
   deliveryFee: number;
@@ -30,6 +32,7 @@ const payload = computed<Record<string, unknown>>(() => ({
   deliverySlot: mode.value === "scheduled" ? slot.value : undefined,
   couponId: selectedCoupon.value?.id,
 }));
+/** 门槛判断：商品金额与券门槛同为分值，直接比较 */
 function meetsThreshold(item: UserCoupon) {
   return (cart.value?.productAmount ?? 0) >= item.coupon.threshold;
 }
@@ -72,7 +75,7 @@ async function selectSlot(label: string, available: boolean) {
 async function chooseCoupon(item: UserCoupon | null) {
   if (item && !meetsThreshold(item)) {
     uni.showToast({
-      title: `满 ${item.coupon.threshold} 元才能用这张券`,
+      title: `满 ${fenToYuan(item.coupon.threshold)} 元才能用这张券`,
       icon: "none",
     });
     return;
@@ -157,7 +160,7 @@ async function submit() {
         ><image :src="line.product.image" mode="aspectFit" /><text
           >{{ line.product.name }} × {{ line.quantity }}</text
         ><text
-          >¥{{ (line.product.price * line.quantity).toFixed(2) }}</text
+          >¥{{ fenToYuan(line.product.price * line.quantity) }}</text
         ></view
       ></view
     ><view class="section-title"
@@ -181,7 +184,9 @@ async function submit() {
         ><view class="coupon-opt__info"
           ><text class="coupon-opt__name">{{ item.coupon.name }}</text
           ><text class="coupon-opt__desc"
-          >满 {{ item.coupon.threshold }} 元可用 · 可省 ¥{{ item.coupon.amount }}
+          >满 {{ fenToYuan(item.coupon.threshold) }} 元可用 · 可省 ¥{{
+            fenToYuan(item.coupon.amount)
+          }}
           元</text
           ></view
         ><text class="coupon-opt__mark">✓</text></view
@@ -190,20 +195,25 @@ async function submit() {
       ></view
     ><view v-if="settlement" class="bill card"
       ><view
-        ><text>商品金额</text><text>¥{{ settlement.productAmount }}</text></view
+        ><text>商品金额</text
+        ><text>¥{{ fenToYuan(settlement.productAmount) }}</text></view
       ><view
-        ><text>配送费</text><text>¥{{ settlement.deliveryFee }}</text></view
+        ><text>配送费</text
+        ><text>¥{{ fenToYuan(settlement.deliveryFee) }}</text></view
       ><view class="bill__coupon"
         ><text>{{ selectedCoupon?.coupon.name || "未使用优惠券" }}</text
-        ><text>−¥{{ settlement.discount }}</text></view
+        ><text>−¥{{ fenToYuan(settlement.discount) }}</text></view
       ><view class="bill__total"
-        ><text>合计</text><text>¥{{ settlement.payableAmount }}</text></view
+        ><text>合计</text
+        ><text>¥{{ fenToYuan(settlement.payableAmount) }}</text></view
       ></view
     ><view class="submit safe-bottom"
       ><view
         ><text class="muted">微信支付</text
         ><text class="submit__price"
-          >¥{{ settlement?.payableAmount || "--" }}</text
+          >¥{{
+            settlement ? fenToYuan(settlement.payableAmount) : "--"
+          }}</text
         ></view
       ><button class="primary-btn" :disabled="submitting" @tap="submit">
         {{ submitting ? "正在支付…" : "确认支付" }}

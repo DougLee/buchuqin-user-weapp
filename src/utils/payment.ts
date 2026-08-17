@@ -1,5 +1,6 @@
 import { api } from "../api";
 import type { WechatPayParams } from "../types";
+import { fenToYuan } from "./money";
 
 function requestPayment(params: WechatPayParams): Promise<void> {
   return new Promise((resolve, reject) =>
@@ -16,6 +17,15 @@ function requestPayment(params: WechatPayParams): Promise<void> {
   );
 }
 
+/** 演示通道金额确认：amount 为整数分（契约 API-3），展示文案统一除 100 转元 */
+async function confirmMockPay(amount?: number): Promise<boolean> {
+  const content = amount
+    ? `微信支付未配置，演示通道确认支付 ¥${fenToYuan(amount)}`
+    : "微信支付未配置，走演示通道完成支付";
+  const { confirm } = await uni.showModal({ title: "确认支付", content });
+  return confirm;
+}
+
 /**
  * 支付收银台统一流程（IK8W5R）：
  * 1. POST /payments/wechat/prepay 拿预支付参数
@@ -26,6 +36,8 @@ function requestPayment(params: WechatPayParams): Promise<void> {
 export async function startPayFlow(orderId: string): Promise<boolean> {
   const prepay = await api.prepay(orderId);
   if (prepay.mock || !prepay.payParams) {
+    // 演示通道：确认后才真正扣款，取消则留在待支付（与收银台取消语义一致）
+    if (!(await confirmMockPay(prepay.amount))) return false;
     await api.payOrder(orderId);
     return true;
   }

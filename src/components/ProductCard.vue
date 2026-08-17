@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Product } from "../types";
+import { fenToYuan } from "../utils/money";
 defineProps<{ product: Product; quantity?: number }>();
 const emit = defineEmits<{ add: [Product]; open: [string] }>();
 </script>
@@ -17,7 +18,7 @@ const emit = defineEmits<{ add: [Product]; open: [string] }>();
       ><text class="product__sub">{{ product.subtitle }}</text
       ><view class="product__bottom"
         ><text class="price"
-          ><text class="price__symbol">¥</text>{{ product.price }}</text
+          ><text class="price__symbol">¥</text>{{ fenToYuan(product.price) }}</text
         ><button
           class="add"
           aria-label="加入购物车"

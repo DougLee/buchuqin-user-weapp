@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { useCartStore } from "../../stores/cart";
+import { fenToYuan } from "../../utils/money";
 import type { Product } from "../../types";
 const product = ref<Product>(),
   cart = useCartStore();
@@ -30,8 +31,8 @@ const add = async () => {
         ><text class="info__sub">{{ product.subtitle }}</text
         ><view class="info__price"
           ><text class="price"
-            ><text class="price__symbol">¥</text>{{ product.price }}</text
-          ><text class="original">¥{{ product.originalPrice }}</text
+            ><text class="price__symbol">¥</text>{{ fenToYuan(product.price) }}</text
+          ><text class="original">¥{{ fenToYuan(product.originalPrice) }}</text
           ><text class="sales">已送到 {{ product.sales }} 间寝室</text></view
         ></view
       ><view class="card guarantee"

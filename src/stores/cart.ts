@@ -8,7 +8,8 @@ export const useCartStore = defineStore("cart", {
       items: [],
       productAmount: 0,
       totalQuantity: 0,
-      deliveryThreshold: 10,
+      /** 起送门槛初始占位：10 元 = 1000 分（真实值以 GET /cart 返回为准） */
+      deliveryThreshold: 1000,
     } as Cart,
     loading: false,
   }),

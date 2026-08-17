@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { fenToYuan } from "../../utils/money";
 import type { AfterSale, Refund } from "../../types";
 /** 售后单状态 → 中文（后端值：pending/approved/rejected） */
 const AFTERSALE_STATUS_TEXT: Record<string, string> = {
@@ -25,7 +26,7 @@ onShow(async () => {
   <view class="page"
     ><view class="summary card"
       ><text class="summary__value"
-        >¥{{ refunds.reduce((n, r) => n + r.amount, 0).toFixed(2) }}</text
+        >¥{{ fenToYuan(refunds.reduce((n, r) => n + r.amount, 0)) }}</text
       ><text class="muted">累计退款</text></view
     ><view class="section-title"
       ><text class="section-title__main">售后记录</text></view
@@ -43,7 +44,7 @@ onShow(async () => {
       ><view
         ><text>{{ r.reason }}</text
         ><text class="muted">{{ r.createdAt.slice(0, 10) }}</text></view
-      ><text class="refund__amount">+¥{{ r.amount }}</text></view
+      ><text class="refund__amount">+¥{{ fenToYuan(r.amount) }}</text></view
     ></view
   >
 </template>

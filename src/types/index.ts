@@ -3,7 +3,9 @@ export interface Product {
   categoryId: string;
   name: string;
   subtitle: string;
+  /** 单位：分 */
   price: number;
+  /** 单位：分 */
   originalPrice: number;
   stock: number;
   sales: number;
@@ -21,8 +23,10 @@ export interface CartLine {
 }
 export interface Cart {
   items: CartLine[];
+  /** 单位：分 */
   productAmount: number;
   totalQuantity: number;
+  /** 起送门槛，单位：分 */
   deliveryThreshold: number;
 }
 export interface Address {
@@ -55,6 +59,7 @@ export interface Order {
   statusPhase: OrderStatusPhase;
   statusText: string;
   createdAt: string;
+  /** 以下金额字段单位均为：分 */
   payableAmount: number;
   productAmount: number;
   deliveryFee: number;
@@ -92,7 +97,9 @@ export interface LoginResult {
 export interface Coupon {
   id: string;
   name: string;
+  /** 面额，单位：分 */
   amount: number;
+  /** 使用门槛，单位：分 */
   threshold: number;
   status: string;
   expiresAt: string;
@@ -132,12 +139,14 @@ export interface AfterSale {
 export interface Refund {
   id: string;
   orderId: string;
+  /** 退款金额，单位：分 */
   amount: number;
   reason: string;
   status: string;
   createdAt: string;
 }
 export interface Settlement extends Cart {
+  /** 以下金额字段单位均为：分 */
   deliveryFee: number;
   discount: number;
   payableAmount: number;
@@ -157,6 +166,7 @@ export interface PrepayResult {
   mock: boolean;
   orderId?: string;
   orderNo?: string;
+  /** 支付金额，单位：分 */
   amount?: number;
   hint?: string;
   payParams?: WechatPayParams;
@@ -169,6 +179,7 @@ export interface PaymentStatus {
   statusText: string;
   paid: boolean;
   paidAt: string | null;
+  /** 订单金额，单位：分 */
   amount: number;
   mock: boolean;
 }

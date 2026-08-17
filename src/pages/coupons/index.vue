@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { fenToYuan } from "../../utils/money";
 import type { Coupon, UserCoupon, UserCouponStatus } from "../../types";
 const claimable = ref<Coupon[]>([]),
   mine = ref<UserCoupon[]>([]),
@@ -37,10 +38,11 @@ async function claim(coupon: Coupon) {
         ><text class="section-title__main">可以领的券</text></view
       ><view class="coupon card" v-for="c in claimable" :key="c.id"
         ><view class="coupon__money"
-          ><text class="symbol">¥</text><text>{{ c.amount }}</text></view
+          ><text class="symbol">¥</text
+          ><text>{{ fenToYuan(c.amount) }}</text></view
         ><view class="coupon__body"
           ><text class="coupon__name">{{ c.name }}</text
-          ><text class="muted">满 {{ c.threshold }} 元可用</text
+          ><text class="muted">满 {{ fenToYuan(c.threshold) }} 元可用</text
           ><text class="coupon__date"
           >有效期至 {{ c.expiresAt.slice(0, 10) }}</text
           ></view
@@ -56,14 +58,16 @@ async function claim(coupon: Coupon) {
     ><view v-if="mine.length"
       ><view class="coupon card" v-for="c in mine" :key="c.id"
         ><view class="coupon__money"
-          ><text class="symbol">¥</text><text>{{ c.coupon.amount }}</text></view
+          ><text class="symbol">¥</text
+          ><text>{{ fenToYuan(c.coupon.amount) }}</text></view
         ><view class="coupon__body"
           ><view class="coupon__name-row"
             ><text class="coupon__name">{{ c.coupon.name }}</text
             ><text class="coupon__status" :class="`coupon__status--${c.status}`"
               >{{ statusLabels[c.status] }}</text
             ></view
-          ><text class="muted">满 {{ c.coupon.threshold }} 元可用</text
+          ><text class="muted"
+          >满 {{ fenToYuan(c.coupon.threshold) }} 元可用</text
           ><text class="coupon__date"
           >有效期至 {{ c.coupon.expiresAt.slice(0, 10) }}</text
           ></view
