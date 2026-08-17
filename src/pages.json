@@ -6,10 +6,6 @@
       "style": { "navigationBarTitleText": "商品" }
     },
     {
-      "path": "pages/cart/index",
-      "style": { "navigationBarTitleText": "购物车" }
-    },
-    {
       "path": "pages/orders/index",
       "style": { "navigationBarTitleText": "我的订单" }
     },
@@ -64,7 +60,7 @@
   // 调大字号需改自定义 tabBar（custom: true + custom-tab-bar 组件），本期暂保持原生默认，真机验收。
   "tabBar": {
     "color": "#747b76",
-    "selectedColor": "#18a84c",
+    "selectedColor": "#25b95a",
     "backgroundColor": "#ffffff",
     "borderStyle": "white",
     "list": [

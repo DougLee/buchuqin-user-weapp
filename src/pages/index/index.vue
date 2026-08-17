@@ -21,6 +21,12 @@ const cart = useCartStore(),
   categories = ref<Category[]>([]),
   products = ref<Product[]>([]),
   loading = ref(true);
+/** 分类图标按 id 稳定映射（IK9AWT）：同一分类恒定同图，列表变动或超 6 个不漂移 */
+function categoryImage(id: string): string {
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 997;
+  return categoryImages[h % categoryImages.length];
+}
 /** 地址栏：默认地址的楼栋+寝室；无地址时引导去选择 */
 const addressText = computed(() =>
   defaultAddress.value
@@ -66,13 +72,19 @@ const banners = [
     theme: "dark",
     tag: "楼长招募令",
     title: "本楼楼长虚位以待",
-    sub: "每单提成 + 月度底薪，扫码报名",
+    sub: "每单提成 + 月度底薪，虚位以待",
   },
 ] as const;
 const add = (p: Product) => cart.set(p, cart.quantity(p.id) + 1);
 const open = (id: string) =>
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
 const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
+/** 首页真搜索（IK9AWP）：确认后带关键词去分类页（switchTab 不支持参数，走 storage 传递） */
+const keyword = ref("");
+function search() {
+  uni.setStorageSync("searchKeyword", keyword.value.trim());
+  goCategory();
+}
 </script>
 
 <template>
@@ -87,10 +99,16 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
       ><text>配送至：{{ campus }} · {{ addressText }}</text
       ><text class="down">⌄</text></view
     >
-    <view class="search" @tap="goCategory"
+    <view class="search"
       ><text class="search__glass">⌕</text
-      ><text class="search__hint">搜索商品：请输入商品名称</text
-      ><text class="search__button">搜索</text></view
+      ><input
+        v-model="keyword"
+        class="search__input"
+        placeholder="今天想吃什么？"
+        placeholder-class="search__placeholder"
+        confirm-type="search"
+        @confirm="search"
+      /><text class="search__button" @tap="search">搜索</text></view
     >
     <swiper
       class="hero"
@@ -125,21 +143,19 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
         ><view
           ><text class="delivery__title">⚡ 30-60 分钟到楼</text
           ><text class="delivery__sub"
-            >本楼楼长 王同学 <text class="delivery__online">●</text> 在线</text
+            >本楼楼长 <text class="delivery__online">●</text> 在线接单</text
           ></view
         ><text class="delivery__mark">›</text></view
       ></view
     >
     <view class="categories card"
       ><view
-        v-for="(item, index) in categories"
+        v-for="item in categories"
         :key="item.id"
         class="category"
         @tap="goCategory"
         ><view class="category__image"
-          ><image
-            :src="categoryImages[index % categoryImages.length]"
-            mode="aspectFit" /></view
+          ><image :src="categoryImage(item.id)" mode="aspectFit" /></view
         ><text>{{ item.name === "全部" ? "零食饮料" : item.name }}</text></view
       ></view
     >
@@ -213,11 +229,15 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
   font-size: 40rpx;
   color: $muted;
 }
-.search__hint {
+.search__input {
   flex: 1;
-  color: #707973;
+  color: $ink;
   margin-left: 12rpx;
   font-size: 25rpx;
+  height: 100%;
+}
+.search__placeholder {
+  color: #707973;
 }
 .search__button {
   align-self: stretch;

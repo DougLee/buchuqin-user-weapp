@@ -15,6 +15,13 @@ async function load() {
   products.value = await api.products(active.value, keyword.value);
 }
 onShow(async () => {
+  // 首页搜索关键词传递（IK9AWP）：switchTab 不支持 query，走 storage 携带
+  const kw = (uni.getStorageSync("searchKeyword") as string) || "";
+  if (kw !== keyword.value) {
+    keyword.value = kw;
+    active.value = "all";
+  }
+  uni.removeStorageSync("searchKeyword");
   await cart.load();
   try {
     categories.value = await api.categories();

@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { useSessionStore } from "../../stores/session";
+import { SERVICE_HOURS, SERVICE_PHONE } from "../../utils/service";
 import type { Address } from "../../types";
 const session = useSessionStore(),
   addresses = ref<Address[]>([]),
@@ -19,29 +20,36 @@ const roomSummary = computed(() =>
 );
 onShow(async () => {
   await session.ensureLogin();
-  const [addressList, bundle, notifications, orders] = await Promise.all([
+  // 各请求独立容错（IK9AWK）：部分失败不清零其他栏位
+  const [a, b, n, o] = await Promise.allSettled([
     api.addresses(),
     api.coupons(),
     api.notifications(),
     api.orders(),
   ]);
-  addresses.value = addressList;
-  const now = Date.now();
-  usableCouponCount.value = bundle.mine.filter(
-    (item) =>
-      (item.status === "claimed" || item.status === "released") &&
-      new Date(item.coupon.expiresAt).getTime() > now,
-  ).length;
-  unread.value = notifications.filter((n) => !n.read).length;
-  orderCount.value = orders.length;
+  if (a.status === "fulfilled") addresses.value = a.value;
+  if (b.status === "fulfilled") {
+    const now = Date.now();
+    usableCouponCount.value = b.value.mine.filter(
+      (item) =>
+        (item.status === "claimed" || item.status === "released") &&
+        new Date(item.coupon.expiresAt).getTime() > now,
+    ).length;
+  }
+  if (n.status === "fulfilled")
+    unread.value = n.value.filter((item) => !item.read).length;
+  if (o.status === "fulfilled") orderCount.value = o.value.length;
 });
 const go = (url: string) => uni.navigateTo({ url });
 /** 订单列表是 tabBar 页，跳Tab 需 switchTab */
 const goOrders = () => uni.switchTab({ url: "/pages/orders/index" });
+/** 优惠券/售后列表入口（IK9AWH：原为无入口孤儿页） */
+const goCoupons = () => go("/pages/coupons/index");
+const goAfterSales = () => go("/pages/after-sales/index");
 const goSettings = () => go("/pages/profile/settings");
-/** TODO: 400-100-1000 为演示号，上线前替换为真实客服电话 */
+/** 客服电话统一常量（IK9AWJ，原 400-100-1000 为演示号） */
 const callService = () =>
-  uni.makePhoneCall({ phoneNumber: "400-100-1000" });
+  uni.makePhoneCall({ phoneNumber: SERVICE_PHONE });
 /** 在线客服 H5 降级：button open-type="contact" 仅小程序端可用 */
 const onlineServiceFallback = () =>
   uni.showToast({ title: "请在小程序中使用在线客服", icon: "none" });
@@ -64,13 +72,13 @@ const onlineServiceFallback = () =>
               defaultAddress.buildingName +
               " " +
               defaultAddress.room
-            : "湖北工业大学"
+            : "点击添加寝室地址，楼长才能送到门口"
         }}</text
         ></view
       ></view
     ><view class="motto">“ 今天不出寝，<br />想吃的照样有。 ”</view
     ><view class="stats card"
-      ><view @tap="goOrders"
+      ><view @tap="goCoupons"
         ><text class="stats__value">{{ usableCouponCount }}</text
         ><text class="muted">可用优惠券</text></view
       ><view @tap="goOrders"
@@ -83,11 +91,16 @@ const onlineServiceFallback = () =>
         ><text>{{ unread ? unread + " 条未读" : "全部已读" }}　›</text></view
       ><view @tap="goOrders"
         ><text>我的订单</text><text>查看全部订单　›</text></view
+      ><view @tap="goCoupons"
+        ><text>优惠券</text
+        ><text>{{ usableCouponCount }} 张可用　›</text></view
+      ><view @tap="goAfterSales"
+        ><text>售后与退款</text><text>进度与明细　›</text></view
       ><view @tap="go('/pages/address/index')"
         ><text>寝室地址</text
         ><text>{{ roomSummary || "去添加" }}　›</text></view
       ><view @tap="callService"
-        ><text>电话客服</text><text>每天 09:00-22:30　›</text></view
+        ><text>电话客服</text><text>{{ SERVICE_HOURS }}　›</text></view
       ><!-- #ifdef MP-WEIXIN -->
       <button class="menu__service" open-type="contact">
         <text>在线客服</text>

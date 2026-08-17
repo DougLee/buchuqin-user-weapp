@@ -6,18 +6,29 @@ import { fenToYuan } from "../../utils/money";
 import type { Coupon, UserCoupon, UserCouponStatus } from "../../types";
 const claimable = ref<Coupon[]>([]),
   mine = ref<UserCoupon[]>([]),
-  claiming = ref("");
+  claiming = ref(""),
+  loading = ref(true),
+  error = ref(false);
 const statusLabels: Record<UserCouponStatus, string> = {
   claimed: "未使用",
   locked: "下单锁定",
   used: "已使用",
   released: "已退回",
 };
-onShow(async () => {
-  const bundle = await api.coupons();
-  claimable.value = bundle.claimable;
-  mine.value = bundle.mine;
-});
+onShow(load);
+async function load() {
+  loading.value = true;
+  error.value = false;
+  try {
+    const bundle = await api.coupons();
+    claimable.value = bundle.claimable;
+    mine.value = bundle.mine;
+  } catch {
+    error.value = true;
+  } finally {
+    loading.value = false;
+  }
+}
 async function claim(coupon: Coupon) {
   if (claiming.value) return;
   claiming.value = coupon.id;
@@ -33,6 +44,12 @@ async function claim(coupon: Coupon) {
 </script>
 <template>
   <view class="page"
+    ><view v-if="error" class="cp-retry card" @tap="load"
+      ><text class="cp-retry__title">优惠券加载失败</text
+      ><text class="muted">网络异常，点击重试</text></view
+    ><view v-else-if="loading" class="cp-skeleton"
+      ><view v-for="n in 3" :key="n" class="skeleton-block" /></view
+    ><template v-else
     ><template v-if="claimable.length"
       ><view class="section-title"
         ><text class="section-title__main">可以领的券</text></view
@@ -79,12 +96,17 @@ async function claim(coupon: Coupon) {
         </button></view
       ></view
     ><view v-else class="empty card"
-      ><text>还没有优惠券，先去上面领一张吧</text></view
+      ><text>{{
+        claimable.length
+          ? "还没有优惠券，先去上面领一张吧"
+          : "还没有优惠券，去下单解锁更多福利吧"
+      }}</text></view
     ><view class="rules"
       ><text class="rules__title">使用说明</text
       ><text>· 每笔订单最多使用一张优惠券</text
       ><text>· 优惠券仅限湖北工业大学校园仓商品</text
       ><text>· 退款是否返券以活动规则为准</text></view
+    ></template
     ></view
   >
 </template>
@@ -184,5 +206,27 @@ async function claim(coupon: Coupon) {
   font-size: 30rpx;
   font-weight: 900;
   margin-bottom: 10rpx;
+}
+.cp-retry {
+  padding: 110rpx 30rpx;
+  text-align: center;
+}
+.cp-retry__title {
+  display: block;
+  font-weight: 900;
+  color: $primary-dark;
+  margin-bottom: 8rpx;
+}
+.cp-skeleton .skeleton-block {
+  height: 190rpx;
+  border-radius: 28rpx;
+  margin-bottom: 22rpx;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: cp-pulse 1.2s infinite;
+}
+@keyframes cp-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 </style>
