@@ -40,21 +40,34 @@ function saveNickname() {
   savingNickname.value = false;
   uni.showToast({ title: "昵称已更新（仅本机生效）", icon: "none" });
 }
-/** 手输绑定：H5 常规路径，也是微信授权码失败的降级路径 */
-async function bindPhone() {
-  const res = await uni.showModal({
-    title: "绑定手机号",
-    editable: true,
-    placeholderText: "用于配送联系",
-  });
-  if (!res.confirm) return;
-  const phone = (res.content || "").trim();
+/**
+ * 手机号自定义弹层（IK9AWT）：uni.showModal 的 editable 仅微信小程序支持，
+ * H5 弹出后没有输入框、确认永远提交空串——改为全端自绘弹层。
+ */
+const phoneDialog = ref(false),
+  phoneInput = ref(""),
+  binding = ref(false);
+function bindPhone() {
+  phoneInput.value = session.user?.phone || "";
+  phoneDialog.value = true;
+}
+async function confirmPhone() {
+  if (binding.value) return;
+  const phone = phoneInput.value.trim();
   if (!/^1\d{10}$/.test(phone)) {
     uni.showToast({ title: "手机号格式不正确", icon: "none" });
     return;
   }
-  await session.bindPhone(phone);
-  uni.showToast({ title: "手机号已绑定", icon: "success" });
+  binding.value = true;
+  try {
+    await session.bindPhone(phone);
+    phoneDialog.value = false;
+    uni.showToast({ title: "手机号已绑定", icon: "success" });
+  } catch {
+    uni.showToast({ title: "绑定失败，请重试", icon: "none" });
+  } finally {
+    binding.value = false;
+  }
 }
 // #ifdef MP-WEIXIN
 /** button open-type="getPhoneNumber" 回调（基础库 2.21.0+ 下发动态令牌 code） */
@@ -63,7 +76,7 @@ interface WxPhoneNumberEvent {
 }
 /**
  * 手机号授权绑定（IK8W5Q）：优先把 e.detail.code 交给 POST /auth/phone 换真实号码；
- * 后端 API-3 扩展中、暂只收 phone 直传时该请求会失败——降级回 showModal 手输旧路径
+ * 后端 API-3 扩展中、暂只收 phone 直传时该请求会失败——降级回自绘弹层手输
  * （待后端对齐 code 后移除降级分支）。
  */
 async function onPhoneNumber(event: WxPhoneNumberEvent) {
@@ -73,7 +86,7 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
     await session.bindPhoneByCode(code);
     uni.showToast({ title: "手机号已绑定", icon: "success" });
   } catch {
-    await bindPhone();
+    bindPhone();
   }
 }
 // #endif
@@ -129,7 +142,33 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
       </view
     ><view class="settings__tip"
       ><text>头像暂不支持上传；昵称修改目前仅保存在本机。</text></view
+    ><!-- 手机号自绘弹层（IK9AWT）：全端可用，替代 showModal editable -->
+    ><view v-if="phoneDialog" class="phone-dialog"
+      ><view class="phone-dialog__mask" @tap="phoneDialog = false"></view
+      ><view class="phone-dialog__panel"
+        ><text class="phone-dialog__title">绑定手机号</text
+        ><text class="phone-dialog__tip">用于配送联系，仅你和配送员可见</text
+        ><input
+          v-model="phoneInput"
+          class="phone-dialog__input"
+          type="number"
+          maxlength="11"
+          placeholder="请输入 11 位手机号"
+          placeholder-class="phone-dialog__placeholder"
+        /><view class="phone-dialog__actions"
+        ><button class="phone-dialog__btn" @tap="phoneDialog = false">
+          取消
+        </button
+        ><button
+          class="phone-dialog__btn phone-dialog__btn--primary"
+          :disabled="binding"
+          @tap="confirmPhone"
+        >
+          {{ binding ? "绑定中…" : "确定" }}
+        </button></view
+      ></view
     ></view
+  ></view
   >
 </template>
 <style scoped lang="scss">
@@ -217,7 +256,76 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
 .settings__tip {
   margin-top: 24rpx;
   padding: 0 10rpx;
-  color: #9aa39d;
+  color: $muted;
   font-size: 22rpx;
+}
+.phone-dialog__mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 30, 20, 0.5);
+  z-index: 998;
+}
+.phone-dialog__panel {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 600rpx;
+  z-index: 999;
+  background: $surface;
+  border-radius: 28rpx;
+  padding: 40rpx 32rpx 28rpx;
+  box-sizing: border-box;
+}
+.phone-dialog__title {
+  display: block;
+  text-align: center;
+  font-size: 34rpx;
+  font-weight: 900;
+}
+.phone-dialog__tip {
+  display: block;
+  text-align: center;
+  font-size: 23rpx;
+  margin: 10rpx 0 28rpx;
+}
+.phone-dialog__input {
+  height: 92rpx;
+  border: 2rpx solid $line;
+  border-radius: 18rpx;
+  background: $paper;
+  padding: 0 24rpx;
+  font-size: 32rpx;
+  text-align: center;
+  letter-spacing: 2rpx;
+}
+.phone-dialog__placeholder {
+  color: #8a938d;
+  letter-spacing: 0;
+}
+.phone-dialog__actions {
+  display: flex;
+  gap: 18rpx;
+  margin-top: 28rpx;
+}
+.phone-dialog__btn {
+  flex: 1;
+  min-height: 88rpx;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 44rpx;
+  background: $paper;
+  color: $ink;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+.phone-dialog__btn--primary {
+  background: $primary;
+  color: #fff;
+}
+.phone-dialog__btn--primary[disabled] {
+  opacity: 0.55;
 }
 </style>

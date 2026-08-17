@@ -10,9 +10,20 @@ const active = ref("all"),
   keyword = ref(""),
   categories = ref<Category[]>([]),
   products = ref<Product[]>([]),
+  loading = ref(true),
+  error = ref(false),
   cart = useCartStore();
+/** 商品列表三态（IK9AWK）：加载骨架 / 失败重试 / 列表 */
 async function load() {
-  products.value = await api.products(active.value, keyword.value);
+  loading.value = true;
+  error.value = false;
+  try {
+    products.value = await api.products(active.value, keyword.value);
+  } catch {
+    error.value = true;
+  } finally {
+    loading.value = false;
+  }
 }
 onShow(async () => {
   // 首页搜索关键词传递（IK9AWP）：switchTab 不支持 query，走 storage 携带
@@ -26,7 +37,12 @@ onShow(async () => {
   try {
     categories.value = await api.categories();
   } catch {
-    categories.value = (await api.home()).categories;
+    // 分类接口失败先退 home 接口；再失败侧栏仅剩「全部」，商品区由 load 三态兜底
+    try {
+      categories.value = (await api.home()).categories;
+    } catch {
+      categories.value = [];
+    }
   }
   await load();
 });
@@ -61,34 +77,59 @@ const currentName = () =>
         ></scroll-view
       ><scroll-view scroll-y class="main"
         ><view class="main__title">{{ currentName() }}</view
-        ><view v-if="!products.length" class="main__empty muted"
-          >这个分类暂时没货，去看看别的吧</view
-        ><view
-          v-for="p in products"
-          :key="p.id"
-          class="item card"
-          @tap="open(p.id)"
-          ><image
-            class="item__image"
-            :src="p.image"
-            mode="aspectFit"
-            :alt="p.name"
-          /><view class="item__main"
-            ><text class="item__name">{{ p.name }}</text
-            ><text class="item__sub">{{ p.subtitle }}</text
-            ><view class="item__bottom"
-              ><text class="price"
-                ><text class="price__symbol">¥</text
-                >{{ fenToYuan(p.price) }}</text
-              ><button
-                class="add"
-                aria-label="加入购物车"
-                @tap.stop="cart.set(p, cart.quantity(p.id) + 1)"
-              >
-                {{ cart.quantity(p.id) ? cart.quantity(p.id) : "＋" }}
-              </button></view
+        ><view v-if="error" class="cat-retry card" @tap="load"
+          ><text class="cat-retry__title">商品加载失败</text
+          ><text class="muted">网络异常，点击重试</text></view
+        ><view v-else-if="loading" class="cat-skeleton"
+          ><view v-for="n in 4" :key="n" class="cat-skeleton__block" /></view
+        ><template v-else
+          ><view v-if="!products.length" class="main__empty muted"
+            >这个分类暂时没货，去看看别的吧</view
+          ><view
+            v-for="p in products"
+            :key="p.id"
+            class="item card"
+            @tap="open(p.id)"
+            ><image
+              class="item__image"
+              :src="p.image"
+              mode="aspectFit"
+              :alt="p.name"
+            /><view class="item__main"
+              ><text class="item__name">{{ p.name }}</text
+              ><text class="item__sub">{{ p.subtitle }}</text
+              ><view class="item__bottom"
+                ><text class="price"
+                  ><text class="price__symbol">¥</text
+                  >{{ fenToYuan(p.price) }}</text
+                ><!-- 计数器（IK9AWL）：数量>0 时展开 − n ＋，数字不再是隐形加号 -->
+                ><view v-if="cart.quantity(p.id)" class="counter" @tap.stop
+                  ><button
+                    class="counter__btn counter__btn--minus"
+                    aria-label="减少一件"
+                    @tap.stop="cart.set(p, cart.quantity(p.id) - 1)"
+                  >
+                    −
+                  </button
+                  ><text class="counter__num">{{ cart.quantity(p.id) }}</text
+                  ><button
+                    class="counter__btn"
+                    aria-label="增加一件"
+                    @tap.stop="cart.set(p, cart.quantity(p.id) + 1)"
+                  >
+                    ＋
+                  </button></view
+                ><button
+                  v-else
+                  class="add"
+                  aria-label="加入购物车"
+                  @tap.stop="cart.set(p, cart.quantity(p.id) + 1)"
+                >
+                  ＋
+                </button></view
+              ></view
             ></view
-          ></view
+          ></template
         ></scroll-view
       ></view
     ><CartOverlay /></view
@@ -197,7 +238,7 @@ const currentName = () =>
 .item__sub {
   display: block;
   color: $muted;
-  font-size: 20rpx;
+  font-size: 22rpx;
   margin-top: 4rpx;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -209,17 +250,66 @@ const currentName = () =>
   justify-content: space-between;
   margin-top: 16rpx;
 }
-.add {
+/* 触控热区（IK9AWL）：64rpx 视觉 + 透明外圈 ::after ≈ 88rpx 命中 */
+.add,
+.counter__btn {
   margin: 0;
-  width: 58rpx;
-  height: 58rpx;
-  line-height: 54rpx;
+  width: 64rpx;
+  height: 64rpx;
+  line-height: 60rpx;
   padding: 0;
   border-radius: 50%;
   background: $primary;
   color: #fff;
   font-weight: 900;
-  font-size: 32rpx;
+  font-size: 34rpx;
   box-shadow: none;
+  position: relative;
+}
+.add::after,
+.counter__btn::after {
+  content: "";
+  position: absolute;
+  left: -12rpx;
+  top: -12rpx;
+  right: -12rpx;
+  bottom: -12rpx;
+}
+.counter {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+}
+.counter__btn--minus {
+  background: $primary-soft;
+  color: $primary-dark;
+}
+.counter__num {
+  min-width: 40rpx;
+  text-align: center;
+  font-size: 28rpx;
+  font-weight: 900;
+}
+.cat-retry {
+  padding: 110rpx 30rpx;
+  text-align: center;
+}
+.cat-retry__title {
+  display: block;
+  font-weight: 900;
+  color: $primary-dark;
+  margin-bottom: 8rpx;
+}
+.cat-skeleton__block {
+  height: 190rpx;
+  border-radius: 24rpx;
+  margin-bottom: 18rpx;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: cat-pulse 1.2s infinite;
+}
+@keyframes cat-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 </style>

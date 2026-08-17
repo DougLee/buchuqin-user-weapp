@@ -60,11 +60,18 @@ onUnmounted(() => uni.$off(EVENT, open));
               ><text class="price"
                 ><text class="price__symbol">¥</text
                 >{{ fenToYuan(line.product.price) }}</text
+              ><!-- 数量读写走 cart.quantity()（IK9AWM）：连点时读到 pending 新值，不用服务端旧值 -->
               ><view class="counter"
-                ><button @tap="cart.set(line.product, line.quantity - 1)">
+                ><button
+                  aria-label="减少一件"
+                  @tap="cart.set(line.product, cart.quantity(line.product.id) - 1)"
+                >
                   −</button
-                ><text>{{ line.quantity }}</text
-                ><button @tap="cart.set(line.product, line.quantity + 1)">
+                ><text>{{ cart.quantity(line.product.id) }}</text
+                ><button
+                  aria-label="增加一件"
+                  @tap="cart.set(line.product, cart.quantity(line.product.id) + 1)"
+                >
                   ＋
                 </button></view
               ></view
@@ -196,17 +203,32 @@ onUnmounted(() => uni.$off(EVENT, open));
 .counter {
   display: flex;
   align-items: center;
-  gap: 18rpx;
+  gap: 10rpx;
 }
+/* 触控热区（IK9AWL）：64rpx 视觉 + 透明外圈 ::after ≈ 88rpx 命中 */
 .counter button {
-  width: 60rpx;
-  height: 60rpx;
-  line-height: 56rpx;
+  position: relative;
+  width: 64rpx;
+  height: 64rpx;
+  line-height: 60rpx;
   padding: 0;
   margin: 0;
   border-radius: 50%;
   background: $primary-soft;
   color: $primary-dark;
+  font-weight: 900;
+}
+.counter button::after {
+  content: "";
+  position: absolute;
+  left: -12rpx;
+  top: -12rpx;
+  right: -12rpx;
+  bottom: -12rpx;
+}
+.counter text {
+  min-width: 44rpx;
+  text-align: center;
   font-weight: 900;
 }
 .cart-overlay__footer {

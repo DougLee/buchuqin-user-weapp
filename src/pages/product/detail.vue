@@ -4,27 +4,62 @@ import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
+import { SERVICE_PHONE } from "../../utils/service";
 import type { Product } from "../../types";
 const product = ref<Product>(),
-  cart = useCartStore();
+  cart = useCartStore(),
+  productId = ref(""),
+  loading = ref(true),
+  error = ref(false);
 onLoad(async (q) => {
+  productId.value = String(q?.id || "");
   await cart.load();
-  product.value = await api.product(String(q?.id || "p001"));
+  await load();
 });
-const add = async () => {
-  if (product.value) {
-    await cart.set(product.value, cart.quantity(product.value.id) + 1);
-    uni.showToast({ title: "已放进购物车", icon: "success" });
+/** 详情三态（IK9AWK）：加载骨架 / 失败重试 / 内容；无 id 视为链接无效 */
+async function load() {
+  if (!productId.value) {
+    error.value = true;
+    loading.value = false;
+    return;
   }
+  loading.value = true;
+  error.value = false;
+  try {
+    product.value = await api.product(productId.value);
+  } catch {
+    error.value = true;
+  } finally {
+    loading.value = false;
+  }
+}
+const add = async () => {
+  if (!product.value) return;
+  const ok = await cart.set(
+    product.value,
+    cart.quantity(product.value.id) + 1,
+  );
+  if (ok) uni.showToast({ title: "已放进购物车", icon: "success" });
 };
 // 跨工位契约：购物车悬浮窗由工位 B 全局挂载，emit open-cart 唤起，不 import 组件
 const openCart = () => uni.$emit("open-cart");
-// H5 端客服占位（小程序端走 button open-type="contact"）
-const onService = () =>
-  uni.showToast({ title: "客服功能即将上线", icon: "none" });
+// H5 端无 contact 能力，直接拨客服电话（IK9AWJ）
+const onService = () => uni.makePhoneCall({ phoneNumber: SERVICE_PHONE });
 </script>
 <template>
-  <view v-if="product" class="detail"
+  <view v-if="error" class="detail-error card" @tap="load"
+    ><text class="detail-error__title">商品加载失败</text
+    ><text class="muted">网络异常或商品已下架，点击重试</text></view
+  >
+  <view v-else-if="loading || !product" class="detail"
+    ><!-- 加载骨架（IK9AWK） -->
+    ><view class="visual detail-skeleton__visual" /><view class="content"
+      ><view class="card detail-skeleton__block" /><view
+        class="card detail-skeleton__block detail-skeleton__block--short"
+      /></view
+    ></view
+  >
+  <view v-else class="detail"
     ><view class="visual"
       ><image :src="product.image" mode="aspectFit" :alt="product.name" /><text
         class="visual__tag"
@@ -55,14 +90,7 @@ const onService = () =>
           ><text class="guarantee__title">最快 30 分钟</text
           ><text class="muted">楼长送到寝室</text></view
         ></view
-      ><view class="showcase card"
-        ><view class="showcase__figure"
-          ><text class="showcase__badge">商品演示</text
-          ><text class="showcase__figure-title">{{ product.name }}</text></view
-        ><text class="showcase__title">开袋这一刻，快乐值拉满</text
-        ><text class="muted showcase__desc"
-          >{{ product.subtitle }}。从校园仓到你的寝室门口全程保温保脆，熬夜复习、追剧加餐、寝室分享都合适；分量刚好一人解馋、两人分也不打架。</text
-        ></view
+      ><!-- 假「商品演示」卡已摘除（IK9AWT）：占位图+生成文案冒充商品信息，仅保留真实流程说明（下方 story） -->
       ><view class="story"
         ><text class="story__eyebrow">今晚的快乐很简单</text
         ><text class="story__title">不用换鞋，不用下楼。</text
@@ -182,47 +210,6 @@ const onService = () =>
 .story {
   padding: 48rpx 10rpx;
 }
-.showcase {
-  margin-top: 22rpx;
-  padding: 26rpx;
-}
-.showcase__figure {
-  height: 320rpx;
-  border-radius: 24rpx;
-  background: linear-gradient(135deg, $primary-soft 0%, #c8efd2 55%, $primary 130%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16rpx;
-  position: relative;
-  overflow: hidden;
-}
-.showcase__badge {
-  background: rgba(255, 255, 255, 0.9);
-  color: $primary-dark;
-  font-size: 22rpx;
-  font-weight: 800;
-  padding: 8rpx 20rpx;
-  border-radius: 24rpx;
-}
-.showcase__figure-title {
-  font-size: 34rpx;
-  font-weight: 900;
-  color: $primary-dark;
-  padding: 0 40rpx;
-  text-align: center;
-}
-.showcase__title {
-  display: block;
-  font-size: 32rpx;
-  font-weight: 900;
-  margin: 24rpx 0 10rpx;
-}
-.showcase__desc {
-  display: block;
-  line-height: 1.7;
-}
 .story__eyebrow {
   color: $primary-dark;
   font-weight: 800;
@@ -260,5 +247,32 @@ const onService = () =>
 }
 .bottom .primary-btn {
   flex: 1;
+}
+.detail-error {
+  margin: 28rpx;
+  padding: 160rpx 30rpx;
+  text-align: center;
+}
+.detail-error__title {
+  display: block;
+  font-weight: 900;
+  color: $primary-dark;
+  margin-bottom: 8rpx;
+}
+.detail-skeleton__visual {
+  animation: detail-pulse 1.2s infinite;
+}
+.detail-skeleton__block {
+  height: 260rpx;
+  margin-top: 22rpx;
+  animation: detail-pulse 1.2s infinite;
+}
+.detail-skeleton__block--short {
+  height: 160rpx;
+}
+@keyframes detail-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 </style>

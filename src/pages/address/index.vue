@@ -145,12 +145,18 @@ async function makeDefault(a: Address) {
 .address__actions {
   display: flex;
   justify-content: flex-end;
-  gap: 34rpx;
+  gap: 10rpx;
   margin-top: 22rpx;
   padding-top: 20rpx;
   border-top: 2rpx dashed $line;
 }
+/* 操作热区（IK9AWL）：文字链升级为 ≥88rpx 命中块，避免误触相邻操作 */
 .address__action {
+  min-width: 128rpx;
+  min-height: 88rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 25rpx;
   font-weight: 700;
   color: $primary-dark;

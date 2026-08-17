@@ -76,6 +76,8 @@ const banners = [
   },
 ] as const;
 const add = (p: Product) => cart.set(p, cart.quantity(p.id) + 1);
+/** 计数器减件（IK9AWL）：ProductCard 数量>0 时展开 − n ＋ */
+const remove = (p: Product) => cart.set(p, cart.quantity(p.id) - 1);
 const open = (id: string) =>
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
 const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
@@ -172,6 +174,7 @@ function search() {
         :product="p"
         :quantity="cart.quantity(p.id)"
         @add="add"
+        @remove="remove"
         @open="open"
     /></view>
   ></view

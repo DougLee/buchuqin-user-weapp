@@ -60,7 +60,14 @@ button {
     background-color 0.2s ease,
     border-color 0.2s ease,
     box-shadow 0.2s ease,
-    opacity 0.2s ease;
+    opacity 0.2s ease,
+    transform 0.12s ease;
+}
+/* 按压反馈（IK9AWT）：小程序按钮有原生 hover-class，H5 端用 :active 补齐触觉确认 */
+button:active,
+.primary-btn:active {
+  transform: scale(0.97);
+  opacity: 0.85;
 }
 .muted {
   color: #667069 !important;

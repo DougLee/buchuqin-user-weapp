@@ -204,7 +204,7 @@ async function save() {
   font-weight: 700;
 }
 .picker--empty {
-  color: #9aa39d;
+  color: $muted;
   font-weight: 400;
 }
 .picker__arrow {
