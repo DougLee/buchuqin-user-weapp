@@ -113,6 +113,11 @@ export const api = {
     request<PaymentStatus>(`/payments/${orderId}/status`),
   orders: async (status = "all") =>
     (await request<PageResult<Order>>(`/orders?status=${status}`)).items,
+  /** 订单分页契约（IK9AWO）：滚动加载用，返回完整信封 {items,total,page,pageSize} */
+  ordersPage: (status = "all", page = 1, pageSize = 20) =>
+    request<PageResult<Order>>(
+      `/orders?status=${status}&page=${page}&pageSize=${pageSize}`,
+    ),
   order: (id: string) => request<Order>(`/orders/${id}`),
   cancelOrder: (id: string) =>
     request<Order>(`/orders/${id}/cancel`, { method: "POST" }),
@@ -126,6 +131,17 @@ export const api = {
   /** 同 /addresses：解包分页信封 */
   notifications: async () =>
     (await request<PageResult<Notification>>("/notifications")).items,
+  /** 消息分页契约（IK9AWO）：滚动加载用 */
+  notificationsPage: (page = 1, pageSize = 20) =>
+    request<PageResult<Notification>>(
+      `/notifications?page=${page}&pageSize=${pageSize}`,
+    ),
+  /** 全部已读（IK9AWO）：POST /notifications/read-all */
+  readAllNotifications: () =>
+    request<{ updated: number }>("/notifications/read-all", {
+      method: "POST",
+      data: {},
+    }),
   readNotification: (id: string) =>
     request<Notification>(`/notifications/${id}/read`, { method: "POST" }),
 };
