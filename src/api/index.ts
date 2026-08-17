@@ -72,7 +72,9 @@ export const api = {
   cart: () => request<Cart>("/cart"),
   updateCart: (items: Array<{ productId: string; quantity: number }>) =>
     request<Cart>("/cart", { method: "PUT", data: { items } }),
-  addresses: () => request<Address[]>("/addresses"),
+  /** 后端 /addresses 返回 {items,page,pageSize,total} 分页信封，这里解包成数组供页面直接用 */
+  addresses: async () =>
+    (await request<PageResult<Address>>("/addresses")).items,
   addAddress: (data: Record<string, unknown>) =>
     request<Address>("/addresses", { method: "POST", data }),
   updateAddress: (id: string, data: Record<string, unknown>) =>
@@ -121,7 +123,9 @@ export const api = {
     request<AfterSale>(`/orders/${id}/after-sales`, { method: "POST", data }),
   afterSales: () => request<AfterSale[]>("/after-sales"),
   refunds: () => request<Refund[]>("/refunds"),
-  notifications: () => request<Notification[]>("/notifications"),
+  /** 同 /addresses：解包分页信封 */
+  notifications: async () =>
+    (await request<PageResult<Notification>>("/notifications")).items,
   readNotification: (id: string) =>
     request<Notification>(`/notifications/${id}/read`, { method: "POST" }),
 };
