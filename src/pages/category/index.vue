@@ -6,6 +6,9 @@ import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
 import type { Category, Product } from "../../types";
 const ALL = { id: "all", name: "全部" };
+/** 侧栏只留本地「全部」（接口数据里也带一个「全部」，不过滤会显示两个） */
+const dedupeAll = (list: Category[]) =>
+  list.filter((c) => c.id !== ALL.id && c.name !== ALL.name);
 const active = ref("all"),
   keyword = ref(""),
   categories = ref<Category[]>([]),
@@ -35,11 +38,11 @@ onShow(async () => {
   uni.removeStorageSync("searchKeyword");
   await cart.load();
   try {
-    categories.value = await api.categories();
+    categories.value = dedupeAll(await api.categories());
   } catch {
     // 分类接口失败先退 home 接口；再失败侧栏仅剩「全部」，商品区由 load 三态兜底
     try {
-      categories.value = (await api.home()).categories;
+      categories.value = dedupeAll((await api.home()).categories);
     } catch {
       categories.value = [];
     }
