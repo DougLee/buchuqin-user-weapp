@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { startPayFlow } from "../../utils/payment";
 import type { Address, Cart, UserCoupon } from "../../types";
 interface Settlement {
   productAmount: number;
@@ -84,8 +85,20 @@ async function submit() {
   submitting.value = true;
   try {
     const created = await api.createOrder(payload.value);
-    const paid = await api.payOrder(created.id);
-    uni.redirectTo({ url: `/pages/orders/detail?id=${paid.id}` });
+    let paid = false;
+    try {
+      paid = await startPayFlow(created.id);
+    } catch {
+      // 支付请求异常不吞掉订单：落到详情页继续支付，不留死路
+    }
+    uni.showToast({
+      title: paid ? "支付成功" : "支付未完成，可继续支付",
+      icon: paid ? "success" : "none",
+    });
+    setTimeout(
+      () => uni.redirectTo({ url: `/pages/orders/detail?id=${created.id}` }),
+      500,
+    );
   } finally {
     submitting.value = false;
   }
@@ -188,7 +201,7 @@ async function submit() {
       ></view
     ><view class="submit safe-bottom"
       ><view
-        ><text class="muted">微信支付（联调测试通道）</text
+        ><text class="muted">微信支付</text
         ><text class="submit__price"
           >¥{{ settlement?.payableAmount || "--" }}</text
         ></view

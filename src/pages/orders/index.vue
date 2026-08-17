@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onHide, onShow, onUnload } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { startPayFlow } from "../../utils/payment";
 import type { Order } from "../../types";
+/** 与后端支付超时关单保持一致（15 分钟，Cron + 懒执行） */
+const PAY_WINDOW_MS = 15 * 60 * 1000;
 const orders = ref<Order[]>([]),
-  active = ref("all");
+  active = ref("all"),
+  now = ref(Date.now()),
+  paying = ref(""),
+  ticker = ref<number>();
 const tabs = [
   ["all", "全部"],
   ["pending-payment", "待支付"],
@@ -17,7 +23,48 @@ async function load(status = "all") {
   active.value = status;
   orders.value = await api.orders(status);
 }
-onShow(() => load(active.value));
+function startTicker() {
+  // 定时刷新"待支付剩余时间"展示
+  if (!ticker.value)
+    ticker.value = setInterval(() => (now.value = Date.now()), 30_000);
+}
+function stopTicker() {
+  if (ticker.value) {
+    clearInterval(ticker.value);
+    ticker.value = undefined;
+  }
+}
+function countdownText(order: Order): string {
+  const remaining =
+    new Date(order.createdAt).getTime() + PAY_WINDOW_MS - now.value;
+  if (remaining <= 0) return "支付超时，订单即将关闭";
+  const minutes = Math.floor(remaining / 60_000),
+    seconds = Math.floor((remaining % 60_000) / 1000);
+  return `剩 ${minutes}:${String(seconds).padStart(2, "0")} 自动关闭`;
+}
+async function pay(order: Order) {
+  if (paying.value) return;
+  paying.value = order.id;
+  try {
+    const paid = await startPayFlow(order.id);
+    if (paid) {
+      uni.showToast({ title: "支付成功", icon: "success" });
+      await load(active.value);
+    } else {
+      // 取消/失败：跳详情页提供"继续支付"入口，不留死路
+      uni.showToast({ title: "支付未完成，可继续支付", icon: "none" });
+      uni.navigateTo({ url: `/pages/orders/detail?id=${order.id}` });
+    }
+  } finally {
+    paying.value = "";
+  }
+}
+onShow(() => {
+  startTicker();
+  load(active.value);
+});
+onHide(stopTicker);
+onUnload(stopTicker);
 </script>
 <template>
   <view class="page"
@@ -56,6 +103,18 @@ onShow(() => load(active.value));
       ><view class="order__bottom"
         ><text>{{ order.estimatedArrival }}</text
         ><text class="order__price">实付 ¥{{ order.payableAmount }}</text></view
+      ><view
+        v-if="order.status === 'pending-payment'"
+        class="order__pay"
+        @tap.stop
+        ><text class="order__countdown">{{ countdownText(order) }}</text
+        ><button
+          class="order__pay-btn"
+          :disabled="paying === order.id"
+          @tap="pay(order)"
+        >
+          {{ paying === order.id ? "正在支付…" : "去支付" }}
+        </button></view
       ></view
     ></view
   >
@@ -129,6 +188,31 @@ onShow(() => load(active.value));
 .order__price {
   font-weight: 900;
   color: #ff4d18;
+}
+.order__pay {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+.order__countdown {
+  font-size: 22rpx;
+  color: #b1560f;
+}
+.order__pay-btn {
+  min-height: 64rpx;
+  line-height: 64rpx;
+  margin: 0;
+  padding: 0 34rpx;
+  background: $primary;
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 800;
+  border-radius: 32rpx;
+}
+.order__pay-btn[disabled] {
+  opacity: 0.6;
 }
 .empty {
   text-align: center;

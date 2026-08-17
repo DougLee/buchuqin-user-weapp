@@ -129,3 +129,32 @@ export interface Settlement extends Cart {
   payableAmount: number;
   estimatedArrival: string;
 }
+/** 微信支付收银台参数（prepay mock:false 时下发） */
+export interface WechatPayParams {
+  appId: string;
+  timeStamp: string;
+  nonceStr: string;
+  package: string;
+  signType: string;
+  paySign: string;
+}
+/** POST /payments/wechat/prepay 响应：mock=true 表示微信支付未配置，走 /orders/:id/pay 演示通道 */
+export interface PrepayResult {
+  mock: boolean;
+  orderId?: string;
+  orderNo?: string;
+  amount?: number;
+  hint?: string;
+  payParams?: WechatPayParams;
+}
+/** GET /payments/:orderId/status 响应 */
+export interface PaymentStatus {
+  orderId: string;
+  orderNo: string;
+  status: string;
+  statusText: string;
+  paid: boolean;
+  paidAt: string | null;
+  amount: number;
+  mock: boolean;
+}

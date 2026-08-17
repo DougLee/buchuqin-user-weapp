@@ -8,6 +8,8 @@ import type {
   LoginResult,
   Notification,
   Order,
+  PaymentStatus,
+  PrepayResult,
   Product,
   Refund,
   SessionUser,
@@ -79,6 +81,14 @@ export const api = {
     request<Order>("/orders", { method: "POST", data }),
   payOrder: (id: string) =>
     request<Order>(`/orders/${id}/pay`, { method: "POST" }),
+  /** 微信预支付：mock=true 表示商户 env 未配置（前端改走 /orders/:id/pay 演示通道） */
+  prepay: (orderId: string) =>
+    request<PrepayResult>("/payments/wechat/prepay", {
+      method: "POST",
+      data: { orderId },
+    }),
+  paymentStatus: (orderId: string) =>
+    request<PaymentStatus>(`/payments/${orderId}/status`),
   orders: async (status = "all") =>
     (await request<PageResult<Order>>(`/orders?status=${status}`)).items,
   order: (id: string) => request<Order>(`/orders/${id}`),
