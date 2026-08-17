@@ -7,7 +7,7 @@
     },
     {
       "path": "pages/cart/index",
-      "style": { "navigationBarTitleText": "寝室购物袋" }
+      "style": { "navigationBarTitleText": "购物车" }
     },
     {
       "path": "pages/orders/index",

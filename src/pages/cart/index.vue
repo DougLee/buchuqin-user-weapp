@@ -11,8 +11,8 @@ const checkout = () => {
 <template>
   <view class="page"
     ><view v-if="!cart.cart.items.length" class="empty"
-      ><view class="empty__bag">袋</view
-      ><text class="empty__title">购物袋还空着</text
+      ><view class="empty__bag">车</view
+      ><text class="empty__title">购物车还空着</text
       ><text class="muted">去挑点今晚想吃的吧</text
       ><button
         class="primary-btn"
@@ -22,7 +22,7 @@ const checkout = () => {
       </button></view
     ><template v-else
       ><view class="cart-head"
-        ><text>寝室购物袋</text
+        ><text>购物车</text
         ><text class="muted">{{ cart.cart.totalQuantity }} 件</text></view
       ><view class="cart-list card"
         ><view
@@ -56,7 +56,7 @@ const checkout = () => {
           ><text class="total">¥{{ fenToYuan(cart.cart.productAmount) }}</text></view
         ><button class="primary-btn" @tap="checkout">去结算</button></view
       ></template
-    ></view
+    ><CartOverlay /></view
   >
 </template>
 <style scoped lang="scss">

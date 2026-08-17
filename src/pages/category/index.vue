@@ -84,7 +84,8 @@ const currentName = () =>
           ></view
         ></scroll-view
       ></view
-  ></view>
+    ><CartOverlay /></view
+  >
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
