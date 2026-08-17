@@ -17,6 +17,11 @@ const add = async () => {
     uni.showToast({ title: "已放进购物袋", icon: "success" });
   }
 };
+// 跨工位契约：购物车悬浮窗由工位 B 全局挂载，emit open-cart 唤起，不 import 组件
+const openCart = () => uni.$emit("open-cart");
+// H5 端客服占位（小程序端走 button open-type="contact"）
+const onService = () =>
+  uni.showToast({ title: "客服功能即将上线", icon: "none" });
 </script>
 <template>
   <view v-if="product" class="detail"
@@ -24,7 +29,15 @@ const add = async () => {
       ><image :src="product.image" mode="aspectFit" :alt="product.name" /><text
         class="visual__tag"
         >{{ product.tag }}</text
-      ></view
+      ><!-- #ifdef MP-WEIXIN --><button
+        class="service"
+        open-type="contact"
+        >客服</button
+      ><!-- #endif --><!-- #ifndef MP-WEIXIN --><button
+        class="service"
+        @tap="onService"
+        >客服</button
+      ><!-- #endif --></view
     ><view class="content"
       ><view class="card info"
         ><text class="info__name">{{ product.name }}</text
@@ -32,16 +45,23 @@ const add = async () => {
         ><view class="info__price"
           ><text class="price"
             ><text class="price__symbol">¥</text>{{ fenToYuan(product.price) }}</text
-          ><text class="original">¥{{ fenToYuan(product.originalPrice) }}</text
-          ><text class="sales">已送到 {{ product.sales }} 间寝室</text></view
+          ><text class="original">¥{{ fenToYuan(product.originalPrice) }}</text></view
         ></view
       ><view class="card guarantee"
         ><view
           ><text class="guarantee__title">校园仓现货</text
-          ><text class="muted">库存 {{ product.stock }} 件</text></view
+          ><text class="muted">仓里常备，随点随有</text></view
         ><view
           ><text class="guarantee__title">最快 30 分钟</text
           ><text class="muted">楼长送到寝室</text></view
+        ></view
+      ><view class="showcase card"
+        ><view class="showcase__figure"
+          ><text class="showcase__badge">商品演示</text
+          ><text class="showcase__figure-title">{{ product.name }}</text></view
+        ><text class="showcase__title">开袋这一刻，快乐值拉满</text
+        ><text class="muted showcase__desc"
+          >{{ product.subtitle }}。从校园仓到你的寝室门口全程保温保脆，熬夜复习、追剧加餐、寝室分享都合适；分量刚好一人解馋、两人分也不打架。</text
         ></view
       ><view class="story"
         ><text class="story__eyebrow">今晚的快乐很简单</text
@@ -51,7 +71,7 @@ const add = async () => {
         ></view
       ></view
     ><view class="bottom safe-bottom"
-      ><button class="bag" @tap="uni.switchTab({ url: '/pages/cart/index' })">
+      ><button class="bag" @tap="openCart">
         购物袋 {{ cart.cart.totalQuantity || "" }}</button
       ><button class="primary-btn" @tap="add">加入购物袋</button></view
     ></view
@@ -119,10 +139,27 @@ const add = async () => {
   text-decoration: line-through;
   color: #667069;
 }
-.sales {
-  margin-left: auto;
-  font-size: 22rpx;
-  color: #667069;
+.service {
+  position: absolute;
+  left: 24rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  color: $primary-dark;
+  font-size: 24rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  box-shadow: 0 8rpx 22rpx rgba(21, 75, 38, 0.16);
+}
+.service::after {
+  border: none;
 }
 .guarantee {
   display: grid;
@@ -143,6 +180,47 @@ const add = async () => {
 }
 .story {
   padding: 48rpx 10rpx;
+}
+.showcase {
+  margin-top: 22rpx;
+  padding: 26rpx;
+}
+.showcase__figure {
+  height: 320rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, $primary-soft 0%, #c8efd2 55%, $primary 130%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  position: relative;
+  overflow: hidden;
+}
+.showcase__badge {
+  background: rgba(255, 255, 255, 0.9);
+  color: $primary-dark;
+  font-size: 22rpx;
+  font-weight: 800;
+  padding: 8rpx 20rpx;
+  border-radius: 24rpx;
+}
+.showcase__figure-title {
+  font-size: 34rpx;
+  font-weight: 900;
+  color: $primary-dark;
+  padding: 0 40rpx;
+  text-align: center;
+}
+.showcase__title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 900;
+  margin: 24rpx 0 10rpx;
+}
+.showcase__desc {
+  display: block;
+  line-height: 1.7;
 }
 .story__eyebrow {
   color: $primary-dark;
