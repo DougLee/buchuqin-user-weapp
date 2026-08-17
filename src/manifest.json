@@ -1,7 +1,7 @@
 {
   "name": "不出寝食社",
-  /* 待道哥提供正式 appid，勿编造占位值 */
-  "appid": "",
+  /* 用户端正式 appid（道哥 2026-08-17 提供，IK8W5Q） */
+  "appid": "wxc814687e5ae26924",
   "description": "",
   "versionName": "1.0.0",
   "versionCode": "100",
@@ -55,8 +55,7 @@
   "quickapp": {},
   /* 小程序特有相关 */
   "mp-weixin": {
-    /* 待道哥提供正式 appid（微信公众平台注册后下发），勿编造占位值 */
-    "appid": "",
+    "appid": "wxc814687e5ae26924",
     "setting": {
       "urlCheck": false
     },
