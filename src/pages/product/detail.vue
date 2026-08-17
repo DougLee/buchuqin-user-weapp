@@ -76,6 +76,7 @@ const onService = () =>
       ><button class="primary-btn" @tap="add">加入购物车</button></view
     ></view
   >
+  <CartOverlay />
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";

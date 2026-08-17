@@ -144,7 +144,9 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
         @add="add"
         @open="open"
     /></view>
-  </view>
+  ></view
+  >
+  <CartOverlay />
 </template>
 
 <style scoped lang="scss">

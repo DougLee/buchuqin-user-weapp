@@ -234,6 +234,7 @@ async function submit() {
       </button></view
     ></view
   >
+  <CartOverlay />
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
