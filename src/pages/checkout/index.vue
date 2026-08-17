@@ -16,6 +16,7 @@ const address = ref<Address>(),
   cart = ref<Cart>(),
   mode = ref<"instant" | "scheduled">("instant"),
   slot = ref("20:00-21:00"),
+  remark = ref(""),
   settlement = ref<Settlement>(),
   submitting = ref(false),
   slots = ref<Array<{ id: string; label: string; available: boolean }>>([]);
@@ -31,6 +32,7 @@ const payload = computed<Record<string, unknown>>(() => ({
   deliveryMode: mode.value,
   deliverySlot: mode.value === "scheduled" ? slot.value : undefined,
   couponId: selectedCoupon.value?.id,
+  remark: remark.value.trim() || undefined,
 }));
 /** 门槛判断：商品金额与券门槛同为分值，直接比较 */
 function meetsThreshold(item: UserCoupon) {
@@ -94,10 +96,12 @@ async function submit() {
     } catch {
       // 支付请求异常不吞掉订单：落到详情页继续支付，不留死路
     }
-    uni.showToast({
-      title: paid ? "支付成功" : "支付未完成，可继续支付",
-      icon: paid ? "success" : "none",
-    });
+    if (paid) {
+      // 模拟支付成功：直达支付成功页（IK97FE/IK97FH）
+      uni.redirectTo({ url: `/pages/checkout/success?id=${created.id}` });
+      return;
+    }
+    uni.showToast({ title: "支付未完成，可继续支付", icon: "none" });
     setTimeout(
       () => uni.redirectTo({ url: `/pages/orders/detail?id=${created.id}` }),
       500,
@@ -133,9 +137,9 @@ async function submit() {
         class="mode card"
         :class="{ 'mode--active': mode === 'scheduled' }"
         @tap="setMode('scheduled')"
-        ><text class="mode__title">省心送达</text
-        ><text class="mode__time">2 小时内</text
-        ><text class="muted">运费更省</text></view
+        ><text class="mode__title">预约配送</text
+        ><text class="mode__time">2 小时送达</text
+        ><text class="mode__gift">赠送 2 元全品类优惠券</text></view
       ></view
     ><view v-if="mode === 'scheduled'" class="slots card"
       ><text class="slots__title">选择时间</text
@@ -193,6 +197,16 @@ async function submit() {
       ><view v-if="!usableCoupons.length" class="coupon-opt coupon-opt--empty"
         ><text>暂无可用优惠券，去「我的 → 优惠券」领一张</text></view
       ></view
+    ><view class="section-title"
+      ><text class="section-title__main">订单备注</text></view
+    ><view class="remark card"
+      ><input
+        v-model="remark"
+        class="remark__input"
+        maxlength="50"
+        placeholder="选填，给配送员捎句话（50 字内）"
+        placeholder-class="remark__placeholder"
+      /></view
     ><view v-if="settlement" class="bill card"
       ><view
         ><text>商品金额</text
@@ -265,6 +279,22 @@ async function submit() {
   font-weight: 900;
   margin: 12rpx 0;
   color: $primary-dark;
+}
+.mode__gift {
+  display: block;
+  font-size: 22rpx;
+  color: $orange;
+  font-weight: 800;
+}
+.remark {
+  padding: 8rpx 26rpx;
+}
+.remark__input {
+  min-height: 88rpx;
+  font-size: 28rpx;
+}
+.remark__placeholder {
+  color: #9aa39d;
 }
 .slots {
   display: flex;
