@@ -15,10 +15,13 @@ interface Settlement {
 const address = ref<Address>(),
   cart = ref<Cart>(),
   mode = ref<"instant" | "scheduled">("instant"),
-  slot = ref("20:00-21:00"),
+  slot = ref(""),
   remark = ref(""),
   settlement = ref<Settlement>(),
   submitting = ref(false),
+  /** 三态（IK9AWK）：购物车等核心数据失败给整页重试，弱项缺省不阻塞 */
+  loading = ref(true),
+  error = ref(false),
   slots = ref<Array<{ id: string; label: string; available: boolean }>>([]);
 const usableCoupons = ref<UserCoupon[]>([]),
   selectedCouponId = ref<string>();
@@ -41,30 +44,67 @@ function meetsThreshold(item: UserCoupon) {
 async function refresh() {
   settlement.value = await api.checkout(payload.value);
 }
-onShow(async () => {
-  const [a, c, s, bundle] = await Promise.all([
+/** 低于起送门槛时禁付并提示差额（IK9AWN） */
+const belowThreshold = computed(
+  () =>
+    (cart.value?.productAmount ?? 0) > 0 &&
+    (cart.value?.productAmount ?? 0) <
+      (cart.value?.deliveryThreshold ?? 1000),
+);
+const thresholdGap = computed(() =>
+  fenToYuan(
+    (cart.value?.deliveryThreshold ?? 1000) -
+      (cart.value?.productAmount ?? 0),
+  ),
+);
+async function load() {
+  loading.value = true;
+  error.value = false;
+  // 各请求独立容错（IK9AWK）：地址/时段/优惠券缺省不阻塞结算，购物车挂了才整页重试
+  const [a, c, s, b] = await Promise.allSettled([
     api.addresses(),
     api.cart(),
     api.slots(),
     api.coupons(),
   ]);
-  const selected = uni.getStorageSync("selectedAddressId");
-  address.value = a.find((item) => item.id === selected) || a[0];
-  cart.value = c;
-  slots.value = s;
-  const now = Date.now();
-  usableCoupons.value = bundle.mine.filter(
-    (item) =>
-      (item.status === "claimed" || item.status === "released") &&
-      new Date(item.coupon.expiresAt).getTime() > now,
-  );
-  // 默认选用抵扣最多的可用券
-  const best = usableCoupons.value
-    .filter(meetsThreshold)
-    .sort((x, y) => y.coupon.amount - x.coupon.amount)[0];
-  selectedCouponId.value = best?.id;
-  await refresh();
-});
+  if (a.status === "fulfilled") {
+    const selected = uni.getStorageSync("selectedAddressId");
+    address.value =
+      a.value.find((item) => item.id === selected) || a.value[0];
+  }
+  if (c.status === "fulfilled") cart.value = c.value;
+  if (s.status === "fulfilled") {
+    slots.value = s.value;
+    // 默认选中第一个可用时段，不再硬编码 label（IK9AWN）
+    if (!slot.value || !s.value.some((x) => x.label === slot.value && x.available))
+      slot.value = s.value.find((x) => x.available)?.label ?? "";
+  }
+  if (b.status === "fulfilled") {
+    const now = Date.now();
+    usableCoupons.value = b.value.mine.filter(
+      (item) =>
+        (item.status === "claimed" || item.status === "released") &&
+        new Date(item.coupon.expiresAt).getTime() > now,
+    );
+    // 默认选用抵扣最多的可用券
+    const best = usableCoupons.value
+      .filter(meetsThreshold)
+      .sort((x, y) => y.coupon.amount - x.coupon.amount)[0];
+    selectedCouponId.value = best?.id;
+  }
+  if (!cart.value) {
+    error.value = true;
+    loading.value = false;
+    return;
+  }
+  try {
+    await refresh();
+  } catch {
+    error.value = true;
+  }
+  loading.value = false;
+}
+onShow(load);
 async function setMode(value: "instant" | "scheduled") {
   mode.value = value;
   await refresh();
@@ -76,8 +116,9 @@ async function selectSlot(label: string, available: boolean) {
 }
 async function chooseCoupon(item: UserCoupon | null) {
   if (item && !meetsThreshold(item)) {
+    // 门槛文案取整数元（IK9AWT：去掉"满 10.00 元"的多余小数）
     uni.showToast({
-      title: `满 ${fenToYuan(item.coupon.threshold)} 元才能用这张券`,
+      title: `满 ${Number(fenToYuan(item.coupon.threshold))} 元才能用这张券`,
       icon: "none",
     });
     return;
@@ -87,6 +128,16 @@ async function chooseCoupon(item: UserCoupon | null) {
 }
 async function submit() {
   if (submitting.value) return;
+  // 无地址前置校验（IK9AWI）：不再等后端报错
+  if (!address.value) {
+    uni.showToast({ title: "请先添加寝室地址", icon: "none" });
+    uni.navigateTo({ url: "/pages/address/edit" });
+    return;
+  }
+  if (belowThreshold.value) {
+    uni.showToast({ title: "还差一点起送金额，再去挑一件吧", icon: "none" });
+    return;
+  }
   submitting.value = true;
   try {
     const created = await api.createOrder(payload.value);
@@ -113,6 +164,12 @@ async function submit() {
 </script>
 <template>
   <view class="page checkout"
+    ><view v-if="loading" class="checkout__skeleton"
+      ><view v-for="n in 4" :key="n" class="skeleton-block" /></view
+    ><view v-else-if="error" class="retry card" @tap="load"
+      ><text class="retry__title">加载失败</text
+      ><text class="muted">网络异常，点击重试</text></view
+    ><template v-else
     ><view
       v-if="address"
       class="address card"
@@ -123,6 +180,13 @@ async function submit() {
       ><text class="muted"
         >{{ address.contactName }} {{ address.phone }}　›</text
       ></view
+    ><view
+      v-else
+      class="address address--empty card"
+      @tap="uni.navigateTo({ url: '/pages/address/edit' })"
+      ><text class="address__flag">送到这里</text
+      ><text class="address__room">还没有寝室地址</text
+      ><text class="muted">点击添加，楼长才知道送到哪　›</text></view
     ><view class="section-title"
       ><text class="section-title__main">怎么送到寝</text></view
     ><view class="modes"
@@ -141,19 +205,25 @@ async function submit() {
         ><text class="mode__time">2 小时送达</text
         ><text class="mode__gift">赠送 2 元全品类优惠券</text></view
       ></view
-    ><view v-if="mode === 'scheduled'" class="slots card"
-      ><text class="slots__title">选择时间</text
-      ><view
-        v-for="s in slots"
-        :key="s.id"
-        class="slot"
-        :class="{
-          'slot--active': slot === s.label,
-          'slot--disabled': !s.available,
-        }"
-        @tap="selectSlot(s.label, s.available)"
-        >{{ s.label }}</view
-      ></view
+    ><scroll-view
+      v-if="mode === 'scheduled'"
+      scroll-x
+      class="slots card"
+      :show-scrollbar="false"
+      ><view class="slots__inner"
+        ><text class="slots__title">选择时间</text
+        ><view
+          v-for="s in slots"
+          :key="s.id"
+          class="slot"
+          :class="{
+            'slot--active': slot === s.label,
+            'slot--disabled': !s.available,
+          }"
+          @tap="selectSlot(s.label, s.available)"
+          >{{ s.label }}</view
+        ></view
+      ></scroll-view
     ><view class="section-title"
       ><text class="section-title__main">这袋有这些</text></view
     ><view class="goods card"
@@ -223,15 +293,28 @@ async function submit() {
       ></view
     ><view class="submit safe-bottom"
       ><view
-        ><text class="muted">微信支付</text
+        ><text class="muted">{{
+          belowThreshold ? "还差 ¥" + thresholdGap + " 起送" : "微信支付"
+        }}</text
         ><text class="submit__price"
           >¥{{
             settlement ? fenToYuan(settlement.payableAmount) : "--"
           }}</text
         ></view
-      ><button class="primary-btn" :disabled="submitting" @tap="submit">
-        {{ submitting ? "正在支付…" : "确认支付" }}
+      ><button
+        class="primary-btn"
+        :disabled="submitting || !address || belowThreshold"
+        @tap="submit"
+      >
+        {{
+          belowThreshold
+            ? "还差起送金额"
+            : submitting
+              ? "正在支付…"
+              : "确认支付"
+        }}
       </button></view
+    ></template
     ></view
   >
   <CartOverlay />
@@ -248,6 +331,34 @@ async function submit() {
   color: $primary-dark;
   font-size: 22rpx;
   font-weight: 800;
+}
+/* 无地址引导卡（IK9AWI） */
+.address--empty .address__room {
+  color: $primary-dark;
+}
+.checkout__skeleton {
+  padding-top: 20rpx;
+}
+.skeleton-block {
+  height: 180rpx;
+  border-radius: 28rpx;
+  margin-bottom: 22rpx;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: checkout-pulse 1.2s infinite;
+}
+@keyframes checkout-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+.retry {
+  padding: 90rpx 30rpx;
+  text-align: center;
+}
+.retry__title {
+  display: block;
+  font-weight: 900;
+  color: $primary-dark;
 }
 .address__room {
   display: block;
@@ -297,13 +408,16 @@ async function submit() {
 .remark__placeholder {
   color: #9aa39d;
 }
+/* 时段横向滚动（IK9AWN：时段多时不裁切） */
 .slots {
-  display: flex;
+  margin-top: 20rpx;
+  white-space: nowrap;
+}
+.slots__inner {
+  display: inline-flex;
   align-items: center;
   gap: 12rpx;
-  margin-top: 20rpx;
   padding: 22rpx;
-  overflow: hidden;
 }
 .slots__title {
   font-weight: 800;
@@ -316,6 +430,7 @@ async function submit() {
   font-size: 21rpx;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 .slot--active {
   background: $primary;

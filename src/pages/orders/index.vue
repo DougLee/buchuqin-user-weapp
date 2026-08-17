@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { onHide, onShow, onUnload } from "@dcloudio/uni-app";
+import { onHide, onReachBottom, onShow, onUnload } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { fenToYuan } from "../../utils/money";
 import { startPayFlow } from "../../utils/payment";
@@ -11,7 +11,14 @@ const orders = ref<Order[]>([]),
   active = ref("all"),
   now = ref(Date.now()),
   paying = ref(""),
-  ticker = ref<number>();
+  ticker = ref<number>(),
+  /** 三态（IK9AWK）：加载骨架 + 错误重试，空态不再在加载期闪现 */
+  loading = ref(true),
+  error = ref(false),
+  /** 滚动分页（IK9AWO） */
+  page = ref(1),
+  total = ref(0),
+  loadingMore = ref(false);
 // tab 与后端 status 过滤参数直接对应；delivering 含全部履约中状态（含 delivered 已送达待确认）
 const tabs = [
   ["all", "全部"],
@@ -22,10 +29,35 @@ const tabs = [
   ["refunded", "退款"],
   ["exception", "异常"],
 ];
-async function load(status = "all") {
+/** reset=true 切 tab/重试重置到第一页；false 为触底追加下一页 */
+async function load(status = "all", reset = true) {
   active.value = status;
-  orders.value = await api.orders(status);
+  if (reset) {
+    loading.value = true;
+    page.value = 1;
+  }
+  error.value = false;
+  try {
+    const res = await api.ordersPage(status, page.value);
+    orders.value = reset ? res.items : [...orders.value, ...res.items];
+    total.value = res.total;
+  } catch {
+    error.value = true;
+  } finally {
+    loading.value = false;
+  }
 }
+onReachBottom(async () => {
+  if (loadingMore.value || loading.value || error.value) return;
+  if (orders.value.length >= total.value) return;
+  loadingMore.value = true;
+  try {
+    page.value += 1;
+    await load(active.value, false);
+  } finally {
+    loadingMore.value = false;
+  }
+});
 function startTicker() {
   // 定时刷新"待支付剩余时间"展示
   if (!ticker.value)
@@ -58,6 +90,8 @@ async function pay(order: Order) {
       uni.showToast({ title: "支付未完成，可继续支付", icon: "none" });
       uni.navigateTo({ url: `/pages/orders/detail?id=${order.id}` });
     }
+  } catch {
+    // 网络异常等：request 层已 toast，这里兜底防未处理 rejection
   } finally {
     paying.value = "";
   }
@@ -82,10 +116,17 @@ onUnload(stopTicker);
           >{{ t[1] }}</view
         ></view
       ></scroll-view
-    ><view v-if="!orders.length" class="empty"
+    ><view v-if="error" class="empty" @tap="load(active.value)"
+      ><text class="empty__mark">!</text
+      ><text class="empty__title">订单加载失败</text
+      ><text class="muted">网络异常，点击重试</text></view
+    ><view v-else-if="loading" class="orders-skeleton"
+      ><view v-for="n in 3" :key="n" class="skeleton-block" /></view
+    ><view v-else-if="!orders.length" class="empty"
       ><text class="empty__mark">空</text
       ><text class="empty__title">这里还没有订单</text
       ><text class="muted">第一袋快乐，正在首页等你</text></view
+    ><template v-else
     ><view
       v-for="order in orders"
       :key="order.id"
@@ -106,7 +147,9 @@ onUnload(stopTicker);
       ><view class="order__bottom"
         ><text>{{ order.estimatedArrival }}</text
         ><text class="order__price"
-          >实付 ¥{{ fenToYuan(order.payableAmount) }}</text
+          >{{ order.status === "pending-payment" ? "应付" : "实付" }} ¥{{
+            fenToYuan(order.payableAmount)
+          }}</text
         ></view
       ><view
         v-if="order.status === 'pending-payment'"
@@ -121,6 +164,15 @@ onUnload(stopTicker);
           {{ paying === order.id ? "正在支付…" : "去支付" }}
         </button></view
       ></view
+    ><view v-if="!loading && !error && orders.length" class="list-foot"
+      >{{
+        loadingMore
+          ? "加载中…"
+          : orders.length >= total
+            ? "没有更多了"
+            : "上拉加载更多"
+      }}</view
+    ></template
     ></view
   >
   <CartOverlay />
@@ -207,18 +259,40 @@ onUnload(stopTicker);
   color: #b1560f;
 }
 .order__pay-btn {
-  min-height: 64rpx;
-  line-height: 64rpx;
+  /* 热区提至 88rpx 标准（IK9AWL），视觉字号不变 */
+  min-height: 88rpx;
+  line-height: 88rpx;
   margin: 0;
   padding: 0 34rpx;
   background: $primary;
   color: #fff;
   font-size: 24rpx;
   font-weight: 800;
-  border-radius: 32rpx;
+  border-radius: 44rpx;
 }
 .order__pay-btn[disabled] {
   opacity: 0.6;
+}
+.orders-skeleton {
+  padding-top: 10rpx;
+}
+.skeleton-block {
+  height: 240rpx;
+  border-radius: 28rpx;
+  margin-bottom: 22rpx;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: orders-pulse 1.2s infinite;
+}
+@keyframes orders-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+.list-foot {
+  text-align: center;
+  color: $muted;
+  font-size: 22rpx;
+  padding: 20rpx 0 10rpx;
 }
 .empty {
   text-align: center;

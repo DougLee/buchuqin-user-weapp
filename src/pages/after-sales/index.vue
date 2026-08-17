@@ -14,16 +14,27 @@ function statusText(status: string): string {
   return AFTERSALE_STATUS_TEXT[status] ?? status;
 }
 const cases = ref<AfterSale[]>([]),
-  refunds = ref<Refund[]>([]);
-onShow(async () => {
-  [cases.value, refunds.value] = await Promise.all([
-    api.afterSales(),
-    api.refunds(),
-  ]);
-});
+  refunds = ref<Refund[]>([]),
+  loading = ref(true),
+  error = ref(false);
+onShow(load);
+async function load() {
+  loading.value = true;
+  error.value = false;
+  // 两接口独立容错（IK9AWK），任一失败给整页重试
+  const [c, r] = await Promise.allSettled([api.afterSales(), api.refunds()]);
+  if (c.status === "fulfilled") cases.value = c.value;
+  if (r.status === "fulfilled") refunds.value = r.value;
+  if (c.status === "rejected" || r.status === "rejected") error.value = true;
+  loading.value = false;
+}
 </script>
 <template>
   <view class="page"
+    ><view v-if="error" class="as-retry card" @tap="load"
+      ><text class="as-retry__title">加载失败</text
+      ><text class="muted">网络异常，点击重试</text></view
+    ><template v-else
     ><view class="summary card"
       ><text class="summary__value"
         >¥{{ fenToYuan(refunds.reduce((n, r) => n + r.amount, 0)) }}</text
@@ -45,6 +56,7 @@ onShow(async () => {
         ><text>{{ r.reason }}</text
         ><text class="muted">{{ r.createdAt.slice(0, 10) }}</text></view
       ><text class="refund__amount">+¥{{ fenToYuan(r.amount) }}</text></view
+    ></template
     ></view
   >
 </template>
@@ -64,6 +76,16 @@ onShow(async () => {
 }
 .summary .muted {
   color: #e8ffed !important;
+}
+.as-retry {
+  padding: 110rpx 30rpx;
+  text-align: center;
+}
+.as-retry__title {
+  display: block;
+  font-weight: 900;
+  color: $primary-dark;
+  margin-bottom: 8rpx;
 }
 .empty,
 .case {

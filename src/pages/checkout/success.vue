@@ -6,10 +6,7 @@ import { fenToYuan } from "../../utils/money";
 import type { Order } from "../../types";
 const orderId = ref(""),
   order = ref<Order>(),
-  cancelVisible = ref(false),
-  cancelReason = ref(""),
   cancelling = ref(false);
-const cancelReasons = ["拍错了", "不想要了", "地址填错了", "其他"];
 onLoad(async (q) => {
   orderId.value = String(q?.id || "");
   if (orderId.value) order.value = await api.order(orderId.value);
@@ -17,21 +14,30 @@ onLoad(async (q) => {
 function goHome() {
   uni.switchTab({ url: "/pages/index/index" });
 }
+/**
+ * 取消确认（IK9AWR）：后端 cancel 接口暂无 reason 字段，
+ * 原原因选择弹窗收集后不上传属 UI 表演，已移除；接口支持后再恢复选择并上传。
+ */
 function openCancel() {
-  cancelReason.value = cancelReasons[0];
-  cancelVisible.value = true;
-}
-async function confirmCancel() {
-  if (!order.value || cancelling.value) return;
-  cancelling.value = true;
-  try {
-    await api.cancelOrder(order.value.id);
-    cancelVisible.value = false;
-    uni.showToast({ title: "订单已取消", icon: "success" });
-    setTimeout(() => uni.switchTab({ url: "/pages/orders/index" }), 600);
-  } finally {
-    cancelling.value = false;
-  }
+  uni.showModal({
+    title: "取消订单",
+    content:
+      order.value?.status === "pending-payment"
+        ? "订单尚未支付，取消后直接关闭"
+        : "取消后将按支付渠道发起退款",
+    confirmColor: "#d4380d",
+    success: async (m) => {
+      if (!m.confirm || !order.value || cancelling.value) return;
+      cancelling.value = true;
+      try {
+        await api.cancelOrder(order.value.id);
+        uni.showToast({ title: "订单已取消", icon: "success" });
+        setTimeout(() => uni.switchTab({ url: "/pages/orders/index" }), 600);
+      } finally {
+        cancelling.value = false;
+      }
+    },
+  });
 }
 </script>
 <template>
@@ -63,33 +69,9 @@ async function confirmCancel() {
       ><button
         v-if="order && ['paid', 'pending-payment'].includes(order.status)"
         class="actions__cancel"
+        :disabled="cancelling"
         @tap="openCancel"
-        >取消订单</button
-      ></view
-    ><view
-      v-if="cancelVisible"
-      class="mask"
-      @tap="cancelVisible = false"
-      ><view class="sheet" @tap.stop
-        ><text class="sheet__title">取消原因</text
-        ><view
-          v-for="reason in cancelReasons"
-          :key="reason"
-          class="sheet__opt"
-          :class="{ 'sheet__opt--active': cancelReason === reason }"
-          @tap="cancelReason = reason"
-          ><text>{{ reason }}</text
-          ><text class="sheet__mark">✓</text></view
-        ><view class="sheet__btns"
-          ><button class="sheet__btn" @tap="cancelVisible = false"
-            >再想想</button
-          ><button
-            class="sheet__btn sheet__btn--danger"
-            :disabled="cancelling"
-            @tap="confirmCancel"
-            >{{ cancelling ? "正在取消…" : "确认取消" }}</button
-          ></view
-        ></view
+        >{{ cancelling ? "正在取消…" : "取消订单" }}</button
       ></view
     ></view
   >
@@ -166,72 +148,5 @@ async function confirmCancel() {
 }
 .actions__cancel::after {
   border: none;
-}
-.mask {
-  position: fixed;
-  inset: 0;
-  background: rgba(20, 30, 24, 0.45);
-  display: flex;
-  align-items: flex-end;
-  z-index: 30;
-}
-.sheet {
-  width: 100%;
-  background: #fff;
-  border-radius: 32rpx 32rpx 0 0;
-  padding: 32rpx 28rpx 48rpx;
-}
-.sheet__title {
-  display: block;
-  font-size: 32rpx;
-  font-weight: 900;
-  text-align: center;
-  margin-bottom: 16rpx;
-}
-.sheet__opt {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 96rpx;
-  border-bottom: 2rpx solid $line;
-  font-weight: 600;
-}
-.sheet__mark {
-  width: 40rpx;
-  height: 40rpx;
-  border: 2rpx solid $line;
-  border-radius: 50%;
-  color: transparent;
-  font-size: 22rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.sheet__opt--active {
-  color: $primary-dark;
-  .sheet__mark {
-    background: $primary;
-    border-color: $primary;
-    color: #fff;
-  }
-}
-.sheet__btns {
-  display: flex;
-  gap: 18rpx;
-  margin-top: 28rpx;
-}
-.sheet__btn {
-  flex: 1;
-  min-height: 88rpx;
-  border-radius: 44rpx;
-  background: $primary-soft;
-  color: $primary-dark;
-  font-weight: 800;
-  margin: 0;
-}
-.sheet__btn--danger {
-  background: #fff;
-  color: #d4482a;
-  border: 2rpx solid #f2c4b5;
 }
 </style>

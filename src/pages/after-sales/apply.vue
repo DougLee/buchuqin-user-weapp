@@ -2,6 +2,7 @@
 import { reactive, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { AFTER_SALE_TYPES } from "../../utils/afterSale";
 const orderId = ref(""),
   submitting = ref(false),
   uploading = ref(false),
@@ -62,11 +63,7 @@ async function submit() {
       ><text class="label">问题类型</text
       ><view class="types"
         ><view
-          v-for="item in [
-            ['quality', '质量问题'],
-            ['missing', '商品缺失'],
-            ['damaged', '包装破损'],
-          ]"
+          v-for="item in AFTER_SALE_TYPES"
           :key="item[0]"
           class="type"
           :class="{ 'type--active': form.type === item[0] }"

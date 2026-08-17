@@ -4,13 +4,18 @@ import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { fenToYuan } from "../../utils/money";
 import { startPayFlow } from "../../utils/payment";
+import { AFTER_SALE_TYPES } from "../../utils/afterSale";
+import { SERVICE_PHONE } from "../../utils/service";
 import type { Order } from "../../types";
 const orderId = ref(""),
   order = ref<Order>(),
   confirming = ref(false),
   paying = ref(false),
   afterSaleOpen = ref(false),
-  afterSaleSubmitting = ref(false);
+  afterSaleSubmitting = ref(false),
+  /** 三态（IK9AWK）：加载骨架 + 错误重试 */
+  loading = ref(true),
+  error = ref(false);
 /** 履约中（已拣货及之后、尚未送达）状态：不可取消但可申请售后（IK97FI） */
 const IN_FULFILLMENT_STATUSES = [
   "picking",
@@ -18,17 +23,6 @@ const IN_FULFILLMENT_STATUSES = [
   "first-mile",
   "waiting-handover",
   "last-mile",
-];
-/**
- * 快捷售后弹窗的预设选项（IK97FI）。
- * damaged/missing 沿用申请页已有枚举；wrong/other 为新增键，
- * AfterSale.type 契约是自由字符串，若后端后续收敛枚举需对齐。
- */
-const AFTER_SALE_OPTIONS: Array<[string, string]> = [
-  ["damaged", "商品破损"],
-  ["missing", "漏发"],
-  ["wrong", "错发"],
-  ["other", "其他"],
 ];
 const afterSaleForm = reactive({ type: "damaged", description: "" });
 // onShow 每次进页都拉最新进度（从支付页/列表返回、后台推进状态后都能看到新状态）
@@ -38,7 +32,15 @@ onLoad((q) => {
 onShow(refresh);
 async function refresh() {
   if (!orderId.value) return;
-  order.value = await api.order(orderId.value);
+  loading.value = !order.value;
+  error.value = false;
+  try {
+    order.value = await api.order(orderId.value);
+  } catch {
+    error.value = true;
+  } finally {
+    loading.value = false;
+  }
 }
 async function cancel() {
   if (!order.value) return;
@@ -104,8 +106,9 @@ async function submitAfterSale() {
       images: [],
     });
     afterSaleOpen.value = false;
+    // IK9AWS：快捷通道不收凭证，成功后引导到申请页补充材料
     uni.showToast({
-      title: "已提交，可在「售后与退款」查看",
+      title: "已提交，可到「售后与退款」补充凭证照",
       icon: "none",
       duration: 2500,
     });
@@ -118,13 +121,23 @@ function backHome() {
 }
 </script>
 <template>
-  <view v-if="order" class="page detail"
+  <view v-if="error" class="page detail"
+    ><view class="detail-retry card" @tap="refresh"
+      ><text class="detail-retry__title">订单加载失败</text
+      ><text class="muted">网络异常或订单不存在，点击重试</text></view
+    ></view
+  >
+  <view v-else-if="loading && !order" class="page detail"
+    ><view class="detail-skeleton"
+      ><view v-for="n in 3" :key="n" class="skeleton-block" /></view
+  ></view>
+  <view v-else-if="order" class="page detail"
     ><view class="status" :class="{ 'status--exception': order.status === 'exception' }"
       ><text class="status__eyebrow">{{ order.estimatedArrival }}</text
       ><text class="status__title">{{ order.statusText }}</text
       ><text class="status__sub">{{
         order.status === "exception"
-          ? "别担心，客服正在跟进处理，可来电 4008002026"
+          ? `别担心，客服正在跟进处理，可来电 ${SERVICE_PHONE}`
           : order.status === "pending-payment"
             ? "15 分钟内完成支付，超时订单将自动关闭"
             : "你的这一袋，正在校园里接力"
@@ -206,7 +219,7 @@ function backHome() {
     ><button
       v-if="order.status === 'exception'"
       class="cancel"
-      @tap="uni.makePhoneCall({ phoneNumber: '4008002026' })"
+      @tap="uni.makePhoneCall({ phoneNumber: SERVICE_PHONE })"
     >
       联系客服处理
     </button
@@ -220,7 +233,7 @@ function backHome() {
         ><text class="sheet__sub">订单正在配送途中，先登记问题，客服会跟进处理</text
         ><view class="sheet__options"
           ><view
-            v-for="item in AFTER_SALE_OPTIONS"
+            v-for="item in AFTER_SALE_TYPES"
             :key="item[0]"
             class="sheet__option"
             :class="{ 'sheet__option--active': afterSaleForm.type === item[0] }"
@@ -368,6 +381,32 @@ function backHome() {
 }
 .pay-again {
   margin: 24rpx 0 0;
+}
+/* 三态（IK9AWK） */
+.detail-retry {
+  padding: 120rpx 30rpx;
+  text-align: center;
+}
+.detail-retry__title {
+  display: block;
+  font-weight: 900;
+  color: $primary-dark;
+  margin-bottom: 8rpx;
+}
+.detail-skeleton {
+  padding-top: 10rpx;
+}
+.skeleton-block {
+  height: 220rpx;
+  border-radius: 28rpx;
+  margin-bottom: 22rpx;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: detail-pulse 1.2s infinite;
+}
+@keyframes detail-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 .cancel {
   min-height: 88rpx;
