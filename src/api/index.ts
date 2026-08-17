@@ -2,6 +2,7 @@ import { request, toAbsoluteUrl, uploadImage } from "./request";
 import type {
   Address,
   AfterSale,
+  Building,
   Cart,
   Category,
   CouponBundle,
@@ -66,6 +67,17 @@ export const api = {
   addresses: () => request<Address[]>("/addresses"),
   addAddress: (data: Record<string, unknown>) =>
     request<Address>("/addresses", { method: "POST", data }),
+  updateAddress: (id: string, data: Record<string, unknown>) =>
+    request<Address>(`/addresses/${id}`, { method: "PATCH", data }),
+  deleteAddress: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/addresses/${id}`, {
+      method: "DELETE",
+    }),
+  setDefaultAddress: (id: string) =>
+    request<Address>(`/addresses/${id}/default`, { method: "PUT" }),
+  /** 当前校园的楼栋预设列表（地址表单楼栋选择器） */
+  buildings: () =>
+    request<Building[]>("/campuses/current/buildings"),
   coupons: () => request<CouponBundle>("/coupons"),
   claimCoupon: (couponId: string) =>
     request<UserCoupon>(`/coupons/${couponId}/claim`, { method: "POST" }),

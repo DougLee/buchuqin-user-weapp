@@ -6,7 +6,10 @@ const ORIGIN = BASE_URL.replace(/\/api\/v1\/?$/, "");
 export function toAbsoluteUrl(url: string): string {
   return /^https?:\/\//.test(url) ? url : `${ORIGIN}${url}`;
 }
-type RequestOptions = Omit<UniApp.RequestOptions, "url">;
+/** @dcloudio/types 未收录 PATCH（微信基础库 wx.request 已支持），这里放宽 method */
+type RequestOptions = Omit<UniApp.RequestOptions, "url" | "method"> & {
+  method?: UniApp.RequestOptions["method"] | "PATCH";
+};
 function isApiResult<T>(value: unknown): value is ApiResult<T> {
   return (
     typeof value === "object" &&
@@ -102,7 +105,7 @@ export async function request<T>(
   const send = (authToken: string, retried: boolean) =>
     new Promise<T>((resolve, reject) => {
       uni.request({
-        ...options,
+        ...(options as UniApp.RequestOptions),
         url: `${BASE_URL}${path}`,
         header: {
           "content-type": "application/json",

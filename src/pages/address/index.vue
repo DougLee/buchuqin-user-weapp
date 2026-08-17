@@ -4,17 +4,51 @@ import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import type { Address } from "../../types";
 const addresses = ref<Address[]>([]),
-  selectedId = ref("");
-onShow(async () => {
+  selectedId = ref(""),
+  busy = ref(false);
+async function refresh() {
   addresses.value = await api.addresses();
   selectedId.value =
     uni.getStorageSync("selectedAddressId") || addresses.value[0]?.id || "";
-});
+}
+onShow(refresh);
 function select(a: Address) {
   selectedId.value = a.id;
   uni.setStorageSync("selectedAddressId", a.id);
   uni.showToast({ title: "已选为收货寝室", icon: "success" });
   setTimeout(() => uni.navigateBack(), 400);
+}
+function edit(a: Address) {
+  uni.navigateTo({ url: `/pages/address/edit?id=${a.id}` });
+}
+async function remove(a: Address) {
+  const res = await uni.showModal({
+    title: "删除这间寝室地址？",
+    content: `${a.buildingName} ${a.room}（${a.contactName}）将被移除`,
+    confirmText: "删除",
+    confirmColor: "#d4380d",
+  });
+  if (!res.confirm || busy.value) return;
+  busy.value = true;
+  try {
+    await api.deleteAddress(a.id);
+    if (selectedId.value === a.id) uni.removeStorageSync("selectedAddressId");
+    uni.showToast({ title: "已删除", icon: "success" });
+    await refresh();
+  } finally {
+    busy.value = false;
+  }
+}
+async function makeDefault(a: Address) {
+  if (busy.value || a.isDefault) return;
+  busy.value = true;
+  try {
+    await api.setDefaultAddress(a.id);
+    uni.showToast({ title: "已设为默认地址", icon: "success" });
+    await refresh();
+  } finally {
+    busy.value = false;
+  }
 }
 </script>
 <template>
@@ -27,10 +61,24 @@ function select(a: Address) {
       :class="{ 'address--selected': selectedId === a.id }"
       @tap="select(a)"
       ><view class="address__head"
-        ><text>{{ a.buildingName }} · {{ a.room }} 寝室</text
-        ><text v-if="selectedId === a.id" class="tag">已选择</text></view
+        ><view class="address__title"
+          ><text>{{ a.buildingName }} · {{ a.room }} 寝室</text
+          ><text v-if="a.isDefault" class="tag tag--default">默认</text
+          ><text v-if="selectedId === a.id" class="tag">已选择</text></view
+        ></view
       ><text class="muted">{{ a.campusName }} · {{ a.floor }} 楼</text
-      ><text class="person">{{ a.contactName }}　{{ a.phone }}</text></view
+      ><text class="person">{{ a.contactName }}　{{ a.phone }}</text
+      ><view class="address__actions" @tap.stop
+        ><text
+          v-if="!a.isDefault"
+          class="address__action"
+          @tap="makeDefault(a)"
+          >设为默认</text
+        ><text class="address__action" @tap="edit(a)">编辑</text
+        ><text class="address__action address__action--danger" @tap="remove(a)"
+          >删除</text
+        ></view
+      ></view
     ><button
       class="primary-btn"
       @tap="uni.navigateTo({ url: '/pages/address/edit' })"
@@ -72,6 +120,12 @@ function select(a: Address) {
   font-weight: 900;
   margin-bottom: 12rpx;
 }
+.address__title {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-wrap: wrap;
+}
 .tag {
   background: $primary;
   color: #fff;
@@ -80,10 +134,29 @@ function select(a: Address) {
   font-size: 20rpx;
   white-space: nowrap;
 }
+.tag--default {
+  background: #ff7a1a;
+}
 .person {
   display: block;
   margin-top: 22rpx;
   font-weight: 700;
+}
+.address__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 34rpx;
+  margin-top: 22rpx;
+  padding-top: 20rpx;
+  border-top: 2rpx dashed $line;
+}
+.address__action {
+  font-size: 25rpx;
+  font-weight: 700;
+  color: $primary-dark;
+}
+.address__action--danger {
+  color: #d4380d;
 }
 .primary-btn {
   margin-top: 32rpx;

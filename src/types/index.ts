@@ -28,12 +28,23 @@ export interface Cart {
 export interface Address {
   id: string;
   campusName: string;
+  buildingId?: string;
   buildingName: string;
   floor: number;
   room: string;
   contactName: string;
   phone: string;
   isDefault: boolean;
+}
+/** 校园楼栋预设（GET /campuses/current/buildings），地址表单的楼栋选择器数据源 */
+export interface Building {
+  id: string;
+  name: string;
+  minFloor: number;
+  maxFloor: number;
+  hasElevator: boolean;
+  gender: string;
+  available: boolean;
 }
 export interface Order {
   id: string;
