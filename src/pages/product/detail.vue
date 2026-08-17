@@ -51,7 +51,7 @@ const add = async () => {
         ></view
       ></view
     ><view class="bottom safe-bottom"
-      ><button class="bag" @tap="uni.switchTab({ url: '/pages/cart/index' })">
+      ><button class="bag" @tap="uni.$emit('open-cart')">
         购物袋 {{ cart.cart.totalQuantity || "" }}</button
       ><button class="primary-btn" @tap="add">加入购物袋</button></view
     ></view
