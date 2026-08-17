@@ -109,8 +109,10 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
         ><text class="delivery__mark">›</text></view
       ><view class="delivery__item delivery__item--orange"
         ><view
-          ><text class="delivery__title">2 小时送到</text
-          ><text class="delivery__sub">超时赔付 · 安心等</text></view
+          ><text class="delivery__title">⚡ 30-60 分钟到楼</text
+          ><text class="delivery__sub"
+            >本楼楼长 王同学 <text class="delivery__online">●</text> 在线</text
+          ></view
         ><text class="delivery__mark">›</text></view
       ></view
     >
@@ -298,6 +300,10 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
 .delivery__mark {
   font-size: 48rpx;
   font-weight: 300;
+}
+.delivery__online {
+  color: $primary;
+  font-size: 18rpx;
 }
 .categories {
   display: grid;
