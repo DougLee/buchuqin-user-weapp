@@ -131,7 +131,7 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
     >
     <view class="section-title"
       ><text class="section-title__main">为你推荐</text
-      ><text class="section-title__sub" @tap="goCategory">换一批 ↻</text></view
+      ><text class="section-title__sub" @tap="goCategory">更多 ›</text></view
     >
     <view v-if="loading" class="grid"
       ><view v-for="n in 4" :key="n" class="skeleton" /></view
