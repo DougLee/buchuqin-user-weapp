@@ -38,6 +38,29 @@ onShow(async () => {
   await cart.load();
   loading.value = false;
 });
+const banners = [
+  {
+    id: "fresh",
+    theme: "green",
+    tag: "今日爆款",
+    title: "零食饮料 寝室直达",
+    sub: "楼下自提柜 · 熄灯前都能送",
+  },
+  {
+    id: "night",
+    theme: "orange",
+    tag: "夜宵专场",
+    title: "泡面卤味 热乎到楼",
+    sub: "每晚 21:00-23:30 加急配送",
+  },
+  {
+    id: "recruit",
+    theme: "dark",
+    tag: "楼长招募令",
+    title: "本楼楼长虚位以待",
+    sub: "每单提成 + 月度底薪，扫码报名",
+  },
+] as const;
 const add = (p: Product) => cart.set(p, cart.quantity(p.id) + 1);
 const open = (id: string) =>
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
@@ -61,12 +84,23 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
       ><text class="search__hint">搜索商品：请输入商品名称</text
       ><text class="search__button">搜索</text></view
     >
-    <view class="hero"
-      ><image
-        src="/static/home-hero-v3.webp"
-        mode="aspectFill"
-        alt="不出寝食社，校园零食日用送到寝室"
-    /></view>
+    <swiper
+      class="hero"
+      autoplay
+      circular
+      :interval="4000"
+      :duration="400"
+      indicator-dots
+      indicator-color="rgba(255, 255, 255, 0.45)"
+      indicator-active-color="#ffffff"
+      ><swiper-item v-for="banner in banners" :key="banner.id"
+        ><view class="hero__slide" :class="`hero__slide--${banner.theme}`"
+          ><text class="hero__tag">{{ banner.tag }}</text
+          ><text class="hero__title">{{ banner.title }}</text
+          ><text class="hero__sub">{{ banner.sub }}</text></view
+        ></swiper-item
+      ></swiper
+    >
     <view class="delivery"
       ><view class="delivery__item delivery__item--green"
         ><view
@@ -186,9 +220,44 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
   background: $primary-soft;
   box-shadow: 0 12rpx 32rpx rgba(21, 117, 54, 0.1);
 }
-.hero image {
+.hero__slide {
   width: 100%;
   height: 100%;
+  box-sizing: border-box;
+  padding: 44rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.hero__slide--green {
+  background: linear-gradient(120deg, #07883b 0%, #25b95a 60%, #41ce69 100%);
+}
+.hero__slide--orange {
+  background: linear-gradient(120deg, #e25c05 0%, #ff7a21 60%, #ffa24d 100%);
+}
+.hero__slide--dark {
+  background: linear-gradient(120deg, #1e2520 0%, #2f4436 60%, #159447 100%);
+}
+.hero__tag {
+  align-self: flex-start;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  border: 1rpx solid rgba(255, 255, 255, 0.55);
+  border-radius: 999rpx;
+  padding: 6rpx 20rpx;
+}
+.hero__title {
+  margin-top: 20rpx;
+  font-size: 44rpx;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 2rpx;
+}
+.hero__sub {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.85);
 }
 .delivery {
   display: grid;
