@@ -16,9 +16,10 @@ function isApiResult<T>(value: unknown): value is ApiResult<T> {
   );
 }
 let loginPromise: Promise<string> | undefined;
-async function ensureToken(path: string) {
+async function ensureToken(path: string, force = false) {
   const cached = uni.getStorageSync("token") as string;
-  if (cached || path.startsWith("/auth/")) return cached;
+  if (!force && (cached || path.startsWith("/auth/"))) return cached;
+  if (force) uni.removeStorageSync("token");
   loginPromise ??= new Promise<string>((resolve, reject) =>
     uni.request({
       url: `${BASE_URL}/auth/test-login`,
@@ -41,37 +42,49 @@ export async function request<T>(
   options: RequestOptions = {},
 ): Promise<T> {
   const token = await ensureToken(path);
-  return new Promise((resolve, reject) => {
-    uni.request({
-      ...options,
-      url: `${BASE_URL}${path}`,
-      header: {
-        "content-type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(options.header || {}),
-      },
-      success(res) {
-        if (
-          isApiResult<T>(res.data) &&
-          res.statusCode >= 200 &&
-          res.statusCode < 300 &&
-          res.data.code === 0
-        ) {
-          resolve(res.data.data);
-          return;
-        }
-        const message = isApiResult<T>(res.data)
-          ? res.data.message
-          : "服务返回了无法识别的响应";
-        uni.showToast({ title: message || "请求失败", icon: "none" });
-        reject(new Error(message));
-      },
-      fail(error) {
-        uni.showToast({ title: "服务暂时不可用", icon: "none" });
-        reject(error);
-      },
+  const send = (authToken: string, retried: boolean) =>
+    new Promise<T>((resolve, reject) => {
+      uni.request({
+        ...options,
+        url: `${BASE_URL}${path}`,
+        header: {
+          "content-type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          ...(options.header || {}),
+        },
+        success: async (res) => {
+          // token 过期/失效：清缓存强制重登一次后重试
+          if (res.statusCode === 401 && !retried && !path.startsWith("/auth/")) {
+            try {
+              const fresh = await ensureToken(path, true);
+              resolve(await send(fresh, true));
+            } catch (error) {
+              reject(error instanceof Error ? error : new Error("登录失败"));
+            }
+            return;
+          }
+          if (
+            isApiResult<T>(res.data) &&
+            res.statusCode >= 200 &&
+            res.statusCode < 300 &&
+            res.data.code === 0
+          ) {
+            resolve(res.data.data);
+            return;
+          }
+          const message = isApiResult<T>(res.data)
+            ? res.data.message
+            : "服务返回了无法识别的响应";
+          uni.showToast({ title: message || "请求失败", icon: "none" });
+          reject(new Error(message));
+        },
+        fail(error) {
+          uni.showToast({ title: "服务暂时不可用", icon: "none" });
+          reject(error);
+        },
+      });
     });
-  });
+  return send(token, false);
 }
 interface UploadResult {
   url: string;
