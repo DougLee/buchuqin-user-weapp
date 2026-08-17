@@ -15,6 +15,10 @@
     },
     { "path": "pages/profile/index", "style": { "navigationStyle": "custom" } },
     {
+      "path": "pages/profile/settings",
+      "style": { "navigationBarTitleText": "个人信息" }
+    },
+    {
       "path": "pages/product/detail",
       "style": { "navigationBarTitleText": "商品详情" }
     },

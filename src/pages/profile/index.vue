@@ -7,9 +7,8 @@ import type { Address } from "../../types";
 const session = useSessionStore(),
   addresses = ref<Address[]>([]),
   usableCouponCount = ref(0),
-  unread = ref(0),
-  editingNickname = ref(false),
-  nicknameInput = ref("");
+  orderCount = ref(0),
+  unread = ref(0);
 const defaultAddress = computed(
   () => addresses.value.find((item) => item.isDefault) || addresses.value[0],
 );
@@ -20,10 +19,11 @@ const roomSummary = computed(() =>
 );
 onShow(async () => {
   await session.ensureLogin();
-  const [addressList, bundle, notifications] = await Promise.all([
+  const [addressList, bundle, notifications, orders] = await Promise.all([
     api.addresses(),
     api.coupons(),
     api.notifications(),
+    api.orders(),
   ]);
   addresses.value = addressList;
   const now = Date.now();
@@ -33,81 +33,28 @@ onShow(async () => {
       new Date(item.coupon.expiresAt).getTime() > now,
   ).length;
   unread.value = notifications.filter((n) => !n.read).length;
+  orderCount.value = orders.length;
 });
 const go = (url: string) => uni.navigateTo({ url });
-function startEditNickname() {
-  nicknameInput.value =
-    session.nickname === "微信用户" ? "" : session.nickname;
-  editingNickname.value = true;
-}
-function saveNickname() {
-  if (!nicknameInput.value.trim()) {
-    uni.showToast({ title: "昵称不能为空", icon: "none" });
-    return;
-  }
-  session.setNickname(nicknameInput.value);
-  editingNickname.value = false;
-  uni.showToast({ title: "昵称已更新（仅本机生效）", icon: "none" });
-}
-/** 手输绑定：H5 常规路径，也是微信授权码失败的降级路径 */
-async function bindPhone() {
-  const res = await uni.showModal({
-    title: "绑定手机号",
-    editable: true,
-    placeholderText: "用于配送联系",
-  });
-  if (!res.confirm) return;
-  const phone = (res.content || "").trim();
-  if (!/^1\d{10}$/.test(phone)) {
-    uni.showToast({ title: "手机号格式不正确", icon: "none" });
-    return;
-  }
-  await session.bindPhone(phone);
-  uni.showToast({ title: "手机号已绑定", icon: "success" });
-}
-// #ifdef MP-WEIXIN
-/** button open-type="getPhoneNumber" 回调（基础库 2.21.0+ 下发动态令牌 code） */
-interface WxPhoneNumberEvent {
-  detail: { errMsg: string; code?: string };
-}
-/**
- * 手机号授权绑定（IK8W5Q）：优先把 e.detail.code 交给 POST /auth/phone 换真实号码；
- * 后端 API-3 扩展中、暂只收 phone 直传时该请求会失败——降级回 showModal 手输旧路径
- * （待后端对齐 code 后移除降级分支）。
- */
-async function onPhoneNumber(event: WxPhoneNumberEvent) {
-  const code = event.detail.code;
-  if (!code) return; // 用户拒绝/关闭授权弹窗，不打扰
-  try {
-    await session.bindPhoneByCode(code);
-    uni.showToast({ title: "手机号已绑定", icon: "success" });
-  } catch {
-    await bindPhone();
-  }
-}
-// #endif
+/** 订单列表是 tabBar 页，跳Tab 需 switchTab */
+const goOrders = () => uni.switchTab({ url: "/pages/orders/index" });
+const goSettings = () => go("/pages/profile/settings");
+/** TODO: 400-100-1000 为演示号，上线前替换为真实客服电话 */
+const callService = () =>
+  uni.makePhoneCall({ phoneNumber: "400-100-1000" });
+/** 在线客服 H5 降级：button open-type="contact" 仅小程序端可用 */
+const onlineServiceFallback = () =>
+  uni.showToast({ title: "请在小程序中使用在线客服", icon: "none" });
 </script>
 <template>
   <view class="page profile"
     ><view class="profile__top"
-      ><view class="avatar">寝</view
+      ><view class="avatar" @tap="goSettings">寝</view
       ><view
-        ><view v-if="editingNickname" class="nickname-edit"
-          ><input
-            v-model="nicknameInput"
-            class="nickname-edit__input"
-            :focus="true"
-            maxlength="12"
-            placeholder="给自己起个名字"
-            confirm-type="done"
-            @confirm="saveNickname"
-          /><text class="nickname-edit__save" @tap="saveNickname"
-            >保存</text
-          ></view
-        ><view v-else class="name-row" @tap="startEditNickname"
+        ><view class="name-row" @tap="goSettings"
           ><text class="name">{{ session.nickname || "同学" }}</text
           ><text class="name-row__edit">{{
-            session.needsNickname ? "点此设置昵称" : "改昵称"
+            session.needsNickname ? "点此设置昵称" : "个人信息"
           }}</text></view
         ><text class="muted"
         >{{
@@ -123,43 +70,35 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
       ></view
     ><view class="motto">“ 今天不出寝，<br />想吃的照样有。 ”</view
     ><view class="stats card"
-      ><view
+      ><view @tap="goOrders"
         ><text class="stats__value">{{ usableCouponCount }}</text
         ><text class="muted">可用优惠券</text></view
-      ><view
-        ><text class="stats__value">{{ addresses.length }}</text
-        ><text class="muted">寝室地址</text></view
+      ><view @tap="goOrders"
+        ><text class="stats__value">{{ orderCount }}</text
+        ><text class="muted">我的订单</text></view
       ></view
     ><view class="menu card"
       ><view @tap="go('/pages/messages/index')"
         ><text>消息中心</text
         ><text>{{ unread ? unread + " 条未读" : "全部已读" }}　›</text></view
+      ><view @tap="goOrders"
+        ><text>我的订单</text><text>查看全部订单　›</text></view
+      ><view @tap="go('/pages/address/index')"
+        ><text>寝室地址</text
+        ><text>{{ roomSummary || "去添加" }}　›</text></view
+      ><view @tap="callService"
+        ><text>电话客服</text><text>每天 09:00-22:30　›</text></view
       ><!-- #ifdef MP-WEIXIN -->
-      <button
-        class="menu__phone"
-        open-type="getPhoneNumber"
-        @getphonenumber="onPhoneNumber"
-      >
-        <text>手机号</text>
-        <text>{{ session.user?.phone || "未绑定" }}　›</text>
+      <button class="menu__service" open-type="contact">
+        <text>在线客服</text>
+        <text>微信内会话　›</text>
       </button>
       <!-- #endif -->
       <!-- #ifndef MP-WEIXIN -->
-      <view @tap="bindPhone"
-        ><text>手机号</text
-        ><text>{{ session.user?.phone || "未绑定" }}　›</text></view
+      <view @tap="onlineServiceFallback"
+        ><text>在线客服</text><text>仅小程序可用　›</text></view
       ><!-- #endif -->
-      <view @tap="go('/pages/address/index')"
-        ><text>寝室地址</text
-        ><text>{{ roomSummary || "去添加" }}　›</text></view
-      ><view @tap="go('/pages/coupons/index')"
-        ><text>我的优惠券</text
-        ><text>{{ usableCouponCount }} 张可用　›</text></view
-      ><view @tap="go('/pages/after-sales/index')"
-        ><text>售后与退款</text><text>查看记录　›</text></view
-      ><view @tap="uni.makePhoneCall({ phoneNumber: '4008002026' })"
-        ><text>联系客服</text><text>每天 09:00-22:30　›</text></view
-      ></view
+      </view
     ><view class="brand-foot"
       ><text>不出寝｜食社</text
       ><text class="muted">校园零食日用，送到寝室</text></view
@@ -214,30 +153,6 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
   padding: 4rpx 12rpx;
   white-space: nowrap;
 }
-.nickname-edit {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-  margin-bottom: 8rpx;
-}
-.nickname-edit__input {
-  width: 260rpx;
-  height: 60rpx;
-  background: #fff;
-  border: 2rpx solid $primary;
-  border-radius: 16rpx;
-  padding: 0 16rpx;
-  font-size: 30rpx;
-  font-weight: 800;
-}
-.nickname-edit__save {
-  color: #fff;
-  background: $primary;
-  border-radius: 16rpx;
-  padding: 8rpx 20rpx;
-  font-size: 23rpx;
-  font-weight: 800;
-}
 .motto {
   color: $primary-dark;
   font-size: 46rpx;
@@ -284,8 +199,8 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
   font-weight: 400;
   text-align: right;
 }
-/* 手机号行（mp-weixin 授权按钮伪装成普通菜单行，视觉与 .menu > view 一致） */
-.menu__phone {
+/* 在线客服（mp-weixin contact 按钮伪装成普通菜单行，视觉与 .menu > view 一致） */
+.menu__service {
   width: 100%;
   min-height: 106rpx;
   display: flex;
@@ -302,11 +217,14 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
   font-weight: 700;
   line-height: inherit;
 }
-.menu__phone text:last-child {
+.menu__service text:last-child {
   color: #667069;
   font-size: 23rpx;
   font-weight: 400;
   text-align: right;
+}
+.menu__service:last-child {
+  border: none;
 }
 .brand-foot {
   text-align: center;
