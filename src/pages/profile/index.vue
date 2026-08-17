@@ -49,6 +49,7 @@ function saveNickname() {
   editingNickname.value = false;
   uni.showToast({ title: "昵称已更新（仅本机生效）", icon: "none" });
 }
+/** 手输绑定：H5 常规路径，也是微信授权码失败的降级路径 */
 async function bindPhone() {
   const res = await uni.showModal({
     title: "绑定手机号",
@@ -64,6 +65,27 @@ async function bindPhone() {
   await session.bindPhone(phone);
   uni.showToast({ title: "手机号已绑定", icon: "success" });
 }
+// #ifdef MP-WEIXIN
+/** button open-type="getPhoneNumber" 回调（基础库 2.21.0+ 下发动态令牌 code） */
+interface WxPhoneNumberEvent {
+  detail: { errMsg: string; code?: string };
+}
+/**
+ * 手机号授权绑定（IK8W5Q）：优先把 e.detail.code 交给 POST /auth/phone 换真实号码；
+ * 后端 API-3 扩展中、暂只收 phone 直传时该请求会失败——降级回 showModal 手输旧路径
+ * （待后端对齐 code 后移除降级分支）。
+ */
+async function onPhoneNumber(event: WxPhoneNumberEvent) {
+  const code = event.detail.code;
+  if (!code) return; // 用户拒绝/关闭授权弹窗，不打扰
+  try {
+    await session.bindPhoneByCode(code);
+    uni.showToast({ title: "手机号已绑定", icon: "success" });
+  } catch {
+    await bindPhone();
+  }
+}
+// #endif
 </script>
 <template>
   <view class="page profile"
@@ -112,10 +134,22 @@ async function bindPhone() {
       ><view @tap="go('/pages/messages/index')"
         ><text>消息中心</text
         ><text>{{ unread ? unread + " 条未读" : "全部已读" }}　›</text></view
-      ><view @tap="bindPhone"
+      ><!-- #ifdef MP-WEIXIN -->
+      <button
+        class="menu__phone"
+        open-type="getPhoneNumber"
+        @getphonenumber="onPhoneNumber"
+      >
+        <text>手机号</text>
+        <text>{{ session.user?.phone || "未绑定" }}　›</text>
+      </button>
+      <!-- #endif -->
+      <!-- #ifndef MP-WEIXIN -->
+      <view @tap="bindPhone"
         ><text>手机号</text
         ><text>{{ session.user?.phone || "未绑定" }}　›</text></view
-      ><view @tap="go('/pages/address/index')"
+      ><!-- #endif -->
+      <view @tap="go('/pages/address/index')"
         ><text>寝室地址</text
         ><text>{{ roomSummary || "去添加" }}　›</text></view
       ><view @tap="go('/pages/coupons/index')"
@@ -245,6 +279,30 @@ async function bindPhone() {
   border: none;
 }
 .menu > view text:last-child {
+  color: #667069;
+  font-size: 23rpx;
+  font-weight: 400;
+  text-align: right;
+}
+/* 手机号行（mp-weixin 授权按钮伪装成普通菜单行，视觉与 .menu > view 一致） */
+.menu__phone {
+  width: 100%;
+  min-height: 106rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  border-bottom: 2rpx solid $line;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  line-height: inherit;
+}
+.menu__phone text:last-child {
   color: #667069;
   font-size: 23rpx;
   font-weight: 400;

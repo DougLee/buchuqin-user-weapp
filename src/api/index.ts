@@ -35,11 +35,15 @@ export const api = {
       method: "POST",
       data: { code },
     }),
-  /** 绑定手机号（简化版：直接传号；真实实现需小程序手机号授权码，见后端 TODO） */
-  bindPhone: (phone: string) =>
+  /**
+   * 绑定手机号（POST /auth/phone）：
+   * - { code }：微信小程序手机号授权码（getPhoneNumber 回调 e.detail.code），后端换取真实号码
+   * - { phone }：手输直传（H5 / 后端暂不支持 code 时的降级路径）
+   */
+  bindPhone: (data: { code: string } | { phone: string }) =>
     request<{ id: string; phone: string }>("/auth/phone", {
       method: "POST",
-      data: { phone },
+      data,
     }),
   home: () =>
     request<{

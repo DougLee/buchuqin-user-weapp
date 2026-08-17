@@ -35,9 +35,16 @@ export const useSessionStore = defineStore("session", {
       if (this.user) this.user = { ...this.user, nickname: value };
       this.needsNickname = false;
     },
+    /** 手输绑定（H5 / 微信授权码降级路径） */
     async bindPhone(phone: string) {
-      await api.bindPhone(phone);
+      await api.bindPhone({ phone });
       if (this.user) this.user = { ...this.user, phone };
+    },
+    /** 微信授权码绑定：后端用 code 换取真实手机号并回传，本地以回传值刷新展示 */
+    async bindPhoneByCode(code: string) {
+      const result = await api.bindPhone({ code });
+      if (this.user) this.user = { ...this.user, phone: result.phone };
+      return result.phone;
     },
   },
 });
