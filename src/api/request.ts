@@ -86,6 +86,8 @@ function loginFlow(): Promise<string> {
   return testLogin();
   // #endif
 }
+/** 真正的登录通道：401 不能靠"重登"自愈（会死循环）；profile 等带鉴权接口允许自动重登 */
+const LOGIN_CHANNELS = ["/auth/test-login", "/auth/wechat-login"];
 let loginPromise: Promise<string> | undefined;
 async function ensureToken(path: string, force = false) {
   const cached = uni.getStorageSync("token") as string;
@@ -114,7 +116,11 @@ export async function request<T>(
         },
         success: async (res) => {
           // token 过期/失效：清缓存强制重登一次后重试
-          if (res.statusCode === 401 && !retried && !path.startsWith("/auth/")) {
+          if (
+            res.statusCode === 401 &&
+            !retried &&
+            !LOGIN_CHANNELS.includes(path)
+          ) {
             try {
               const fresh = await ensureToken(path, true);
               resolve(await send(fresh, true));
@@ -132,9 +138,17 @@ export async function request<T>(
             resolve(res.data.data);
             return;
           }
-          const message = isApiResult<T>(res.data)
-            ? res.data.message
-            : "服务返回了无法识别的响应";
+          // 非标准信封的报错：429 给人话；Nest 异常体 {statusCode,message} 取 message
+          const nestError =
+            typeof res.data === "object" && res.data !== null
+              ? (res.data as { message?: string }).message
+              : undefined;
+          const message =
+            res.statusCode === 429
+              ? "操作太频繁，请 1 分钟后再试"
+              : isApiResult<T>(res.data)
+                ? res.data.message
+                : nestError || `请求失败（${res.statusCode}）`;
           uni.showToast({ title: message || "请求失败", icon: "none" });
           reject(new Error(message));
         },

@@ -35,6 +35,8 @@ export const api = {
       method: "POST",
       data: { code },
     }),
+  /** 当前登录用户信息：已有 token 时静默换取，避免每次刷新都打登录接口（限流 10 次/分/IP） */
+  profile: () => request<SessionUser>("/auth/profile"),
   /**
    * 绑定手机号（POST /auth/phone）：
    * - { code }：微信小程序手机号授权码（getPhoneNumber 回调 e.detail.code），后端换取真实号码

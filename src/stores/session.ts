@@ -19,12 +19,23 @@ export const useSessionStore = defineStore("session", {
   actions: {
     async ensureLogin() {
       if (this.ready) return;
+      const cached = uni.getStorageSync("token") as string;
+      if (cached) {
+        // 已有 token：静默换取用户信息即可，不再每次刷新都打 test-login（限流 10 次/分/IP）。
+        // token 过期时 request 层会自动清 token 重登并重试本请求。
+        this.applyUser(await api.profile());
+        return;
+      }
       const result = await api.login();
       uni.setStorageSync("token", result.token);
-      this.user = result.user;
+      this.applyUser(result.user);
+    },
+    /** 写入会话用户并完成初始化（登录 / token 换取资料两条路径共用） */
+    applyUser(user: SessionUser) {
+      this.user = user;
       this.needsNickname =
         !readLocalNickname() &&
-        (!result.user.nickname || result.user.nickname === "微信用户");
+        (!user.nickname || user.nickname === "微信用户");
       this.ready = true;
     },
     /** 改昵称：仅本地 storage 覆盖展示（后端暂无修改昵称接口） */
