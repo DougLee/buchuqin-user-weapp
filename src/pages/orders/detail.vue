@@ -1,12 +1,22 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { startPayFlow } from "../../utils/payment";
 import type { Order } from "../../types";
-const order = ref<Order>();
-onLoad(async (q) => {
-  order.value = await api.order(String(q?.id));
+const orderId = ref(""),
+  order = ref<Order>(),
+  confirming = ref(false),
+  paying = ref(false);
+// onShow 每次进页都拉最新进度（从支付页/列表返回、后台推进状态后都能看到新状态）
+onLoad((q) => {
+  orderId.value = String(q?.id || "");
 });
+onShow(refresh);
+async function refresh() {
+  if (!orderId.value) return;
+  order.value = await api.order(orderId.value);
+}
 async function cancel() {
   if (!order.value) return;
   const res = await uni.showModal({
@@ -18,6 +28,32 @@ async function cancel() {
   });
   if (res.confirm) order.value = await api.cancelOrder(order.value.id);
 }
+async function payAgain() {
+  if (!order.value || paying.value) return;
+  paying.value = true;
+  try {
+    const paid = await startPayFlow(order.value.id);
+    if (paid) {
+      uni.showToast({ title: "支付成功", icon: "success" });
+      await refresh();
+    } else {
+      uni.showToast({ title: "支付未完成，可稍后再试", icon: "none" });
+      await refresh();
+    }
+  } finally {
+    paying.value = false;
+  }
+}
+async function confirmReceipt() {
+  if (!order.value || confirming.value) return;
+  confirming.value = true;
+  try {
+    order.value = await api.confirmReceipt(order.value.id);
+    uni.showToast({ title: "已确认收货，订单完成", icon: "success" });
+  } finally {
+    confirming.value = false;
+  }
+}
 function afterSale() {
   if (order.value)
     uni.navigateTo({
@@ -27,10 +63,16 @@ function afterSale() {
 </script>
 <template>
   <view v-if="order" class="page detail"
-    ><view class="status"
+    ><view class="status" :class="{ 'status--exception': order.status === 'exception' }"
       ><text class="status__eyebrow">{{ order.estimatedArrival }}</text
       ><text class="status__title">{{ order.statusText }}</text
-      ><text class="status__sub">你的这一袋，正在校园里接力</text></view
+      ><text class="status__sub">{{
+        order.status === "exception"
+          ? "别担心，客服正在跟进处理，可来电 4008002026"
+          : order.status === "pending-payment"
+            ? "15 分钟内完成支付，超时订单将自动关闭"
+            : "你的这一袋，正在校园里接力"
+      }}</text></view
     ><view class="timeline card"
       ><view
         v-for="(step, i) in order.timeline"
@@ -44,7 +86,10 @@ function afterSale() {
             class="step__line" /></view
         ><view
           ><text class="step__title">{{ step.title }}</text
-          ><text class="step__desc">{{ step.description }}</text></view
+          ><text class="step__desc">{{ step.description }}</text
+          ><text v-if="step.time" class="step__time">{{
+            step.time.slice(11, 16)
+          }}</text></view
         ></view
       ></view
     ><view class="address card"
@@ -64,6 +109,22 @@ function afterSale() {
         ><text>实付</text><text>¥{{ order.payableAmount }}</text></view
       ></view
     ><button
+      v-if="order.status === 'pending-payment'"
+      class="primary-btn pay-again"
+      :disabled="paying"
+      @tap="payAgain"
+    >
+      {{ paying ? "正在拉起支付…" : "继续支付" }}
+    </button
+    ><button
+      v-if="order.status === 'delivered'"
+      class="primary-btn pay-again"
+      :disabled="confirming"
+      @tap="confirmReceipt"
+    >
+      {{ confirming ? "正在确认…" : "确认收货" }}
+    </button
+    ><button
       v-if="['paid', 'pending-payment'].includes(order.status)"
       class="cancel"
       @tap="cancel"
@@ -72,11 +133,18 @@ function afterSale() {
         order.status === "paid" ? "取消订单并申请退款" : "取消未支付订单"
       }}</button
     ><button
-      v-if="order.status === 'completed'"
+      v-if="['delivered', 'completed'].includes(order.status)"
       class="cancel"
       @tap="afterSale"
     >
       申请质量售后
+    </button
+    ><button
+      v-if="order.status === 'exception'"
+      class="cancel"
+      @tap="uni.makePhoneCall({ phoneNumber: '4008002026' })"
+    >
+      联系客服处理
     </button></view
   >
 </template>
@@ -89,6 +157,10 @@ function afterSale() {
   padding: 42rpx;
   margin-bottom: 24rpx;
   box-shadow: 0 14rpx 32rpx rgba(7, 136, 59, 0.2);
+}
+.status--exception {
+  background: linear-gradient(135deg, #b3471e, #e0702f);
+  box-shadow: 0 14rpx 32rpx rgba(208, 92, 34, 0.22);
 }
 .status__eyebrow,
 .status__title,
@@ -159,8 +231,11 @@ function afterSale() {
   font-size: 23rpx;
   margin-top: 8rpx;
 }
-.advance {
-  margin: 24rpx 0;
+.step__time {
+  display: block;
+  font-size: 21rpx;
+  color: #9aa39d;
+  margin-top: 6rpx;
 }
 .address,
 .summary {
@@ -194,6 +269,9 @@ function afterSale() {
   font-size: 34rpx;
   font-weight: 900;
   color: $primary-dark;
+}
+.pay-again {
+  margin: 24rpx 0 0;
 }
 .cancel {
   min-height: 88rpx;

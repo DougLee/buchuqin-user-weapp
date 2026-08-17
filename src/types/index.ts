@@ -46,10 +46,13 @@ export interface Building {
   gender: string;
   available: boolean;
 }
+/** 订单聚合阶段（后端 statusPhase，前端 tab 直接映射；IK93GQ 12 态状态机） */
+export type OrderStatusPhase = "payment" | "fulfillment" | "done" | "exception";
 export interface Order {
   id: string;
   orderNo: string;
   status: string;
+  statusPhase: OrderStatusPhase;
   statusText: string;
   createdAt: string;
   payableAmount: number;

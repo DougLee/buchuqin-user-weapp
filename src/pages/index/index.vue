@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import ProductCard from "../../components/ProductCard.vue";
 import { useCartStore } from "../../stores/cart";
 import { useSessionStore } from "../../stores/session";
-import type { Category, Product } from "../../types";
+import type { Address, Category, Product } from "../../types";
 
 const categoryImages = [
   "/static/products/chips.svg",
@@ -17,13 +17,22 @@ const categoryImages = [
 ];
 const cart = useCartStore(),
   campus = ref("湖北工业大学"),
+  defaultAddress = ref<Address | null>(null),
   categories = ref<Category[]>([]),
   products = ref<Product[]>([]),
   loading = ref(true);
+/** 地址栏：默认地址的楼栋+寝室；无地址时引导去选择 */
+const addressText = computed(() =>
+  defaultAddress.value
+    ? `${defaultAddress.value.buildingName} ${defaultAddress.value.room}`
+    : "请选择地址",
+);
 onShow(async () => {
   await useSessionStore().ensureLogin();
-  const home = await api.home();
+  const [home, addresses] = await Promise.all([api.home(), api.addresses()]);
   campus.value = home.campus.name;
+  defaultAddress.value =
+    addresses.find((item) => item.isDefault) || addresses[0] || null;
   categories.value = home.categories;
   products.value = home.hotProducts;
   await cart.load();
@@ -44,7 +53,7 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
       class="location"
       @tap="uni.navigateTo({ url: '/pages/address/index' })"
       ><text class="pin">●</text
-      ><text>配送至：{{ campus }} · 西区 5 栋 612</text
+      ><text>配送至：{{ campus }} · {{ addressText }}</text
       ><text class="down">⌄</text></view
     >
     <view class="search" @tap="goCategory"

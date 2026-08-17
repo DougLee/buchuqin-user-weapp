@@ -3,6 +3,15 @@ import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import type { AfterSale, Refund } from "../../types";
+/** 售后单状态 → 中文（后端值：pending/approved/rejected） */
+const AFTERSALE_STATUS_TEXT: Record<string, string> = {
+  pending: "待处理",
+  approved: "退款完成",
+  rejected: "已驳回",
+};
+function statusText(status: string): string {
+  return AFTERSALE_STATUS_TEXT[status] ?? status;
+}
 const cases = ref<AfterSale[]>([]),
   refunds = ref<Refund[]>([]);
 onShow(async () => {
@@ -27,9 +36,7 @@ onShow(async () => {
       ><view
         ><text class="case__title">{{ item.description }}</text
         ><text class="muted">订单 {{ item.orderId.slice(-8) }}</text></view
-      ><text class="case__status">{{
-        item.status === "approved" ? "退款完成" : item.status
-      }}</text></view
+      ><text class="case__status">{{ statusText(item.status) }}</text></view
     ><view class="section-title"
       ><text class="section-title__main">退款明细</text></view
     ><view v-for="r in refunds" :key="r.id" class="refund"

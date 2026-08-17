@@ -106,6 +106,9 @@ export const api = {
   order: (id: string) => request<Order>(`/orders/${id}`),
   cancelOrder: (id: string) =>
     request<Order>(`/orders/${id}/cancel`, { method: "POST" }),
+  /** 确认收货：仅 delivered（已送达待确认）状态可调 */
+  confirmReceipt: (id: string) =>
+    request<Order>(`/orders/${id}/confirm-receipt`, { method: "POST" }),
   createAfterSale: (id: string, data: Record<string, unknown>) =>
     request<AfterSale>(`/orders/${id}/after-sales`, { method: "POST", data }),
   afterSales: () => request<AfterSale[]>("/after-sales"),

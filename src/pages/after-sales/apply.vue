@@ -7,7 +7,7 @@ const orderId = ref(""),
   uploading = ref(false),
   form = reactive({
     type: "quality",
-    description: "商品存在质量问题，希望退款",
+    description: "",
     images: [] as string[],
   });
 onLoad((q) => {

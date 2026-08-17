@@ -11,13 +11,15 @@ const orders = ref<Order[]>([]),
   now = ref(Date.now()),
   paying = ref(""),
   ticker = ref<number>();
+// tab 与后端 status 过滤参数直接对应；delivering 含全部履约中状态（含 delivered 已送达待确认）
 const tabs = [
   ["all", "全部"],
   ["pending-payment", "待支付"],
   ["delivering", "配送中"],
   ["completed", "已完成"],
-  ["refunded", "已退款"],
   ["cancelled", "已取消"],
+  ["refunded", "退款"],
+  ["exception", "异常"],
 ];
 async function load(status = "all") {
   active.value = status;
