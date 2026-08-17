@@ -40,10 +40,16 @@ onShow(async () => {
 });
 const banners = [
   {
+    // 品牌帧：原首页 hero 大图（c87ff6f 引入、892f382 移除引用）复活为首帧 Banner。
+    // 图自带文案（不出寝食社·校园零食日用送到寝室），故不叠文字。
+    id: "brand",
+    theme: "green",
+    image: "/static/home-hero-v3.webp",
+    tag: "",
+  },
+  {
     id: "fresh",
     theme: "green",
-    // 复活原首页 hero 大图（c87ff6f 引入、892f382 移除引用），作首帧 Banner 背景真图
-    image: "/static/home-hero-v3.webp",
     tag: "今日爆款",
     title: "零食饮料 寝室直达",
     sub: "楼下自提柜 · 熄灯前都能送",
@@ -102,10 +108,10 @@ const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
             class="hero__bg"
             :src="banner.image"
             mode="aspectFill"
-          /><view class="hero__mask" v-if="'image' in banner"></view
-          ><text class="hero__tag">{{ banner.tag }}</text
-          ><text class="hero__title">{{ banner.title }}</text
-          ><text class="hero__sub">{{ banner.sub }}</text></view
+          /><view class="hero__mask" v-if="'image' in banner && banner.tag"></view
+          ><text v-if="banner.tag" class="hero__tag">{{ banner.tag }}</text
+          ><text v-if="banner.title" class="hero__title">{{ banner.title }}</text
+          ><text v-if="banner.sub" class="hero__sub">{{ banner.sub }}</text></view
         ></swiper-item
       ></swiper
     >
