@@ -152,7 +152,7 @@ export interface Settlement extends Cart {
   payableAmount: number;
   estimatedArrival: string;
 }
-/** 微信支付收银台参数（prepay mock:false 时下发） */
+/** 微信支付收银台参数 */
 export interface WechatPayParams {
   appId: string;
   timeStamp: string;
@@ -161,14 +161,12 @@ export interface WechatPayParams {
   signType: string;
   paySign: string;
 }
-/** POST /payments/wechat/prepay 响应：mock=true 表示微信支付未配置，走 /orders/:id/pay 演示通道 */
+/** POST /payments/wechat/prepay 响应（ADR-0004：商户未配置时接口直接 501，无 mock 字段） */
 export interface PrepayResult {
-  mock: boolean;
   orderId?: string;
   orderNo?: string;
   /** 支付金额，单位：分 */
   amount?: number;
-  hint?: string;
   payParams?: WechatPayParams;
 }
 /** GET /payments/:orderId/status 响应 */
@@ -181,5 +179,4 @@ export interface PaymentStatus {
   paidAt: string | null;
   /** 订单金额，单位：分 */
   amount: number;
-  mock: boolean;
 }

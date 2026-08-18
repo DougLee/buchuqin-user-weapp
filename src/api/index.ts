@@ -102,9 +102,7 @@ export const api = {
     request<Settlement>("/orders/checkout", { method: "POST", data }),
   createOrder: (data: Record<string, unknown>) =>
     request<Order>("/orders", { method: "POST", data }),
-  payOrder: (id: string) =>
-    request<Order>(`/orders/${id}/pay`, { method: "POST" }),
-  /** 微信预支付：mock=true 表示商户 env 未配置（前端改走 /orders/:id/pay 演示通道） */
+  /** 微信预支付（ADR-0004：商户未配置时 501，演示支付通道已下线） */
   prepay: (orderId: string) =>
     request<PrepayResult>("/payments/wechat/prepay", {
       method: "POST",
