@@ -65,7 +65,11 @@ function wxLoginCode(): Promise<string> {
 }
 async function wechatLogin(): Promise<string> {
   const code = await wxLoginCode();
-  const { status, body } = await post("/auth/wechat-login", { code });
+  // 双小程序凭证路由（IK8W5Q）：带上本端 appid，后端挑对应 secret
+  const { status, body } = await post("/auth/wechat-login", {
+    code,
+    appid: "wxc814687e5ae26924",
+  });
   if (status === 501) throw new WechatLoginNotConfigured();
   if (status >= 300) throw new Error("微信登录失败");
   return tokenFrom(body);

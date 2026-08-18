@@ -29,11 +29,12 @@ export const api = {
       method: "POST",
       data: { identity: "user" },
     }),
-  /** 微信小程序登录（后端未配置 WX_* 时 501，request.ts 已负责回退 test-login） */
+  /** 微信小程序登录（后端未配置 WX_* 时 501，request.ts 已负责回退 test-login）。
+   *  appid 用于双小程序凭证路由（IK8W5Q），与 manifest 一致。 */
   wechatLogin: (code: string) =>
     request<LoginResult>("/auth/wechat-login", {
       method: "POST",
-      data: { code },
+      data: { code, appid: "wxc814687e5ae26924" },
     }),
   /** 当前登录用户信息：已有 token 时静默换取，避免每次刷新都打登录接口（限流 10 次/分/IP） */
   profile: () => request<SessionUser>("/auth/profile"),
