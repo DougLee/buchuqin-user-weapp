@@ -6,6 +6,19 @@ const NICKNAME_KEY = "localNickname";
 function readLocalNickname(): string {
   return (uni.getStorageSync(NICKNAME_KEY) as string) || "";
 }
+// #ifdef MP-WEIXIN
+/** wx.login 取 code（小程序正式登录通道用） */
+function wxLoginCode(): Promise<string> {
+  return new Promise((resolve, reject) =>
+    uni.login({
+      provider: "weixin",
+      success: (res) =>
+        res.code ? resolve(res.code) : reject(new Error("uni.login 未返回 code")),
+      fail: reject,
+    }),
+  );
+}
+// #endif
 export const useSessionStore = defineStore("session", {
   state: () => ({
     ready: false,
@@ -21,12 +34,18 @@ export const useSessionStore = defineStore("session", {
       if (this.ready) return;
       const cached = uni.getStorageSync("token") as string;
       if (cached) {
-        // 已有 token：静默换取用户信息即可，不再每次刷新都打 test-login（限流 10 次/分/IP）。
+        // 已有 token：静默换取用户信息即可，不再每次刷新都打登录接口（限流 10 次/分/IP）。
         // token 过期时 request 层会自动清 token 重登并重试本请求。
         this.applyUser(await api.profile());
         return;
       }
+      // 小程序端正式通道（2026-08-18）：微信登录，不走 test-login；H5 保留演示通道
+      // #ifdef MP-WEIXIN
+      const result = await api.wechatLogin(await wxLoginCode());
+      // #endif
+      // #ifndef MP-WEIXIN
       const result = await api.login();
+      // #endif
       uni.setStorageSync("token", result.token);
       this.applyUser(result.user);
     },
