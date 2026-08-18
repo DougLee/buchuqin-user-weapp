@@ -50,7 +50,7 @@ const banners = [
     // 图自带文案（不出寝食社·校园零食日用送到寝室），故不叠文字。
     id: "brand",
     theme: "green",
-    image: "/static/home-hero-v3.webp",
+    image: "/static/home-hero-v3.jpg",
     tag: "",
   },
   {
