@@ -75,15 +75,19 @@ async function wechatLogin(): Promise<string> {
   return tokenFrom(body);
 }
 // #endif
-/** 登录通道选择：微信小程序先走 wechat-login（501 未配置则回退演示通道）；H5 等无 uni.login 的环境直接 test-login */
+/** 登录通道选择：小程序只走微信登录（正式通道，失败不回退）；
+ *  H5 等无 uni.login 的环境保留 test-login 演示通道 */
 function loginFlow(): Promise<string> {
   // #ifdef MP-WEIXIN
   return wechatLogin().catch((error) => {
-    // 演示环境（后端未配置 WX_*，返回 501）不破坏：静默回退 test-login
-    if (error instanceof WechatLoginNotConfigured)
-      console.info("[auth] 微信登录未配置，回退演示登录通道");
-    else console.warn("[auth] 微信登录失败，回退演示登录通道", error);
-    return testLogin();
+    // 正式通道（2026-08-18 道哥拍板）：小程序不再回退 test-login，
+    // 失败给用户明确提示，由用户重试（凭证未配/网络异常都会走到这里）
+    const message =
+      error instanceof WechatLoginNotConfigured
+        ? "登录服务未配置，请联系管理员"
+        : "微信登录失败，请重试";
+    uni.showToast({ title: message, icon: "none" });
+    throw error instanceof Error ? error : new Error(message);
   });
   // #endif
   // #ifndef MP-WEIXIN
