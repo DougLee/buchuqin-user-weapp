@@ -54,6 +54,9 @@ async function makeDefault(a: Address) {
 <template>
   <view class="page"
     ><view class="notice">当前版本固定配送湖北工业大学校内寝室</view
+    ><view v-if="!addresses.length" class="empty-hint"
+      ><text class="empty-hint__title">还没有寝室地址</text
+      ><text class="muted">点下方按钮添加一间，楼长才知道送到哪</text></view
     ><view
       v-for="a in addresses"
       :key="a.id"
@@ -94,6 +97,16 @@ async function makeDefault(a: Address) {
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
+.empty-hint {
+  text-align: center;
+  padding: 110rpx 0 40rpx;
+}
+.empty-hint__title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 900;
+  margin-bottom: 12rpx;
+}
 .notice {
   background: $primary-soft;
   color: $primary-dark;

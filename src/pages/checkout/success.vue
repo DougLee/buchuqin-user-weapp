@@ -17,14 +17,13 @@ function goHome() {
 /**
  * 取消确认（IK9AWR）：后端 cancel 接口暂无 reason 字段，
  * 原原因选择弹窗收集后不上传属 UI 表演，已移除；接口支持后再恢复选择并上传。
+ * G2（2026-08-19 grilling）：仅待支付可取消；已支付订单按 ADR-0004 走客服，
+ * 不再显示取消入口（原"按支付渠道发起退款"文案与后端 400 事实矛盾）。
  */
 function openCancel() {
   uni.showModal({
     title: "取消订单",
-    content:
-      order.value?.status === "pending-payment"
-        ? "订单尚未支付，取消后直接关闭"
-        : "取消后将按支付渠道发起退款",
+    content: "订单尚未支付，取消后直接关闭",
     confirmColor: "#d4380d",
     success: async (m) => {
       if (!m.confirm || !order.value || cancelling.value) return;
@@ -67,7 +66,7 @@ function openCancel() {
       ><button class="primary-btn actions__home" @tap="goHome"
         >返回首页</button
       ><button
-        v-if="order && ['paid', 'pending-payment'].includes(order.status)"
+        v-if="order?.status === 'pending-payment'"
         class="actions__cancel"
         :disabled="cancelling"
         @tap="openCancel"

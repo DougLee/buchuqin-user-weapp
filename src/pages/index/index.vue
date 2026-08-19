@@ -176,6 +176,8 @@ function search() {
     >
     <view v-if="loading" class="grid"
       ><view v-for="n in 4" :key="n" class="skeleton" /></view
+    ><view v-else-if="!products.length" class="grid-empty"
+      ><text class="muted">货架暂时空着，去「商品」页逛逛</text></view
     ><view v-else class="grid"
       ><ProductCard
         v-for="p in products"
@@ -403,6 +405,12 @@ function search() {
 .category__image image {
   width: 100%;
   height: 100%;
+}
+.grid-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 390rpx;
 }
 .grid {
   display: grid;
