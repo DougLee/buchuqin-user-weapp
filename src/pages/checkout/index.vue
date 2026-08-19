@@ -49,11 +49,11 @@ const belowThreshold = computed(
   () =>
     (cart.value?.productAmount ?? 0) > 0 &&
     (cart.value?.productAmount ?? 0) <
-      (cart.value?.deliveryThreshold ?? 1000),
+      (cart.value?.deliveryThreshold ?? 0),
 );
 const thresholdGap = computed(() =>
   fenToYuan(
-    (cart.value?.deliveryThreshold ?? 1000) -
+    (cart.value?.deliveryThreshold ?? 0) -
       (cart.value?.productAmount ?? 0),
   ),
 );
