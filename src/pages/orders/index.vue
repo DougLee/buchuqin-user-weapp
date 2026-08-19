@@ -117,7 +117,7 @@ onUnload(stopTicker);
           >{{ t[1] }}</view
         ></view
       ></scroll-view
-    ><view v-if="error" class="empty" @tap="load(active.value)"
+    ><view v-if="error" class="empty" @tap="load(active)"
       ><text class="empty__mark">!</text
       ><text class="empty__title">订单加载失败</text
       ><text class="muted">网络异常，点击重试</text></view

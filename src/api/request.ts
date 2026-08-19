@@ -41,14 +41,6 @@ function tokenFrom(body: unknown): string {
   if (isApiResult<LoginResult>(body)) return body.data.token;
   throw new Error("登录失败");
 }
-/** 演示登录通道（本地/H5/微信登录未配置时的回退兜底） */
-async function testLogin(): Promise<string> {
-  const { status, body } = await post("/auth/test-login", {
-    identity: "user",
-  });
-  if (status >= 300) throw new Error("登录失败");
-  return tokenFrom(body);
-}
 // #ifdef MP-WEIXIN
 /** 后端 WX_APPID/WX_SECRET 未配置时返回 501"微信登录未配置"，需回退 test-login */
 class WechatLoginNotConfigured extends Error {}
@@ -76,12 +68,14 @@ async function wechatLogin(): Promise<string> {
   return tokenFrom(body);
 }
 // #endif
-/** 登录通道选择：小程序只走微信登录（正式通道，失败不回退）；
- *  H5 等无 uni.login 的环境保留 test-login 演示通道 */
+/** 登录通道：小程序只走微信登录（正式通道，失败不回退；test-login 已随 ADR-0004 下线）。
+ *  H5 等非小程序环境无登录通道，直接拒绝。 */
 function loginFlow(): Promise<string> {
+  // #ifndef MP-WEIXIN
+  return Promise.reject(new Error("请在微信小程序中打开"));
+  // #endif
   // #ifdef MP-WEIXIN
   return wechatLogin().catch((error) => {
-    // 正式通道（2026-08-18 道哥拍板）：小程序不再回退 test-login，
     // 失败给用户明确提示，由用户重试（凭证未配/网络异常都会走到这里）
     const message =
       error instanceof WechatLoginNotConfigured
@@ -91,12 +85,9 @@ function loginFlow(): Promise<string> {
     throw error instanceof Error ? error : new Error(message);
   });
   // #endif
-  // #ifndef MP-WEIXIN
-  return testLogin();
-  // #endif
 }
 /** 真正的登录通道：401 不能靠"重登"自愈（会死循环）；profile 等带鉴权接口允许自动重登 */
-const LOGIN_CHANNELS = ["/auth/test-login", "/auth/wechat-login"];
+const LOGIN_CHANNELS = ["/auth/wechat-login"];
 let loginPromise: Promise<string> | undefined;
 async function ensureToken(path: string, force = false) {
   const cached = uni.getStorageSync("token") as string;

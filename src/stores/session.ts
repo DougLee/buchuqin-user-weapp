@@ -39,13 +39,12 @@ export const useSessionStore = defineStore("session", {
         this.applyUser(await api.profile());
         return;
       }
-      // 小程序端正式通道（2026-08-18）：微信登录，不走 test-login；H5 保留演示通道
-      // #ifdef MP-WEIXIN
-      const result = await api.wechatLogin(await wxLoginCode());
-      // #endif
+      // 正式通道（ADR-0004）：微信登录；test-login 已随后端下线，
+      // H5 等非小程序环境无登录通道，明确报错（开发调试请在微信开发者工具进行）
       // #ifndef MP-WEIXIN
-      const result = await api.login();
+      throw new Error("请在微信小程序中打开");
       // #endif
+      const result = await api.wechatLogin(await wxLoginCode());
       uni.setStorageSync("token", result.token);
       this.applyUser(result.user);
     },

@@ -25,12 +25,7 @@ interface PageResult<T> {
   pageSize: number;
 }
 export const api = {
-  login: () =>
-    request<LoginResult>("/auth/test-login", {
-      method: "POST",
-      data: { identity: "user" },
-    }),
-  /** 微信小程序登录（后端未配置 WX_* 时 501，request.ts 已负责回退 test-login）。
+  /** 微信小程序登录（唯一通道；后端未配置 WX_*_USER 时 501 报"登录服务未配置"）。
    *  appid 用于双小程序凭证路由（IK8W5Q），与 manifest 一致。 */
   wechatLogin: (code: string) =>
     request<LoginResult>("/auth/wechat-login", {

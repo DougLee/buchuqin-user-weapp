@@ -44,7 +44,16 @@ onShow(async () => {
   await cart.load();
   loading.value = false;
 });
-const banners = [
+/** 首页 Banner 帧：品牌帧只有图，其余帧叠 tag/title/sub 文案。 */
+interface Banner {
+  id: string;
+  theme: string;
+  image?: string;
+  tag: string;
+  title?: string;
+  sub?: string;
+}
+const banners: readonly Banner[] = [
   {
     // 品牌帧：原首页 hero 大图（c87ff6f 引入、892f382 移除引用）复活为首帧 Banner。
     // 图自带文案（不出寝食社·校园零食日用送到寝室），故不叠文字。
