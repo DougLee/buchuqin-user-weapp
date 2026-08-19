@@ -97,6 +97,12 @@ async function load() {
     loading.value = false;
     return;
   }
+  if (!address.value) {
+    // 无收货地址：结算接口必 400，不当作网络异常——展示空地址引导卡片，
+    // 添加地址返回后 onShow 重新 load 走正常预览
+    loading.value = false;
+    return;
+  }
   try {
     await refresh();
   } catch {
