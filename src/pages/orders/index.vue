@@ -3,7 +3,7 @@ import { ref } from "vue";
 import { onHide, onReachBottom, onShow, onUnload } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { fenToYuan } from "../../utils/money";
-import { startPayFlow } from "../../utils/payment";
+import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
 import type { Order } from "../../types";
 /** 与后端支付超时关单保持一致（15 分钟，Cron + 懒执行） */
 const PAY_WINDOW_MS = 15 * 60 * 1000;
@@ -97,6 +97,7 @@ async function pay(order: Order) {
   }
 }
 onShow(() => {
+  void preloadPayTemplates();
   startTicker();
   load(active.value);
 });

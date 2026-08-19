@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { fenToYuan } from "../../utils/money";
-import { startPayFlow } from "../../utils/payment";
+import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
 import type { Address, Cart, UserCoupon } from "../../types";
 /** 结算金额字段单位均为分（契约 API-3），展示统一经 fenToYuan */
 interface Settlement {
@@ -104,7 +104,10 @@ async function load() {
   }
   loading.value = false;
 }
-onShow(load);
+onShow(() => {
+  load();
+  void preloadPayTemplates();
+});
 async function setMode(value: "instant" | "scheduled") {
   mode.value = value;
   await refresh();

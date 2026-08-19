@@ -167,7 +167,13 @@ export interface PrepayResult {
   orderNo?: string;
   /** 支付金额，单位：分 */
   amount?: number;
+  /** 订阅消息模板（支付成功/送达，ADR-0004）：支付前 requestSubscribeMessage 用 */
+  subscribeTemplates?: string[];
   payParams?: WechatPayParams;
+}
+/** GET /payments/wechat/templates 响应（进页预载，缓存供支付前授权） */
+export interface SubscribeTemplatesResult {
+  templates: string[];
 }
 /** GET /payments/:orderId/status 响应 */
 export interface PaymentStatus {

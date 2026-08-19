@@ -15,6 +15,7 @@ import type {
   Refund,
   SessionUser,
   Settlement,
+  SubscribeTemplatesResult,
   UserCoupon,
 } from "../types";
 interface PageResult<T> {
@@ -110,6 +111,9 @@ export const api = {
     }),
   paymentStatus: (orderId: string) =>
     request<PaymentStatus>(`/payments/${orderId}/status`),
+  /** 订阅消息模板 ID（支付前 requestSubscribeMessage 用；失败静默） */
+  subscribeTemplates: () =>
+    request<SubscribeTemplatesResult>("/payments/wechat/templates"),
   orders: async (status = "all") =>
     (await request<PageResult<Order>>(`/orders?status=${status}`)).items,
   /** 订单分页契约（IK9AWO）：滚动加载用，返回完整信封 {items,total,page,pageSize} */
