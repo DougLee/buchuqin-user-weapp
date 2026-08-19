@@ -5,7 +5,7 @@ import { api } from "../../api";
 import ProductCard from "../../components/ProductCard.vue";
 import { useCartStore } from "../../stores/cart";
 import { useSessionStore } from "../../stores/session";
-import type { Address, Category, Product } from "../../types";
+import type { Address, Banner, Category, Product } from "../../types";
 
 const categoryImages = [
   "/static/products/chips.svg",
@@ -20,11 +20,14 @@ const cart = useCartStore(),
   defaultAddress = ref<Address | null>(null),
   categories = ref<Category[]>([]),
   products = ref<Product[]>([]),
+  /** 首页轮播（IK9RX2）：DB 数据为准，本地渐变仅为兜底占位（后台无 Banner 时极简展示） */
+  banners = ref<Banner[]>([]),
   loading = ref(true);
-/** 分类图标按 id 稳定映射（IK9AWT）：同一分类恒定同图，列表变动或超 6 个不漂移 */
-function categoryImage(id: string): string {
+/** 分类图标（IK9RX0）：后台配的类别图优先；无图回退本地哈希映射（同 id 恒定同图，列表变动不漂移） */
+function categoryImage(item: Category): string {
+  if (item.image) return item.image;
   let h = 0;
-  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 997;
+  for (const ch of item.id) h = (h * 31 + ch.charCodeAt(0)) % 997;
   return categoryImages[h % categoryImages.length];
 }
 /** 地址栏：默认地址的楼栋+寝室；无地址时引导去选择 */
@@ -40,50 +43,23 @@ onShow(async () => {
   defaultAddress.value =
     addresses.find((item) => item.isDefault) || addresses[0] || null;
   categories.value = home.categories;
+  banners.value = home.banners;
   products.value = home.hotProducts;
   await cart.load();
   loading.value = false;
 });
-/** 首页 Banner 帧：品牌帧只有图，其余帧叠 tag/title/sub 文案。 */
-interface Banner {
-  id: string;
-  theme: string;
-  image?: string;
-  tag: string;
-  title?: string;
-  sub?: string;
+/** Banner 主题：预置键映射渐变，自定义 hex 走内联底色。 */
+const BANNER_THEMES: Record<string, string> = {
+  green: "linear-gradient(120deg, #07883b 0%, #25b95a 60%, #41ce69 100%)",
+  orange: "linear-gradient(120deg, #e25c05 0%, #ff7a21 60%, #ffa24d 100%)",
+  dark: "linear-gradient(120deg, #1e2520 0%, #2f4436 60%, #159447 100%)",
+};
+function bannerStyle(banner: Banner) {
+  const theme = BANNER_THEMES[banner.color];
+  if (theme) return { background: theme };
+  // 自定义 hex：纯色底，文字白字可读
+  return { background: banner.color || "#07883b" };
 }
-const banners: readonly Banner[] = [
-  {
-    // 品牌帧：原首页 hero 大图（c87ff6f 引入、892f382 移除引用）复活为首帧 Banner。
-    // 图自带文案（不出寝食社·校园零食日用送到寝室），故不叠文字。
-    id: "brand",
-    theme: "green",
-    image: "/static/home-hero-v3.jpg",
-    tag: "",
-  },
-  {
-    id: "fresh",
-    theme: "green",
-    tag: "今日爆款",
-    title: "零食饮料 寝室直达",
-    sub: "楼下自提柜 · 熄灯前都能送",
-  },
-  {
-    id: "night",
-    theme: "orange",
-    tag: "夜宵专场",
-    title: "泡面卤味 热乎到楼",
-    sub: "每晚 21:00-23:30 加急配送",
-  },
-  {
-    id: "recruit",
-    theme: "dark",
-    tag: "楼长招募令",
-    title: "本楼楼长虚位以待",
-    sub: "每单提成 + 月度底薪，虚位以待",
-  },
-] as const;
 const add = (p: Product) => cart.set(p, cart.quantity(p.id) + 1);
 /** 计数器减件（IK9AWL）：ProductCard 数量>0 时展开 − n ＋ */
 const remove = (p: Product) => cart.set(p, cart.quantity(p.id) - 1);
@@ -122,6 +98,7 @@ function search() {
       /><text class="search__button" @tap="search">搜索</text></view
     >
     <swiper
+      v-if="banners.length"
       class="hero"
       autoplay
       circular
@@ -131,18 +108,27 @@ function search() {
       indicator-color="rgba(255, 255, 255, 0.45)"
       indicator-active-color="#ffffff"
       ><swiper-item v-for="banner in banners" :key="banner.id"
-        ><view class="hero__slide" :class="`hero__slide--${banner.theme}`"
+        ><view class="hero__slide" :style="bannerStyle(banner)"
           ><image
-            v-if="'image' in banner"
+            v-if="banner.image"
             class="hero__bg"
             :src="banner.image"
             mode="aspectFill"
-          /><view class="hero__mask" v-if="'image' in banner && banner.tag"></view
-          ><text v-if="banner.tag" class="hero__tag">{{ banner.tag }}</text
+          /><view class="hero__mask" v-if="banner.image && banner.badge"></view
+          ><text v-if="banner.badge" class="hero__tag">{{ banner.badge }}</text
           ><text v-if="banner.title" class="hero__title">{{ banner.title }}</text
-          ><text v-if="banner.sub" class="hero__sub">{{ banner.sub }}</text></view
+          ><text v-if="banner.subtitle" class="hero__sub">{{
+            banner.subtitle
+          }}</text></view
         ></swiper-item
       ></swiper
+    >
+    <!-- 空 Banner 降级（IK9RX2）：后台未配置时给一个品牌占位帧，不让轮播区塌掉 -->
+    <view v-else class="hero hero--empty"
+      ><view class="hero__slide hero__slide--green"
+        ><text class="hero__title">今天不出寝</text
+        ><text class="hero__sub">想吃的照样有</text></view
+      ></view
     >
     <view class="delivery"
       ><view class="delivery__item delivery__item--green"
@@ -166,7 +152,7 @@ function search() {
         class="category"
         @tap="goCategory"
         ><view class="category__image"
-          ><image :src="categoryImage(item.id)" mode="aspectFit" /></view
+          ><image :src="categoryImage(item)" mode="aspectFit" /></view
         ><text>{{ item.name === "全部" ? "零食饮料" : item.name }}</text></view
       ></view
     >
@@ -313,6 +299,14 @@ function search() {
 }
 .hero__slide--dark {
   background: linear-gradient(120deg, #1e2520 0%, #2f4436 60%, #159447 100%);
+}
+/* 空 Banner 占位（IK9RX2）：与轮播同高圆角，承载单帧品牌文案 */
+.hero--empty {
+  aspect-ratio: 2.55/1;
+  border-radius: 28rpx;
+  overflow: hidden;
+  margin-top: 24rpx;
+  box-shadow: 0 12rpx 32rpx rgba(21, 117, 54, 0.1);
 }
 .hero__tag {
   align-self: flex-start;

@@ -2,6 +2,7 @@ import { request, toAbsoluteUrl, uploadImage } from "./request";
 import type {
   Address,
   AfterSale,
+  Banner,
   Building,
   Cart,
   Category,
@@ -53,13 +54,7 @@ export const api = {
   home: () =>
     request<{
       campus: { name: string };
-      banners: Array<{
-        id: string;
-        title: string;
-        subtitle: string;
-        badge: string;
-        color: string;
-      }>;
+      banners: Banner[];
       categories: Category[];
       hotProducts: Product[];
     }>("/home"),

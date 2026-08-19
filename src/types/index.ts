@@ -16,6 +16,18 @@ export interface Product {
 export interface Category {
   id: string;
   name: string;
+  /** 类别图（IK9RX0）：后台可改，空串 = 无图回退文字 tab */
+  image?: string;
+}
+/** 首页 Banner（IK9RX2）：后台营销板块管理，/home 返回启用列表。 */
+export interface Banner {
+  id: string;
+  title: string;
+  subtitle: string;
+  badge: string;
+  /** 预置主题键 green/orange/dark 或自定义 #RRGGBB */
+  color: string;
+  image?: string | null;
 }
 export interface CartLine {
   product: Product;

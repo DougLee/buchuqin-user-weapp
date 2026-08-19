@@ -5,7 +5,7 @@ import { api } from "../../api";
 import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
 import type { Category, Product } from "../../types";
-const ALL = { id: "all", name: "全部" };
+const ALL: Category = { id: "all", name: "全部" };
 /** 侧栏只留本地「全部」（接口数据里也带一个「全部」，不过滤会显示两个） */
 const dedupeAll = (list: Category[]) =>
   list.filter((c) => c.id !== ALL.id && c.name !== ALL.name);
@@ -76,7 +76,13 @@ const currentName = () =>
           class="side__item"
           :class="{ 'side__item--active': active === c.id }"
           @tap="pick(c.id)"
-          >{{ c.name }}</view
+          ><!-- 类别图（IK9RX0）：后台配了图才渲染，无图纯文字 -->
+          <image
+            v-if="c.image"
+            class="side__icon"
+            :src="c.image"
+            mode="aspectFill"
+          /><text>{{ c.name }}</text></view
         ></scroll-view
       ><scroll-view scroll-y class="main"
         ><view class="main__title">{{ currentName() }}</view
@@ -187,12 +193,21 @@ const currentName = () =>
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 10rpx;
   padding: 12rpx 16rpx;
   font-size: 26rpx;
   font-weight: 700;
   color: $ink;
   text-align: center;
   border-left: 8rpx solid transparent;
+}
+/* 类别图标（IK9RX0）：小圆角方块，选中态不动态变色（后台图即最终态） */
+.side__icon {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 12rpx;
+  flex-shrink: 0;
+  background: $primary-soft;
 }
 .side__item--active {
   background: $primary-soft;
