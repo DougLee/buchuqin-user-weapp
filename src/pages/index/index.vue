@@ -186,8 +186,9 @@ function search() {
         @remove="remove"
         @open="open"
     /></view>
-  ></view
-  >
+  </view>
+
+  <TabBar :current="0" />
   <CartOverlay />
 </template>
 

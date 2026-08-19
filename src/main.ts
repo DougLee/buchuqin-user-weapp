@@ -2,6 +2,7 @@ import { createSSRApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
 import CartOverlay from "./components/CartOverlay.vue";
+import TabBar from "./components/TabBar.vue";
 export function createApp() {
   const app = createSSRApp(App);
   app.use(createPinia());
@@ -9,5 +10,8 @@ export function createApp() {
   // 因此各页面需写一行 <CartOverlay />（此处全局注册后无需再 import）；
   // 任意页面 uni.$emit('open-cart') 即可唤起。
   app.component("CartOverlay", CartOverlay);
+  // 自绘 tabBar（2026-08-19）：4 个 tab 页各挂 <TabBar :current="N" />，
+  // 原生条在 App.vue onLaunch 即隐藏。
+  app.component("TabBar", TabBar);
   return { app };
 }

@@ -176,6 +176,7 @@ onUnload(stopTicker);
     ></template
     ></view
   >
+  <TabBar :current="2" />
   <CartOverlay />
 </template>
 <style scoped lang="scss">

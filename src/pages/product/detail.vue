@@ -53,7 +53,7 @@ const onService = () => uni.makePhoneCall({ phoneNumber: SERVICE_PHONE });
   >
   <view v-else-if="loading || !product" class="detail"
     ><!-- 加载骨架（IK9AWK） -->
-    ><view class="visual detail-skeleton__visual" /><view class="content"
+    <view class="visual detail-skeleton__visual" /><view class="content"
       ><view class="card detail-skeleton__block" /><view
         class="card detail-skeleton__block detail-skeleton__block--short"
       /></view
@@ -91,7 +91,7 @@ const onService = () => uni.makePhoneCall({ phoneNumber: SERVICE_PHONE });
           ><text class="muted">楼长送到寝室</text></view
         ></view
       ><!-- 假「商品演示」卡已摘除（IK9AWT）：占位图+生成文案冒充商品信息，仅保留真实流程说明（下方 story） -->
-      ><view class="story"
+      <view class="story"
         ><text class="story__eyebrow">今晚的快乐很简单</text
         ><text class="story__title">不用换鞋，不用下楼。</text
         ><text class="muted"

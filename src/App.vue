@@ -3,6 +3,8 @@ import { onLaunch } from "@dcloudio/uni-app";
 import { useSessionStore } from "./stores/session";
 onLaunch(() => {
   void useSessionStore().ensureLogin();
+  // 自绘 tabBar：启动即隐藏原生条（首帧防闪现），tab 页内的 TabBar 组件 onShow 会再兜底
+  uni.hideTabBar({ animation: false, fail: () => {} });
 });
 </script>
 <style lang="scss">
@@ -38,7 +40,8 @@ textarea:focus {
 }
 .page {
   min-height: 100vh;
-  padding: 28rpx 28rpx 180rpx;
+  /* 底部留白 ≥ 自绘 tabBar（内容 116rpx + iPhone 安全区 68rpx ≈ 184rpx）+ 余量 */
+  padding: 28rpx 28rpx 210rpx;
 }
 .card {
   background: $surface;

@@ -143,7 +143,7 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
     ><view class="settings__tip"
       ><text>头像暂不支持上传；昵称修改目前仅保存在本机。</text></view
     ><!-- 手机号自绘弹层（IK9AWT）：全端可用，替代 showModal editable -->
-    ><view v-if="phoneDialog" class="phone-dialog"
+    <view v-if="phoneDialog" class="phone-dialog"
       ><view class="phone-dialog__mask" @tap="phoneDialog = false"></view
       ><view class="phone-dialog__panel"
         ><text class="phone-dialog__title">绑定手机号</text

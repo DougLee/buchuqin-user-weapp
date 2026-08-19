@@ -106,7 +106,7 @@ const currentName = () =>
                   ><text class="price__symbol">¥</text
                   >{{ fenToYuan(p.price) }}</text
                 ><!-- 计数器（IK9AWL）：数量>0 时展开 − n ＋，数字不再是隐形加号 -->
-                ><view v-if="cart.quantity(p.id)" class="counter" @tap.stop
+                <view v-if="cart.quantity(p.id)" class="counter" @tap.stop
                   ><button
                     class="counter__btn counter__btn--minus"
                     aria-label="减少一件"
@@ -135,7 +135,7 @@ const currentName = () =>
           ></template
         ></scroll-view
       ></view
-    ><CartOverlay /></view
+    ><TabBar :current="1" /><CartOverlay /></view
   >
 </template>
 <style scoped lang="scss">

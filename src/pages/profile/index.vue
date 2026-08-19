@@ -114,6 +114,7 @@ const onlineServiceFallback = () =>
       ><text class="muted">校园零食日用，送到寝室</text></view
     ></view
   >
+  <TabBar :current="3" />
   <CartOverlay />
 </template>
 <style scoped lang="scss">

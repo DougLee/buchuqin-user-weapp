@@ -56,8 +56,9 @@
     }
   ],
   // IK97F6: tabBar 由 5 个减为 4 个（去掉购物袋 Tab，购物车改为悬浮窗 IK97FD）。
-  // 注意：pages.json tabBar 不支持 fontSize 配置（微信原生 tabBar 字号固定，约 10px），
-  // 调大字号需改自定义 tabBar（custom: true + custom-tab-bar 组件），本期暂保持原生默认，真机验收。
+  // 2026-08-19 改自绘 tabBar：原生条图标(≈27px)/字号(≈10px)微信写死不可调，
+  // 本配置仅为保留 tab 页身份（switchTab 页面缓存依赖），实际渲染走
+  // components/TabBar.vue（4 个 tab 页各挂一份），原生条 App 启动即 hideTabBar。
   "tabBar": {
     "color": "#747b76",
     "selectedColor": "#25b95a",

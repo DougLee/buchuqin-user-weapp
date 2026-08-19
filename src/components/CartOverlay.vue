@@ -14,12 +14,9 @@ const EVENT = "open-cart";
 function open() {
   visible.value = true;
   void cart.load();
-  // 小程序原生 tabBar 层级高于页面内容，打开悬浮窗时先隐藏，关闭时恢复
-  uni.hideTabBar({ animation: false, fail: () => {} });
 }
 function close() {
   visible.value = false;
-  uni.showTabBar({ animation: false, fail: () => {} });
 }
 function checkout() {
   if (!cart.cart.items.length) return;
@@ -61,7 +58,7 @@ onUnmounted(() => uni.$off(EVENT, open));
                 ><text class="price__symbol">¥</text
                 >{{ fenToYuan(line.product.price) }}</text
               ><!-- 数量读写走 cart.quantity()（IK9AWM）：连点时读到 pending 新值，不用服务端旧值 -->
-              ><view class="counter"
+              <view class="counter"
                 ><button
                   aria-label="减少一件"
                   @tap="cart.set(line.product, cart.quantity(line.product.id) - 1)"

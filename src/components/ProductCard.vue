@@ -24,7 +24,7 @@ const emit = defineEmits<{
         ><text class="price"
           ><text class="price__symbol">¥</text>{{ fenToYuan(product.price) }}</text
         ><!-- 加减计数器（IK9AWL）：数量>0 时展开 − n ＋，数字不再是隐形加号 -->
-        ><view v-if="quantity" class="counter" @tap.stop
+        <view v-if="quantity" class="counter" @tap.stop
           ><button
             class="counter__btn counter__btn--minus"
             aria-label="减少一件"
