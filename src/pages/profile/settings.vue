@@ -17,28 +17,44 @@ watch(
       nicknameInput.value = value === "微信用户" ? "" : value;
   },
 );
-/** 头像点击查看：暂不支持上传（IK97FL），有头像图时放大预览 */
+/** 头像点击查看大图（已上传头像） */
 function previewAvatar() {
   if (session.user?.avatar) {
     uni.previewImage({ urls: [session.user.avatar] });
-    return;
   }
-  uni.showToast({ title: "暂不支持更换头像", icon: "none" });
 }
-/**
- * 保存昵称：后端暂无 PATCH /profile 之类的资料修改接口（IK8W5Q 起即为本地覆盖），
- * 先走 session.setNickname 本地持久化。TODO: 后端资料接口上线后改为远程保存。
- */
-function saveNickname() {
+/** 微信头像选择（IK9ROG）：chooseAvatar 临时路径 → COS → 落库 */
+async function onChooseAvatar(e: Event) {
+  const url = (
+    e as unknown as { detail?: { avatarUrl?: string } }
+  ).detail?.avatarUrl;
+  if (!url) return;
+  uni.showLoading({ title: "上传中…", mask: true });
+  try {
+    await session.setAvatar(url);
+    uni.showToast({ title: "头像已更新", icon: "success" });
+  } catch {
+    uni.showToast({ title: "头像上传失败，请重试", icon: "none" });
+  } finally {
+    uni.hideLoading();
+  }
+}
+/** 保存昵称（IK9ROG）：调资料端点落库，换设备不丢 */
+async function saveNickname() {
   if (savingNickname.value) return;
   if (!nicknameInput.value.trim()) {
     uni.showToast({ title: "昵称不能为空", icon: "none" });
     return;
   }
   savingNickname.value = true;
-  session.setNickname(nicknameInput.value);
-  savingNickname.value = false;
-  uni.showToast({ title: "昵称已更新（仅本机生效）", icon: "none" });
+  try {
+    await session.setNickname(nicknameInput.value);
+    uni.showToast({ title: "昵称已更新", icon: "none" });
+  } catch {
+    /* request 层已 toast 错误信息 */
+  } finally {
+    savingNickname.value = false;
+  }
 }
 /**
  * 手机号自定义弹层（IK9AWT）：uni.showModal 的 editable 仅微信小程序支持，
@@ -94,7 +110,23 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
 <template>
   <view class="page settings"
     ><view class="menu card"
-      ><view class="settings__row" @tap="previewAvatar"
+      ><!-- #ifdef MP-WEIXIN -->
+      <button class="settings__row settings__avatar-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar"
+        ><text>头像</text
+        ><view class="settings__right"
+          ><image
+            v-if="session.user?.avatar"
+            class="settings__avatar"
+            :src="session.user.avatar"
+            mode="aspectFill"
+          /><view v-else class="settings__avatar settings__avatar--text"
+            >寝</view
+          ><text class="settings__hint">更换　›</text></view
+        ></button
+      >
+      <!-- #endif -->
+      <!-- #ifndef MP-WEIXIN -->
+      <view class="settings__row" @tap="previewAvatar"
         ><text>头像</text
         ><view class="settings__right"
           ><image
@@ -106,6 +138,8 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
             >寝</view
           ><text class="settings__hint">查看　›</text></view
         ></view
+      >
+      <!-- #endif -->
       ><view class="settings__row"
         ><text>昵称</text
         ><view class="settings__right"
@@ -188,6 +222,19 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
 }
 .settings__row:last-child {
   border: none;
+}
+/* 微信 chooseAvatar 按钮承载头像行（IK9ROG）：重置原生 button 外观 */
+.settings__avatar-btn {
+  width: 100%;
+  margin: 0;
+  padding: 0 30rpx;
+  background: none;
+  border-radius: 0;
+  border-bottom: 2rpx solid $line;
+  text-align: left;
+  line-height: inherit;
+  font-size: inherit;
+  color: inherit;
 }
 .settings__right {
   display: flex;

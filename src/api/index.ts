@@ -34,6 +34,12 @@ export const api = {
     }),
   /** 当前登录用户信息：已有 token 时静默换取，避免每次刷新都打登录接口（限流 10 次/分/IP） */
   profile: () => request<SessionUser>("/auth/profile"),
+  /** 资料自助修改（IK9ROG）：昵称/头像落库，DB 为准 */
+  updateProfile: (data: { nickname?: string; avatar?: string }) =>
+    request<{ nickname: string; avatar: string }>("/auth/profile", {
+      method: "PATCH",
+      data,
+    }),
   /**
    * 绑定手机号（POST /auth/phone）：
    * - { code }：微信小程序手机号授权码（getPhoneNumber 回调 e.detail.code），后端换取真实号码

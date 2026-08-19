@@ -56,7 +56,13 @@ const onlineServiceFallback = () =>
 <template>
   <view class="page profile"
     ><view class="profile__top"
-      ><view class="avatar" @tap="goSettings">寝</view
+      ><view class="avatar" @tap="goSettings"
+        ><image
+          v-if="session.user?.avatar"
+          class="avatar__img"
+          :src="session.user.avatar"
+          mode="aspectFill"
+        /><template v-else>寝</template></view
       ><view
         ><view class="name-row" @tap="goSettings"
           ><text class="name">{{ session.nickname || "同学" }}</text
@@ -137,10 +143,16 @@ const onlineServiceFallback = () =>
   border: 5rpx solid #fff;
   box-shadow: 0 12rpx 28rpx rgba(7, 136, 59, 0.2);
   display: flex;
+  overflow: hidden;
   align-items: center;
   justify-content: center;
   font-size: 48rpx;
   font-weight: 900;
+}
+/* 真实头像图（IK9ROG）：铺满圆形容器 */
+.avatar__img {
+  width: 100%;
+  height: 100%;
 }
 .name {
   display: block;

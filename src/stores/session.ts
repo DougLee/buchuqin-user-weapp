@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { api } from "../api";
+import { uploadImage } from "../api/request";
 import type { SessionUser } from "../types";
 /** 本地昵称覆盖（IK8W5Q：昵称编辑暂无后端接口，仅本地展示覆盖） */
 const NICKNAME_KEY = "localNickname";
@@ -56,13 +57,20 @@ export const useSessionStore = defineStore("session", {
         (!user.nickname || user.nickname === "微信用户");
       this.ready = true;
     },
-    /** 改昵称：仅本地 storage 覆盖展示（后端暂无修改昵称接口） */
-    setNickname(name: string) {
+    /** 改昵称（IK9ROG）：落库为准，成功后本地 storage 双写做展示加速 */
+    async setNickname(name: string) {
       const value = name.trim().slice(0, 12);
       if (!value) return;
-      uni.setStorageSync(NICKNAME_KEY, value);
-      if (this.user) this.user = { ...this.user, nickname: value };
+      const result = await api.updateProfile({ nickname: value });
+      uni.setStorageSync(NICKNAME_KEY, result.nickname);
+      if (this.user) this.user = { ...this.user, nickname: result.nickname };
       this.needsNickname = false;
+    },
+    /** 换头像（IK9ROG）：微信头像临时路径先传 COS，URL 落库后本地同步 */
+    async setAvatar(avatarUrl: string) {
+      const url = await uploadImage(avatarUrl);
+      const result = await api.updateProfile({ avatar: url });
+      if (this.user) this.user = { ...this.user, avatar: result.avatar };
     },
     /** 手输绑定（H5 / 微信授权码降级路径） */
     async bindPhone(phone: string) {
