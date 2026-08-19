@@ -121,7 +121,7 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
             mode="aspectFill"
           /><view v-else class="settings__avatar settings__avatar--text"
             >寝</view
-          ><text class="settings__hint">更换　›</text></view
+          ><view class="settings__right"><text class="settings__hint">更换</text><text class="chevron" /></view></view
         ></button
       >
       <!-- #endif -->
@@ -136,7 +136,7 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
             mode="aspectFill"
           /><view v-else class="settings__avatar settings__avatar--text"
             >寝</view
-          ><text class="settings__hint">查看　›</text></view
+          ><view class="settings__right"><text class="settings__hint">查看</text><text class="chevron" /></view></view
         ></view
       >
       <!-- #endif -->
@@ -161,22 +161,26 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
         @getphonenumber="onPhoneNumber"
       >
         <text>绑定手机号</text>
-        <text class="settings__hint">{{
-          (session.user?.phone || "未绑定") + "　›"
-        }}</text>
+        <view class="settings__right"
+          ><text class="settings__hint">{{
+            session.user?.phone || "未绑定"
+          }}</text
+          ><text class="chevron" /></view
+        >
       </button>
       <!-- #endif -->
       <!-- #ifndef MP-WEIXIN -->
       <view class="settings__row" @tap="bindPhone"
         ><text>绑定手机号</text
-        ><text class="settings__hint">{{
-          (session.user?.phone || "未绑定") + "　›"
-        }}</text></view
+        ><view class="settings__right"
+          ><text class="settings__hint">{{
+            session.user?.phone || "未绑定"
+          }}</text
+          ><text class="chevron" /></view
+        ></view
       ><!-- #endif -->
       </view
-    ><view class="settings__tip"
-      ><text>头像暂不支持上传；昵称修改目前仅保存在本机。</text></view
-    ><!-- 手机号自绘弹层（IK9AWT）：全端可用，替代 showModal editable -->
+    ><!-- IK9SO3：删过时提示卡（头像已支持上传、昵称已落库） --><!-- 手机号自绘弹层（IK9AWT）：全端可用，替代 showModal editable -->
     <view v-if="phoneDialog" class="phone-dialog"
       ><view class="phone-dialog__mask" @tap="phoneDialog = false"></view
       ><view class="phone-dialog__panel"

@@ -11,6 +11,8 @@ export interface Product {
   sales: number;
   tag: string;
   image: string;
+  /** 详情多图（IK9SNR）：后台维护的图集，首图兼容旧字段 image */
+  images?: string[];
   weight: number;
 }
 export interface Category {
@@ -28,6 +30,8 @@ export interface Banner {
   /** 预置主题键 green/orange/dark 或自定义 #RRGGBB */
   color: string;
   image?: string | null;
+  /** 图文详情（IK9SNN）：后台配置的跳转内容，空则不可点 */
+  content?: string | null;
 }
 export interface CartLine {
   product: Product;

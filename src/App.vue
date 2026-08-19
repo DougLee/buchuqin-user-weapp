@@ -75,6 +75,17 @@ button:active,
 .muted {
   color: #667069 !important;
 }
+/* CSS 箭头（IK9SO3/IK9SNP）：替代 ‹› 字符——安卓部分机型字体缺该字形，
+   渲染为方框乱码。两条边旋转 45° 画 chevron，全机型一致 */
+.chevron {
+  display: inline-block;
+  width: 14rpx;
+  height: 14rpx;
+  border-top: 3rpx solid currentColor;
+  border-right: 3rpx solid currentColor;
+  transform: rotate(45deg);
+  opacity: 0.55;
+}
 .section-title {
   display: flex;
   align-items: center;

@@ -33,10 +33,13 @@ async function claim(coupon: Coupon) {
   if (claiming.value) return;
   claiming.value = coupon.id;
   try {
-    const userCoupon = await api.claimCoupon(coupon.id);
-    claimable.value = claimable.value.filter((item) => item.id !== coupon.id);
-    mine.value = [userCoupon, ...mine.value];
+    await api.claimCoupon(coupon.id);
     uni.showToast({ title: "领取成功", icon: "success" });
+    // IK9SO0：领取成功后整页重拉，两列状态以服务端为准——
+    // 旧写法本地挪数组，任何偏差都会让卡片停留「领取中…」观感
+    await load();
+  } catch {
+    /* request 层已 toast 业务错误（重复领取/库存不足等） */
   } finally {
     claiming.value = "";
   }
@@ -90,7 +93,7 @@ async function claim(coupon: Coupon) {
           ></view
         ><button
           v-if="c.status === 'claimed' || c.status === 'released'"
-          @tap="uni.switchTab({ url: '/pages/index/index' })"
+          @tap="uni.switchTab({ url: '/pages/category/index' })"
         >
           去使用
         </button></view
@@ -126,14 +129,16 @@ async function claim(coupon: Coupon) {
   background: linear-gradient(135deg, $primary, $primary-dark);
   color: #fff;
   display: flex;
-  align-items: center;
+  /* IK9SO0：¥ 与金额基线对齐，比例协调（原 24/64 失衡） */
+  align-items: baseline;
   justify-content: center;
-  font-size: 64rpx;
+  gap: 4rpx;
+  font-size: 52rpx;
   font-weight: 900;
 }
 .symbol {
-  font-size: 24rpx;
-  margin-top: 20rpx;
+  font-size: 30rpx;
+  font-weight: 800;
 }
 .coupon__body {
   padding: 22rpx;

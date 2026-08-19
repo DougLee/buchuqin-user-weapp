@@ -68,7 +68,11 @@ async function confirmReceipt() {
   }
 }
 function backHome() {
-  uni.switchTab({ url: "/pages/index/index" });
+  // IK9SNY：switchTab 失败兜底 reLaunch，确保落到首页而非上一页
+  uni.switchTab({
+    url: "/pages/index/index",
+    fail: () => uni.reLaunch({ url: "/pages/index/index" }),
+  });
 }
 </script>
 <template>

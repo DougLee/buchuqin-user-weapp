@@ -8,8 +8,7 @@ import type { Address } from "../../types";
 const session = useSessionStore(),
   addresses = ref<Address[]>([]),
   usableCouponCount = ref(0),
-  orderCount = ref(0),
-  unread = ref(0);
+  orderCount = ref(0);
 const defaultAddress = computed(
   () => addresses.value.find((item) => item.isDefault) || addresses.value[0],
 );
@@ -21,10 +20,10 @@ const roomSummary = computed(() =>
 onShow(async () => {
   await session.ensureLogin();
   // 各请求独立容错（IK9AWK）：部分失败不清零其他栏位
-  const [a, b, n, o] = await Promise.allSettled([
+  // （IK9SO5：消息中心入口已隐藏，notifications 不再拉取）
+  const [a, b, o] = await Promise.allSettled([
     api.addresses(),
     api.coupons(),
-    api.notifications(),
     api.orders(),
   ]);
   if (a.status === "fulfilled") addresses.value = a.value;
@@ -36,8 +35,6 @@ onShow(async () => {
         new Date(item.coupon.expiresAt).getTime() > now,
     ).length;
   }
-  if (n.status === "fulfilled")
-    unread.value = n.value.filter((item) => !item.read).length;
   if (o.status === "fulfilled") orderCount.value = o.value.length;
 });
 const go = (url: string) => uni.navigateTo({ url });
@@ -91,28 +88,42 @@ const onlineServiceFallback = () =>
         ><text class="muted">我的订单</text></view
       ></view
     ><view class="menu card"
-      ><view @tap="go('/pages/messages/index')"
-        ><text>消息中心</text
-        ><text>{{ unread ? unread + " 条未读" : "全部已读" }}　›</text></view
-      ><view @tap="goOrders"
-        ><text>我的订单</text><text>查看全部订单　›</text></view
+      ><!-- IK9SO5：消息中心未实现，入口先隐藏（页面保留，功能落地后再放出） --><view @tap="goOrders"
+        ><text>我的订单</text
+        ><view class="menu__cell"
+          ><text>查看全部订单</text><text class="chevron" /></view
+        ></view
       ><view @tap="goCoupons"
         ><text>优惠券</text
-        ><text>{{ usableCouponCount }} 张可用　›</text></view
+        ><view class="menu__cell"
+          ><text>{{ usableCouponCount }} 张可用</text
+          ><text class="chevron" /></view
+        ></view
       ><!-- ADR-0004：试点期不退款，售后入口隐藏，走下方在线/电话客服 --><view @tap="go('/pages/address/index')"
         ><text>寝室地址</text
-        ><text>{{ roomSummary || "去添加" }}　›</text></view
+        ><view class="menu__cell"
+          ><text>{{ roomSummary || "去添加" }}</text
+          ><text class="chevron" /></view
+        ></view
       ><view @tap="callService"
-        ><text>电话客服</text><text>{{ SERVICE_HOURS }}　›</text></view
+        ><text>电话客服</text
+        ><view class="menu__cell"
+          ><text>{{ SERVICE_HOURS }}</text><text class="chevron" /></view
+        ></view
       ><!-- #ifdef MP-WEIXIN -->
       <button class="menu__service" open-type="contact">
         <text>在线客服</text>
-        <text>微信内会话　›</text>
+        <view class="menu__cell"
+          ><text>微信内会话</text><text class="chevron" /></view
+        >
       </button>
       <!-- #endif -->
       <!-- #ifndef MP-WEIXIN -->
       <view @tap="onlineServiceFallback"
-        ><text>在线客服</text><text>仅小程序可用　›</text></view
+        ><text>在线客服</text
+        ><view class="menu__cell"
+          ><text>仅小程序可用</text><text class="chevron" /></view
+        ></view
       ><!-- #endif -->
       </view
     ><view class="brand-foot"
@@ -217,7 +228,13 @@ const onlineServiceFallback = () =>
 .menu > view:last-child {
   border: none;
 }
-.menu > view text:last-child {
+/* 行右侧元信息 + CSS 箭头（IK9SO3：› 在部分安卓字体缺字形显示为方框） */
+.menu__cell {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+.menu__cell text:first-child {
   color: #667069;
   font-size: 23rpx;
   font-weight: 400;
@@ -242,6 +259,12 @@ const onlineServiceFallback = () =>
   line-height: inherit;
 }
 .menu__service text:last-child {
+  color: #667069;
+  font-size: 23rpx;
+  font-weight: 400;
+  text-align: right;
+}
+.menu__service .menu__cell text:first-child {
   color: #667069;
   font-size: 23rpx;
   font-weight: 400;

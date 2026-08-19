@@ -53,6 +53,10 @@
     {
       "path": "pages/after-sales/apply",
       "style": { "navigationBarTitleText": "申请售后" }
+    },
+    {
+      "path": "pages/content/detail",
+      "style": { "navigationBarTitleText": "活动详情" }
     }
   ],
   // IK97F6: tabBar 由 5 个减为 4 个（去掉购物袋 Tab，购物车改为悬浮窗 IK97FD）。

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
+import { onHide, onUnload } from "@dcloudio/uni-app";
 import { useCartStore } from "../stores/cart";
 import { fenToYuan } from "../utils/money";
 /**
@@ -25,6 +26,9 @@ function checkout() {
 }
 onMounted(() => uni.$on(EVENT, open));
 onUnmounted(() => uni.$off(EVENT, open));
+// IK9SO2：返回手势/切 Tab/跳页面即关闭弹层——弹层跟着页面走，不留残影
+onHide(close);
+onUnload(close);
 </script>
 <template>
   <view v-if="visible" class="cart-overlay"

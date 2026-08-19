@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { useCartStore } from "../../stores/cart";
@@ -45,6 +45,11 @@ const add = async () => {
 const openCart = () => uni.$emit("open-cart");
 // H5 端无 contact 能力，直接拨客服电话（IK9AWJ）
 const onService = () => uni.makePhoneCall({ phoneNumber: SERVICE_PHONE });
+/** 详情多图（IK9SNR）：后台 images[] 优先，无则退单图；至少一张保证轮播结构 */
+const gallery = computed(() => {
+  const images = (product.value?.images ?? []).filter(Boolean);
+  return images.length ? images : product.value?.image ? [product.value.image] : [];
+});
 </script>
 <template>
   <view v-if="error" class="detail-error card" @tap="load"
@@ -61,18 +66,22 @@ const onService = () => uni.makePhoneCall({ phoneNumber: SERVICE_PHONE });
   >
   <view v-else class="detail"
     ><view class="visual"
-      ><image :src="product.image" mode="aspectFit" :alt="product.name" /><text
+      ><!-- 详情多图（IK9SNR）：后台 images[] 轮播，多图时显示指示点 -->
+      <swiper
+        class="visual__swiper"
+        :indicator-dots="gallery.length > 1"
+        indicator-color="rgba(21, 75, 38, 0.25)"
+        indicator-active-color="#159447"
+        :circular="gallery.length > 1"
+      >
+        <swiper-item v-for="(img, i) in gallery" :key="i">
+          <image :src="img" mode="aspectFit" :alt="product.name" />
+        </swiper-item>
+      </swiper>
+      <text
         class="visual__tag"
         >{{ product.tag }}</text
-      ><!-- #ifdef MP-WEIXIN --><button
-        class="service"
-        open-type="contact"
-        >客服</button
-      ><!-- #endif --><!-- #ifndef MP-WEIXIN --><button
-        class="service"
-        @tap="onService"
-        >客服</button
-      ><!-- #endif --></view
+      ></view
     ><view class="content"
       ><view class="card info"
         ><text class="info__name">{{ product.name }}</text
@@ -99,7 +108,18 @@ const onService = () => uni.makePhoneCall({ phoneNumber: SERVICE_PHONE });
         ></view
       ></view
     ><view class="bottom safe-bottom"
-      ><button class="bag" @tap="uni.$emit('open-cart')">
+      ><!-- 客服入口移至购物车左侧（IK9SNU）：小图标弱化，不抢「加入购物车」焦点 -->
+      <!-- #ifdef MP-WEIXIN -->
+      <button class="service-mini" open-type="contact" aria-label="客服">
+        客服
+      </button>
+      <!-- #endif -->
+      <!-- #ifndef MP-WEIXIN -->
+      <button class="service-mini" @tap="onService" aria-label="客服">
+        客服
+      </button>
+      <!-- #endif -->
+      <button class="bag" @tap="uni.$emit('open-cart')">
         购物车 {{ cart.cart.totalQuantity || "" }}</button
       ><button class="primary-btn" @tap="add">加入购物车</button></view
     ></view
@@ -123,8 +143,13 @@ const onService = () => uni.makePhoneCall({ phoneNumber: SERVICE_PHONE });
   );
   position: relative;
 }
+.visual__swiper,
+.visual__swiper swiper-item,
 .visual image {
   width: 100%;
+  height: 100%;
+}
+.visual__swiper {
   height: 100%;
 }
 .visual__tag {
@@ -168,27 +193,21 @@ const onService = () => uni.makePhoneCall({ phoneNumber: SERVICE_PHONE });
   text-decoration: line-through;
   color: #667069;
 }
-.service {
-  position: absolute;
-  left: 24rpx;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 96rpx;
-  height: 96rpx;
+/* 底栏客服小按钮（IK9SNU）：弱化的次级入口，灰字细边，别抢主按钮视觉 */
+.service-mini {
+  width: 92rpx;
+  height: 92rpx;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.94);
-  color: $primary-dark;
-  font-size: 24rpx;
-  font-weight: 800;
+  background: $paper;
+  color: #8a938d;
+  border: 2rpx solid $line;
+  font-size: 20rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
   margin: 0;
-  box-shadow: 0 8rpx 22rpx rgba(21, 75, 38, 0.16);
-}
-.service::after {
-  border: none;
+  flex-shrink: 0;
 }
 .guarantee {
   display: grid;

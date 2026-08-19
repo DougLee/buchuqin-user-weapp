@@ -60,12 +60,44 @@ function bannerStyle(banner: Banner) {
   // 自定义 hex：纯色底，文字白字可读
   return { background: banner.color || "#07883b" };
 }
+/**
+ * Banner 点击跳图文详情（IK9SNN）：后台配了 content 才可点，
+ * 数据经 storage 传给图文页（/home 已拉全量，不建详情端点）。
+ */
+function openBanner(banner: Banner) {
+  if (!banner.content?.trim()) return; // 无内容 Banner 不跳转
+  uni.setStorageSync(
+    "bannerContent",
+    JSON.stringify({
+      title: banner.title,
+      subtitle: banner.subtitle,
+      badge: banner.badge,
+      image: banner.image,
+      content: banner.content,
+    }),
+  );
+  uni.navigateTo({ url: "/pages/content/detail" });
+}
 const add = (p: Product) => cart.set(p, cart.quantity(p.id) + 1);
+/** 首页金刚区取分类接口子集（IK9SOB）：剔除「全部」（商品页侧栏自带），上限 12 个 */
+const gridCategories = computed(() =>
+  categories.value
+    .filter((item) => item.name !== "全部")
+    .slice(0, 12),
+);
 /** 计数器减件（IK9AWL）：ProductCard 数量>0 时展开 − n ＋ */
 const remove = (p: Product) => cart.set(p, cart.quantity(p.id) - 1);
 const open = (id: string) =>
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
 const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
+/**
+ * 金刚区点击带分类 id 跳商品页（IK9SOB）：switchTab 不支持 query，
+ * 与搜索词同走 storage 传递；商品页 onShow 消费后选中对应分类。
+ */
+function pickCategory(item: Category) {
+  uni.setStorageSync("categoryPick", item.id);
+  goCategory();
+}
 /** 首页真搜索（IK9AWP）：确认后带关键词去分类页（switchTab 不支持参数，走 storage 传递） */
 const keyword = ref("");
 function search() {
@@ -108,7 +140,11 @@ function search() {
       indicator-color="rgba(255, 255, 255, 0.45)"
       indicator-active-color="#ffffff"
       ><swiper-item v-for="banner in banners" :key="banner.id"
-        ><view class="hero__slide" :style="bannerStyle(banner)"
+        ><view
+          class="hero__slide"
+          :class="{ 'hero__slide--link': banner.content?.trim() }"
+          :style="bannerStyle(banner)"
+          @tap="openBanner(banner)"
           ><image
             v-if="banner.image"
             class="hero__bg"
@@ -133,32 +169,32 @@ function search() {
     <view class="delivery"
       ><view class="delivery__item delivery__item--green"
         ><view
-          ><text class="delivery__title">立即配送</text
-          ><text class="delivery__sub">最快 30 分钟送达</text></view
-        ><text class="delivery__mark">›</text></view
+          ><text class="delivery__title">不出寝点单</text
+          ><text class="delivery__sub">零食饮料 寝室直达</text></view
+        ></view
       ><view class="delivery__item delivery__item--orange"
         ><view
-          ><text class="delivery__title">⚡ 30-60 分钟到楼</text
-          ><text class="delivery__sub"
-            >本楼楼长 <text class="delivery__online">●</text> 在线接单</text
-          ></view
-        ><text class="delivery__mark">›</text></view
+          ><text class="delivery__title">最快30分钟送达</text
+          ><text class="delivery__sub">楼长接力送到门口</text></view
+        ></view
       ></view
     >
     <view class="categories card"
       ><view
-        v-for="item in categories"
+        v-for="item in gridCategories"
         :key="item.id"
         class="category"
-        @tap="goCategory"
+        @tap="pickCategory(item)"
         ><view class="category__image"
           ><image :src="categoryImage(item)" mode="aspectFit" /></view
-        ><text>{{ item.name === "全部" ? "零食饮料" : item.name }}</text></view
+        ><text>{{ item.name }}</text></view
       ></view
     >
     <view class="section-title"
       ><text class="section-title__main">为你推荐</text
-      ><text class="section-title__sub" @tap="goCategory">更多 ›</text></view
+      ><text class="section-title__sub" @tap="goCategory">更多
+        <text class="chevron" /></text
+    ></view
     >
     <view v-if="loading" class="grid"
       ><view v-for="n in 4" :key="n" class="skeleton" /></view
@@ -291,6 +327,10 @@ function search() {
   position: relative;
   z-index: 1;
 }
+/* 可点击 Banner（IK9SNN）：轻按压反馈 */
+.hero__slide--link:active {
+  opacity: 0.92;
+}
 .hero__slide--green {
   background: linear-gradient(120deg, #07883b 0%, #25b95a 60%, #41ce69 100%);
 }
@@ -364,14 +404,6 @@ function search() {
   font-size: 21rpx;
   color: $muted;
   margin-top: 8rpx;
-}
-.delivery__mark {
-  font-size: 48rpx;
-  font-weight: 300;
-}
-.delivery__online {
-  color: $primary;
-  font-size: 18rpx;
 }
 .categories {
   display: grid;

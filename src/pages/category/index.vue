@@ -36,6 +36,12 @@ onShow(async () => {
     active.value = "all";
   }
   uni.removeStorageSync("searchKeyword");
+  // 首页金刚区带分类 id 跳转（IK9SOB）：storage 传递，选中对应分类
+  const pick = uni.getStorageSync("categoryPick") as string;
+  if (pick) {
+    active.value = pick;
+    uni.removeStorageSync("categoryPick");
+  }
   await cart.load();
   try {
     categories.value = dedupeAll(await api.categories());

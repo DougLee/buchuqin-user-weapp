@@ -118,11 +118,6 @@ async function setMode(value: "instant" | "scheduled") {
   mode.value = value;
   await refresh();
 }
-async function selectSlot(label: string, available: boolean) {
-  if (!available) return;
-  slot.value = label;
-  await refresh();
-}
 async function chooseCoupon(item: UserCoupon | null) {
   if (item && !meetsThreshold(item)) {
     // 门槛文案取整数元（IK9AWT：去掉"满 10.00 元"的多余小数）
@@ -210,30 +205,11 @@ async function submit() {
         class="mode card"
         :class="{ 'mode--active': mode === 'scheduled' }"
         @tap="setMode('scheduled')"
-        ><text class="mode__title">预约配送</text
-        ><text class="mode__time">2 小时送达</text
+        ><text class="mode__title">2小时送达</text
+        ><text class="mode__time">更从容</text
         ><text class="mode__gift">赠送 2 元全品类优惠券</text></view
       ></view
-    ><scroll-view
-      v-if="mode === 'scheduled'"
-      scroll-x
-      class="slots card"
-      :show-scrollbar="false"
-      ><view class="slots__inner"
-        ><text class="slots__title">选择时间</text
-        ><view
-          v-for="s in slots"
-          :key="s.id"
-          class="slot"
-          :class="{
-            'slot--active': slot === s.label,
-            'slot--disabled': !s.available,
-          }"
-          @tap="selectSlot(s.label, s.available)"
-          >{{ s.label }}</view
-        ></view
-      ></scroll-view
-    ><view class="section-title"
+    ><!-- IK9SNV：非预约场景去掉时段选择器，scheduled 默认取第一个可用时段（load 内已处理） --><view class="section-title"
       ><text class="section-title__main">这袋有这些</text></view
     ><view class="goods card"
       ><view
@@ -274,7 +250,7 @@ async function submit() {
           ></view
         ><text class="coupon-opt__mark">✓</text></view
       ><view v-if="!usableCoupons.length" class="coupon-opt coupon-opt--empty"
-        ><text>暂无可用优惠券，去「我的 → 优惠券」领一张</text></view
+        ><text>暂无可用优惠券</text></view
       ></view
     ><view class="section-title"
       ><text class="section-title__main">订单备注</text></view
@@ -416,39 +392,6 @@ async function submit() {
 }
 .remark__placeholder {
   color: #9aa39d;
-}
-/* 时段横向滚动（IK9AWN：时段多时不裁切） */
-.slots {
-  margin-top: 20rpx;
-  white-space: nowrap;
-}
-.slots__inner {
-  display: inline-flex;
-  align-items: center;
-  gap: 12rpx;
-  padding: 22rpx;
-}
-.slots__title {
-  font-weight: 800;
-}
-.slot {
-  min-height: 64rpx;
-  padding: 12rpx 16rpx;
-  border: 2rpx solid $line;
-  border-radius: 32rpx;
-  font-size: 21rpx;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-.slot--active {
-  background: $primary;
-  color: #fff;
-  border-color: $primary;
-}
-.slot--disabled {
-  opacity: 0.45;
-  text-decoration: line-through;
 }
 .goods {
   padding: 12rpx 24rpx;

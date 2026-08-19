@@ -12,7 +12,11 @@ onLoad(async (q) => {
   if (orderId.value) order.value = await api.order(orderId.value);
 });
 function goHome() {
-  uni.switchTab({ url: "/pages/index/index" });
+  // IK9SNY：switchTab 失败（极端栈状态）兜底 reLaunch，确保落到首页而非上一页
+  uni.switchTab({
+    url: "/pages/index/index",
+    fail: () => uni.reLaunch({ url: "/pages/index/index" }),
+  });
 }
 /**
  * 取消确认（IK9AWR）：后端 cancel 接口暂无 reason 字段，
