@@ -45,7 +45,6 @@ const go = (url: string) => uni.navigateTo({ url });
 const goOrders = () => uni.switchTab({ url: "/pages/orders/index" });
 /** 优惠券/售后列表入口（IK9AWH：原为无入口孤儿页） */
 const goCoupons = () => go("/pages/coupons/index");
-const goAfterSales = () => go("/pages/after-sales/index");
 const goSettings = () => go("/pages/profile/settings");
 /** 客服电话统一常量（IK9AWJ，原 400-100-1000 为演示号） */
 const callService = () =>
@@ -94,9 +93,7 @@ const onlineServiceFallback = () =>
       ><view @tap="goCoupons"
         ><text>优惠券</text
         ><text>{{ usableCouponCount }} 张可用　›</text></view
-      ><view @tap="goAfterSales"
-        ><text>售后与退款</text><text>进度与明细　›</text></view
-      ><view @tap="go('/pages/address/index')"
+      ><!-- ADR-0004：试点期不退款，售后入口隐藏，走下方在线/电话客服 --><view @tap="go('/pages/address/index')"
         ><text>寝室地址</text
         ><text>{{ roomSummary || "去添加" }}　›</text></view
       ><view @tap="callService"

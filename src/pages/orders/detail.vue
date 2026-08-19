@@ -1,35 +1,26 @@
 <script setup lang="ts">
-import { reactive, ref } from "vue";
+import { ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { fenToYuan } from "../../utils/money";
-import { startPayFlow } from "../../utils/payment";
-import { AFTER_SALE_TYPES } from "../../utils/afterSale";
+import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
 import { SERVICE_PHONE } from "../../utils/service";
 import type { Order } from "../../types";
 const orderId = ref(""),
   order = ref<Order>(),
   confirming = ref(false),
   paying = ref(false),
-  afterSaleOpen = ref(false),
-  afterSaleSubmitting = ref(false),
   /** 三态（IK9AWK）：加载骨架 + 错误重试 */
   loading = ref(true),
   error = ref(false);
-/** 履约中（已拣货及之后、尚未送达）状态：不可取消但可申请售后（IK97FI） */
-const IN_FULFILLMENT_STATUSES = [
-  "picking",
-  "waiting-first-mile",
-  "first-mile",
-  "waiting-handover",
-  "last-mile",
-];
-const afterSaleForm = reactive({ type: "damaged", description: "" });
 // onShow 每次进页都拉最新进度（从支付页/列表返回、后台推进状态后都能看到新状态）
 onLoad((q) => {
   orderId.value = String(q?.id || "");
 });
-onShow(refresh);
+onShow(() => {
+  void preloadPayTemplates();
+  refresh();
+});
 async function refresh() {
   if (!orderId.value) return;
   loading.value = !order.value;
@@ -46,10 +37,7 @@ async function cancel() {
   if (!order.value) return;
   const res = await uni.showModal({
     title: "确认取消订单？",
-    content:
-      order.value.status === "pending-payment"
-        ? "订单尚未支付，将直接关闭"
-        : "取消后将按支付渠道发起退款",
+    content: "订单尚未支付，取消后将直接关闭",
   });
   if (res.confirm) order.value = await api.cancelOrder(order.value.id);
 }
@@ -77,43 +65,6 @@ async function confirmReceipt() {
     uni.showToast({ title: "已确认收货，订单完成", icon: "success" });
   } finally {
     confirming.value = false;
-  }
-}
-function afterSale() {
-  if (order.value)
-    uni.navigateTo({
-      url: `/pages/after-sales/apply?orderId=${order.value.id}`,
-    });
-}
-/** 履约中快捷售后：打开预设选项弹窗（IK97FI） */
-function openAfterSaleSheet() {
-  afterSaleForm.type = "damaged";
-  afterSaleForm.description = "";
-  afterSaleOpen.value = true;
-}
-async function submitAfterSale() {
-  if (!order.value || afterSaleSubmitting.value) return;
-  if (afterSaleForm.description.trim().length < 5) {
-    uni.showToast({ title: "请简单说明问题（至少 5 个字）", icon: "none" });
-    return;
-  }
-  afterSaleSubmitting.value = true;
-  try {
-    // 快捷弹窗不收凭证图，详细凭证可在「售后与退款」补充申请页上传
-    await api.createAfterSale(order.value.id, {
-      type: afterSaleForm.type,
-      description: afterSaleForm.description.trim(),
-      images: [],
-    });
-    afterSaleOpen.value = false;
-    // IK9AWS：快捷通道不收凭证，成功后引导到申请页补充材料
-    uni.showToast({
-      title: "已提交，可到「售后与退款」补充凭证照",
-      icon: "none",
-      duration: 2500,
-    });
-  } finally {
-    afterSaleSubmitting.value = false;
   }
 }
 function backHome() {
@@ -195,64 +146,21 @@ function backHome() {
       {{ confirming ? "正在确认…" : "确认收货" }}
     </button
     ><button
-      v-if="['paid', 'pending-payment'].includes(order.status)"
+      v-if="order.status === 'pending-payment'"
       class="cancel"
       @tap="cancel"
     >
-      {{
-        order.status === "paid" ? "取消订单并申请退款" : "取消未支付订单"
-      }}</button
-    ><button
-      v-if="IN_FULFILLMENT_STATUSES.includes(order.status)"
-      class="cancel"
-      @tap="openAfterSaleSheet"
-    >
-      申请售后
-    </button
-    ><button
-      v-if="['delivered', 'completed'].includes(order.status)"
-      class="cancel"
-      @tap="afterSale"
-    >
-      申请质量售后
-    </button
-    ><button
+      取消订单</button
+    ><!-- ADR-0004：试点期售后入口关闭，统一客服处理 --><button
       v-if="order.status === 'exception'"
       class="cancel"
       @tap="uni.makePhoneCall({ phoneNumber: SERVICE_PHONE })"
     >
-      联系客服处理
+      电话客服处理
     </button
-    ><button class="cancel" @tap="backHome"> 返回首页 </button
-    ><view
-      v-if="afterSaleOpen"
-      class="sheet-mask"
-      @tap="afterSaleOpen = false"
-      ><view class="sheet" @tap.stop
-        ><text class="sheet__title">申请售后</text
-        ><text class="sheet__sub">订单正在配送途中，先登记问题，客服会跟进处理</text
-        ><view class="sheet__options"
-          ><view
-            v-for="item in AFTER_SALE_TYPES"
-            :key="item[0]"
-            class="sheet__option"
-            :class="{ 'sheet__option--active': afterSaleForm.type === item[0] }"
-            @tap="afterSaleForm.type = item[0]"
-            >{{ item[1] }}</view
-          ></view
-        ><textarea
-          v-model="afterSaleForm.description"
-          class="sheet__textarea"
-          maxlength="300"
-          placeholder="请简单说明遇到的问题（至少 5 个字）"
-        /><button
-          class="primary-btn sheet__submit"
-          :disabled="afterSaleSubmitting"
-          @tap="submitAfterSale"
-        >
-          {{ afterSaleSubmitting ? "正在提交…" : "提交售后申请" }}
-        </button></view
-      ></view
+    ><!-- #ifdef MP-WEIXIN -->
+    <button class="cancel" open-type="contact">在线客服</button>
+    <!-- #endif --><button class="cancel" @tap="backHome"> 返回首页 </button
     ></view
   >
   <CartOverlay />
