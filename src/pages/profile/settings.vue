@@ -140,7 +140,7 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
         ></view
       >
       <!-- #endif -->
-      ><view class="settings__row"
+<view class="settings__row"
         ><text>昵称</text
         ><view class="settings__right"
           ><input
