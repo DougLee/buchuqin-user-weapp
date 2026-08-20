@@ -75,16 +75,20 @@ button:active,
 .muted {
   color: #667069 !important;
 }
-/* CSS 箭头（IK9SO3/IK9SNP）：替代 ‹› 字符——安卓部分机型字体缺该字形，
-   渲染为方框乱码。两条边旋转 45° 画 chevron，全机型一致 */
-.chevron {
-  display: inline-block;
-  width: 14rpx;
-  height: 14rpx;
-  border-top: 3rpx solid currentColor;
-  border-right: 3rpx solid currentColor;
-  transform: rotate(45deg);
-  opacity: 0.55;
+/* 可点暗示 chip（IK9VQ3）：chevron 两条边旋转出来的形状就是 >，
+   道哥要求页面不再出现任何 > 形标记，全量改绿底胶囊 */
+.link-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  background: $primary-soft;
+  color: $primary-dark;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+.link-chip:active {
+  opacity: 0.8;
 }
 .section-title {
   display: flex;

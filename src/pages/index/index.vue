@@ -175,8 +175,9 @@ function search() {
     >
     <view class="section-title"
       ><text class="section-title__main">为你推荐</text
-      ><text class="section-title__sub" @tap="goCategory">更多
-        <text class="chevron" /></text
+      ><text class="section-title__sub" @tap="goCategory"
+        ><!-- IK9VQ3：chevron 形状即 >，改 chip 暗示可点 -->
+        <text class="link-chip">更多</text></text
     ></view
     >
     <view v-if="loading" class="grid"

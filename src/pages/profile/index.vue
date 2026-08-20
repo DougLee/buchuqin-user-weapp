@@ -91,30 +91,30 @@ const onlineServiceFallback = () =>
       ><!-- IK9SO5：消息中心未实现，入口先隐藏（页面保留，功能落地后再放出） --><view @tap="goOrders"
         ><text>我的订单</text
         ><view class="menu__cell"
-          ><text>查看全部订单</text><text class="chevron" /></view
+          ><text>查看全部订单</text></view
         ></view
       ><view @tap="goCoupons"
         ><text>优惠券</text
         ><view class="menu__cell"
           ><text>{{ usableCouponCount }} 张可用</text
-          ><text class="chevron" /></view
+          ></view
         ></view
       ><!-- ADR-0004：试点期不退款，售后入口隐藏，走下方在线/电话客服 --><view @tap="go('/pages/address/index')"
         ><text>寝室地址</text
         ><view class="menu__cell"
           ><text>{{ roomSummary || "去添加" }}</text
-          ><text class="chevron" /></view
+          ></view
         ></view
       ><view @tap="callService"
         ><text>电话客服</text
         ><view class="menu__cell"
-          ><text>{{ SERVICE_HOURS }}</text><text class="chevron" /></view
+          ><text>{{ SERVICE_HOURS }}</text></view
         ></view
       ><!-- #ifdef MP-WEIXIN -->
       <button class="menu__service" open-type="contact">
         <text>在线客服</text>
         <view class="menu__cell"
-          ><text>微信内会话</text><text class="chevron" /></view
+          ><text>微信内会话</text></view
         >
       </button>
       <!-- #endif -->
@@ -122,7 +122,7 @@ const onlineServiceFallback = () =>
       <view @tap="onlineServiceFallback"
         ><text>在线客服</text
         ><view class="menu__cell"
-          ><text>仅小程序可用</text><text class="chevron" /></view
+          ><text>仅小程序可用</text></view
         ></view
       ><!-- #endif -->
       </view

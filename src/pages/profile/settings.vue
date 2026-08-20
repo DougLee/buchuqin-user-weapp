@@ -121,7 +121,7 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
             mode="aspectFill"
           /><view v-else class="settings__avatar settings__avatar--text"
             >寝</view
-          ><view class="settings__right"><text class="settings__hint">更换</text><text class="chevron" /></view></view
+          ><view class="settings__right"><text class="settings__hint">更换</text></view></view
         ></button
       >
       <!-- #endif -->
@@ -136,7 +136,7 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
             mode="aspectFill"
           /><view v-else class="settings__avatar settings__avatar--text"
             >寝</view
-          ><view class="settings__right"><text class="settings__hint">查看</text><text class="chevron" /></view></view
+          ><view class="settings__right"><text class="settings__hint">查看</text></view></view
         ></view
       >
       <!-- #endif -->
@@ -165,7 +165,7 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
           ><text class="settings__hint">{{
             session.user?.phone || "未绑定"
           }}</text
-          ><text class="chevron" /></view
+          ></view
         >
       </button>
       <!-- #endif -->
@@ -176,7 +176,7 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
           ><text class="settings__hint">{{
             session.user?.phone || "未绑定"
           }}</text
-          ><text class="chevron" /></view
+          ></view
         ></view
       ><!-- #endif -->
       </view
