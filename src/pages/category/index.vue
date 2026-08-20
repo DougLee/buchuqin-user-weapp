@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { useCartStore } from "../../stores/cart";
+import { categoryImage } from "../../utils/categoryImage";
 import { fenToYuan } from "../../utils/money";
 import type { Category, Product } from "../../types";
 const ALL: Category = { id: "all", name: "全部" };
@@ -37,11 +38,8 @@ onShow(async () => {
   }
   uni.removeStorageSync("searchKeyword");
   // 首页金刚区带分类 id 跳转（IK9SOB）：storage 传递，选中对应分类
-  const pick = uni.getStorageSync("categoryPick") as string;
-  if (pick) {
-    active.value = pick;
-    uni.removeStorageSync("categoryPick");
-  }
+  const pick = (uni.getStorageSync("categoryPick") as string) || "";
+  uni.removeStorageSync("categoryPick");
   await cart.load();
   try {
     categories.value = dedupeAll(await api.categories());
@@ -53,6 +51,9 @@ onShow(async () => {
       categories.value = [];
     }
   }
+  // IK9VD3：pick 校验存在性——类别被删/接口降级时回退「全部」，避免侧栏无高亮、标题与列表错位
+  if (pick)
+    active.value = categories.value.some((c) => c.id === pick) ? pick : "all";
   await load();
 });
 async function pick(id: string) {
@@ -82,12 +83,12 @@ const currentName = () =>
           class="side__item"
           :class="{ 'side__item--active': active === c.id }"
           @tap="pick(c.id)"
-          ><!-- 类别图（IK9RX0）：后台配了图才渲染，无图纯文字 -->
+          ><!-- 类别图（IK9VD3）：与首页金刚区共享 categoryImage，未配图回退本地哈希图标；「全部」为功能项不渲染图标 -->
           <image
-            v-if="c.image"
+            v-if="c.id !== ALL.id"
             class="side__icon"
-            :src="c.image"
-            mode="aspectFill"
+            :src="categoryImage(c)"
+            mode="aspectFit"
           /><text>{{ c.name }}</text></view
         ></scroll-view
       ><scroll-view scroll-y class="main"

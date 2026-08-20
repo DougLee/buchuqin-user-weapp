@@ -5,16 +5,9 @@ import { api } from "../../api";
 import ProductCard from "../../components/ProductCard.vue";
 import { useCartStore } from "../../stores/cart";
 import { useSessionStore } from "../../stores/session";
+import { categoryImage } from "../../utils/categoryImage";
 import type { Address, Banner, Category, Product } from "../../types";
 
-const categoryImages = [
-  "/static/products/chips.svg",
-  "/static/products/soda.svg",
-  "/static/products/noodle.svg",
-  "/static/products/tissue.svg",
-  "/static/products/grape.svg",
-  "/static/products/biscuit.svg",
-];
 const cart = useCartStore(),
   campus = ref("湖北工业大学"),
   defaultAddress = ref<Address | null>(null),
@@ -23,13 +16,7 @@ const cart = useCartStore(),
   /** 首页轮播（IK9RX2）：DB 数据为准，本地渐变仅为兜底占位（后台无 Banner 时极简展示） */
   banners = ref<Banner[]>([]),
   loading = ref(true);
-/** 分类图标（IK9RX0）：后台配的类别图优先；无图回退本地哈希映射（同 id 恒定同图，列表变动不漂移） */
-function categoryImage(item: Category): string {
-  if (item.image) return item.image;
-  let h = 0;
-  for (const ch of item.id) h = (h * 31 + ch.charCodeAt(0)) % 997;
-  return categoryImages[h % categoryImages.length];
-}
+/** 分类图标：共享 categoryImage（IK9VD3），商品页侧栏同款回退，两边恒一致 */
 /** 地址栏：默认地址的楼栋+寝室；无地址时引导去选择 */
 const addressText = computed(() =>
   defaultAddress.value
