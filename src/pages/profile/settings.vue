@@ -1,10 +1,17 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { useSessionStore } from "../../stores/session";
 const session = useSessionStore(),
   nicknameInput = ref(""),
   savingNickname = ref(false);
+/** 绑定后脱敏回显（IKA090）：138****1234，不回显完整号码 */
+const maskedPhone = computed(() => {
+  const phone = session.user?.phone || "";
+  return /^1\d{10}$/.test(phone)
+    ? `${phone.slice(0, 3)}****${phone.slice(7)}`
+    : phone || "未绑定";
+});
 onShow(async () => {
   await session.ensureLogin();
   nicknameInput.value =
@@ -163,7 +170,7 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
         <text>绑定手机号</text>
         <view class="settings__right"
           ><text class="settings__hint">{{
-            session.user?.phone || "未绑定"
+            maskedPhone
           }}</text
           ></view
         >
@@ -174,7 +181,7 @@ async function onPhoneNumber(event: WxPhoneNumberEvent) {
         ><text>绑定手机号</text
         ><view class="settings__right"
           ><text class="settings__hint">{{
-            session.user?.phone || "未绑定"
+            maskedPhone
           }}</text
           ></view
         ></view

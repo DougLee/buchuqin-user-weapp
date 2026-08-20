@@ -22,18 +22,24 @@ function expired(c: UserCoupon) {
   return new Date(c.coupon.expiresAt).getTime() <= Date.now();
 }
 onShow(load);
-async function load() {
-  loading.value = true;
-  error.value = false;
+/**
+ * silent（IKA08Y）：静默重拉不切骨架——领取成功后原地更新两列，
+ * 消除整页闪断；状态仍以服务端返回为准（IK9SO0 原则不变）
+ */
+async function load(silent = false) {
+  if (!silent) {
+    loading.value = true;
+    error.value = false;
+  }
   try {
     const bundle = await api.coupons();
     claimable.value = bundle.claimable;
     mine.value = bundle.mine;
   } catch (e) {
     // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
-    if (isRetryable(e)) error.value = true;
+    if (isRetryable(e) && !silent) error.value = true;
   } finally {
-    loading.value = false;
+    if (!silent) loading.value = false;
   }
 }
 async function claim(coupon: Coupon) {
@@ -44,7 +50,8 @@ async function claim(coupon: Coupon) {
     uni.showToast({ title: "领取成功", icon: "success" });
     // IK9SO0：领取成功后整页重拉，两列状态以服务端为准——
     // 旧写法本地挪数组，任何偏差都会让卡片停留「领取中…」观感
-    await load();
+    // IKA08Y：改静默拉取，不再整页闪骨架
+    await load(true);
   } catch {
     /* request 层已 toast 业务错误（重复领取/库存不足等） */
   } finally {
@@ -64,9 +71,12 @@ async function claim(coupon: Coupon) {
       ><view class="section-title"
         ><text class="section-title__main">可以领的券</text></view
       ><view class="coupon card" v-for="c in claimable" :key="c.id"
-        ><view class="coupon__money"
-          ><text class="symbol">¥</text
-          ><text>{{ fenToYuan(c.amount) }}</text></view
+        ><!-- 金额列（IKA08W）：外层满高居中，内层基线对齐 --><view
+          class="coupon__money"
+          ><view class="coupon__money-inner"
+            ><text class="symbol">¥</text
+            ><text>{{ fenToYuan(c.amount) }}</text></view
+          ></view
         ><view class="coupon__body"
           ><text class="coupon__name">{{ c.name }}</text
           ><text class="muted">满 {{ fenToYuan(c.threshold) }} 元可用</text
@@ -88,9 +98,12 @@ async function claim(coupon: Coupon) {
         v-for="c in mine"
         :key="c.id"
         :class="{ 'coupon--dead': expired(c) }"
-        ><view class="coupon__money"
-          ><text class="symbol">¥</text
-          ><text>{{ fenToYuan(c.coupon.amount) }}</text></view
+        ><!-- 金额列（IKA08W）：外层满高居中，内层基线对齐 --><view
+          class="coupon__money"
+          ><view class="coupon__money-inner"
+            ><text class="symbol">¥</text
+            ><text>{{ fenToYuan(c.coupon.amount) }}</text></view
+          ></view
         ><view class="coupon__body"
           ><view class="coupon__name-row"
             ><text class="coupon__name">{{ c.coupon.name }}</text
@@ -143,13 +156,18 @@ async function claim(coupon: Coupon) {
   height: 100%;
   background: linear-gradient(135deg, $primary, $primary-dark);
   color: #fff;
+  /* IKA08W：外层满高弹性盒只管垂直居中，基线对齐交给内层 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 52rpx;
+  font-weight: 900;
+}
+.coupon__money-inner {
   display: flex;
   /* IK9SO0：¥ 与金额基线对齐，比例协调（原 24/64 失衡） */
   align-items: baseline;
-  justify-content: center;
   gap: 4rpx;
-  font-size: 52rpx;
-  font-weight: 900;
 }
 .symbol {
   font-size: 30rpx;

@@ -146,6 +146,11 @@ button:active,
   body {
     background: #e8ebe7;
   }
+  /* PC 端（IKA08S）：滚动槽常驻——经典滚动条出现/消失会改变可用宽度
+     引发整页回流抖动，常驻后切 Tab 宽度恒定 */
+  html {
+    overflow-y: scroll;
+  }
   uni-app,
   uni-page,
   uni-page-body,

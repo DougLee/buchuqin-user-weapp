@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { useCartStore } from "../../stores/cart";
 import { isRetryable } from "../../api/request";
 import { fenToYuan } from "../../utils/money";
 import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
@@ -50,6 +51,8 @@ async function payAgain() {
     const paid = await startPayFlow(order.value.id);
     if (paid) {
       uni.showToast({ title: "支付成功", icon: "success" });
+      // 支付成功清空本地购物车（IKA08U，服务端落账时已清）
+      useCartStore().clearLocal();
       await refresh();
     } else {
       uni.showToast({ title: "支付未完成，可稍后再试", icon: "none" });

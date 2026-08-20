@@ -31,6 +31,19 @@ export const useCartStore = defineStore("cart", {
       }
     },
     /**
+     * 支付成功后本地清空（IKA08U）：服务端在查单落账时已清购物车行，
+     * 这里同步抹掉缓存与 pending 意图，返回首页弹层不再显示已购商品
+     */
+    clearLocal() {
+      this.cart = {
+        items: [],
+        productAmount: 0,
+        totalQuantity: 0,
+        deliveryThreshold: this.cart.deliveryThreshold,
+      };
+      this.pending = {};
+    },
+    /**
      * 设置某商品数量（绝对值），连点安全（IK9AWM）：
      * 意图先记 pending（UI 即时反馈）→ 请求挂串行链，构建时合并当前全部
      * pending（后写覆盖先写）→ 成功只清未被覆盖的意图，失败回滚并 toast。

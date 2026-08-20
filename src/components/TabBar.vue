@@ -80,4 +80,15 @@ onShow(() => uni.hideTabBar({ animation: false, fail: () => {} }));
 .tabbar__item:active .tabbar__icon {
   transform: scale(0.88);
 }
+@media (min-width: 560px) {
+  /* PC 端（IKA08S）：定宽居中替代 left:0/right:0 全宽拉伸——
+     切 Tab 引发滚动条出现/消失时全宽条会变窄、flex 项重新分位即「晃动」；
+     定宽后不再受影响，且与 480px 手机宽度居中方案视觉统一 */
+  .tabbar {
+    left: 50%;
+    right: auto;
+    width: 480px;
+    transform: translateX(-50%);
+  }
+}
 </style>

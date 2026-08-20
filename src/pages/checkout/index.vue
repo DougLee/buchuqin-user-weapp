@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
+import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
 import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
 import type { Address, Cart, UserCoupon } from "../../types";
@@ -169,7 +170,9 @@ async function submit() {
       // 支付请求异常不吞掉订单：落到详情页继续支付，不留死路
     }
     if (paid) {
-      // 模拟支付成功：直达支付成功页（IK97FE/IK97FH）
+      // 支付成功：清空本地购物车（IKA08U，服务端查单落账时已清）
+      useCartStore().clearLocal();
+      // 直达支付成功页（IK97FE/IK97FH）
       uni.redirectTo({ url: `/pages/checkout/success?id=${created.id}` });
       return;
     }
@@ -199,7 +202,7 @@ async function submit() {
       ><text class="address__room"
         >{{ address.buildingName }} · {{ address.room }} 寝室</text
       ><text class="muted"
-        >{{ address.contactName }} {{ address.phone }}　›</text
+        >{{ address.contactName }} {{ address.phone }}</text
       ></view
     ><view
       v-else
@@ -207,7 +210,7 @@ async function submit() {
       @tap="uni.navigateTo({ url: '/pages/address/edit' })"
       ><text class="address__flag">送到这里</text
       ><text class="address__room">还没有寝室地址</text
-      ><text class="muted">点击添加，楼长才知道送到哪　›</text></view
+      ><text class="muted">点击添加，楼长才知道送到哪</text></view
     ><view class="section-title"
       ><text class="section-title__main">怎么送到寝</text></view
     ><view class="modes"
