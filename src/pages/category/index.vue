@@ -6,10 +6,10 @@ import { useCartStore } from "../../stores/cart";
 import { categoryImage } from "../../utils/categoryImage";
 import { fenToYuan } from "../../utils/money";
 import type { Category, Product } from "../../types";
-const ALL: Category = { id: "all", name: "全部" };
-/** 侧栏只留本地「全部」（接口数据里也带一个「全部」，不过滤会显示两个） */
-const dedupeAll = (list: Category[]) =>
-  list.filter((c) => c.id !== ALL.id && c.name !== ALL.name);
+/**
+ * 侧栏直接用 DB 分类字典（IK9VDJ）：「全部」也是 DB 记录（id 恰为 all、配 biscuit 图），
+ * 不再本地合成/去重；active 初始 'all' 与 DB id 天然一致，api.products('all') 后端已兼容。
+ */
 const active = ref("all"),
   keyword = ref(""),
   categories = ref<Category[]>([]),
@@ -42,13 +42,13 @@ onShow(async () => {
   uni.removeStorageSync("categoryPick");
   await cart.load();
   try {
-    categories.value = dedupeAll(await api.categories());
+    categories.value = await api.categories();
   } catch {
-    // 分类接口失败先退 home 接口；再失败侧栏仅剩「全部」，商品区由 load 三态兜底
+    // 分类接口失败先退 home 接口；再失败合成裸「全部」保底 tab，商品区由 load 三态兜底
     try {
-      categories.value = dedupeAll((await api.home()).categories);
+      categories.value = (await api.home()).categories;
     } catch {
-      categories.value = [];
+      categories.value = [{ id: "all", name: "全部" }];
     }
   }
   // IK9VD3：pick 校验存在性——类别被删/接口降级时回退「全部」，避免侧栏无高亮、标题与列表错位
@@ -63,8 +63,7 @@ async function pick(id: string) {
 const open = (id: string) =>
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
 const currentName = () =>
-  [ALL, ...categories.value].find((c) => c.id === active.value)?.name ||
-  "全部商品";
+  categories.value.find((c) => c.id === active.value)?.name || "全部商品";
 </script>
 <template>
   <view class="page"
@@ -78,14 +77,13 @@ const currentName = () =>
     ><view class="body"
       ><scroll-view scroll-y class="side"
         ><view
-          v-for="c in [ALL, ...categories]"
+          v-for="c in categories"
           :key="c.id"
           class="side__item"
           :class="{ 'side__item--active': active === c.id }"
           @tap="pick(c.id)"
-          ><!-- 类别图（IK9VD3）：与首页金刚区共享 categoryImage，未配图回退本地哈希图标；「全部」为功能项不渲染图标 -->
+          ><!-- 类别图（IK9VDJ）：与首页金刚区共享 categoryImage（含「全部」的 DB 配图），未配图回退本地哈希 -->
           <image
-            v-if="c.id !== ALL.id"
             class="side__icon"
             :src="categoryImage(c)"
             mode="aspectFit"

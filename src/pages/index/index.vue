@@ -66,12 +66,8 @@ function openBanner(banner: Banner) {
   uni.navigateTo({ url: "/pages/content/detail" });
 }
 const add = (p: Product) => cart.set(p, cart.quantity(p.id) + 1);
-/** 首页金刚区取分类接口子集（IK9SOB）：剔除「全部」（商品页侧栏自带），上限 12 个 */
-const gridCategories = computed(() =>
-  categories.value
-    .filter((item) => item.name !== "全部")
-    .slice(0, 12),
-);
+/** 首页金刚区展示全部分类（IK9VDJ）：与商品页侧栏同源同序，含「全部」（DB 配图），上限 12 防御 */
+const gridCategories = computed(() => categories.value.slice(0, 12));
 /** 计数器减件（IK9AWL）：ProductCard 数量>0 时展开 − n ＋ */
 const remove = (p: Product) => cart.set(p, cart.quantity(p.id) - 1);
 const open = (id: string) =>
