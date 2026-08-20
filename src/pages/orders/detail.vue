@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { isRetryable } from "../../api/request";
 import { fenToYuan } from "../../utils/money";
 import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
 import { SERVICE_PHONE } from "../../utils/service";
@@ -27,8 +28,9 @@ async function refresh() {
   error.value = false;
   try {
     order.value = await api.order(orderId.value);
-  } catch {
-    error.value = true;
+  } catch (e) {
+    // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
+    if (isRetryable(e)) error.value = true;
   } finally {
     loading.value = false;
   }

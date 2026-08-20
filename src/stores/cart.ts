@@ -55,7 +55,8 @@ export const useCartStore = defineStore("cart", {
           // 回滚未被后续连点覆盖的意图（已被覆盖的留给下一个排队请求重试）
           for (const [id, q] of Object.entries(snapshot))
             if (this.pending[id] === q) delete this.pending[id];
-          uni.showToast({ title: "购物车同步失败，请重试", icon: "none" });
+          // 提醒由 request 层统一 toast（ADR-0005 IKA00Q：库存不足等业务原因
+          // 直接透出，不再用"同步失败"笼统文案二次弹）
           throw error;
         }
       });

@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { isRetryable } from "../../api/request";
 import { fenToYuan } from "../../utils/money";
 import type { Coupon, UserCoupon, UserCouponStatus } from "../../types";
 const claimable = ref<Coupon[]>([]),
@@ -15,6 +16,11 @@ const statusLabels: Record<UserCouponStatus, string> = {
   used: "已使用",
   released: "已退回",
 };
+/** 券不可用行内标注（ADR-0005/IKA00Q）：过期置灰 + 状态改「已过期」，
+ *  不再显示「未使用/去使用」误导；门槛原因在结算页券列表就地标差价 */
+function expired(c: UserCoupon) {
+  return new Date(c.coupon.expiresAt).getTime() <= Date.now();
+}
 onShow(load);
 async function load() {
   loading.value = true;
@@ -23,8 +29,9 @@ async function load() {
     const bundle = await api.coupons();
     claimable.value = bundle.claimable;
     mine.value = bundle.mine;
-  } catch {
-    error.value = true;
+  } catch (e) {
+    // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
+    if (isRetryable(e)) error.value = true;
   } finally {
     loading.value = false;
   }
@@ -76,23 +83,31 @@ async function claim(coupon: Coupon) {
     ><view class="section-title"
       ><text class="section-title__main">我的优惠券</text></view
     ><view v-if="mine.length"
-      ><view class="coupon card" v-for="c in mine" :key="c.id"
+      ><view
+        class="coupon card"
+        v-for="c in mine"
+        :key="c.id"
+        :class="{ 'coupon--dead': expired(c) }"
         ><view class="coupon__money"
           ><text class="symbol">¥</text
           ><text>{{ fenToYuan(c.coupon.amount) }}</text></view
         ><view class="coupon__body"
           ><view class="coupon__name-row"
             ><text class="coupon__name">{{ c.coupon.name }}</text
-            ><text class="coupon__status" :class="`coupon__status--${c.status}`"
-              >{{ statusLabels[c.status] }}</text
+            ><text
+              class="coupon__status"
+              :class="expired(c) ? 'coupon__status--expired' : `coupon__status--${c.status}`"
+              >{{ expired(c) ? "已过期" : statusLabels[c.status] }}</text
             ></view
           ><text class="muted"
           >满 {{ fenToYuan(c.coupon.threshold) }} 元可用</text
           ><text class="coupon__date"
           >有效期至 {{ c.coupon.expiresAt.slice(0, 10) }}</text
           ></view
-        ><button
-          v-if="c.status === 'claimed' || c.status === 'released'"
+        ><!-- 过期券不再给「去使用」（ADR-0005/IKA00Q） --><button
+          v-if="
+            (c.status === 'claimed' || c.status === 'released') && !expired(c)
+          "
           @tap="uni.switchTab({ url: '/pages/category/index' })"
         >
           去使用
@@ -170,6 +185,17 @@ async function claim(coupon: Coupon) {
   color: $orange;
 }
 .coupon__status--used {
+  background: $line;
+  color: $muted;
+}
+/* 过期券置灰（ADR-0005/IKA00Q）：整体降透明度，金额面去色 */
+.coupon--dead {
+  opacity: 0.55;
+}
+.coupon--dead .coupon__money {
+  background: linear-gradient(135deg, #aeb8b2, #97a49c);
+}
+.coupon__status--expired {
   background: $line;
   color: $muted;
 }

@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { isRetryable } from "../../api/request";
 import { fenToYuan } from "../../utils/money";
 import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
 import type { Address, Cart, UserCoupon } from "../../types";
@@ -95,7 +96,8 @@ async function load() {
     selectedCouponId.value = best?.id;
   }
   if (!cart.value) {
-    error.value = true;
+    // ADR-0005(IKA00Q)：仅网络/服务故障给整页错误态；业务拒绝由 request 层 toast
+    if (c.status === "rejected" && isRetryable(c.reason)) error.value = true;
     loading.value = false;
     return;
   }
@@ -114,10 +116,12 @@ async function load() {
   try {
     await refresh();
   } catch (e) {
-    error.value = true;
-    // 业务错误透出真实原因（如「xx库存不足」），网络类失败（非 Error
-    // 实例）保持「网络异常」——不再一律误导为网络问题（IK9YPJ）
-    errorReason.value = e instanceof Error && e.message ? e.message : "";
+    // ADR-0005(IKA00Q)：业务拒绝不进错误态（request 层已 toast 真实原因），
+    // 页面照常渲染；网络/服务故障进重试卡，副文案显示分类文案
+    if (isRetryable(e)) {
+      error.value = true;
+      errorReason.value = e instanceof Error && e.message ? e.message : "";
+    }
   }
   loading.value = false;
 }
@@ -255,11 +259,15 @@ async function submit() {
         @tap="chooseCoupon(item)"
         ><view class="coupon-opt__info"
           ><text class="coupon-opt__name">{{ item.coupon.name }}</text
-          ><text class="coupon-opt__desc"
-          >满 {{ fenToYuan(item.coupon.threshold) }} 元可用 · 可省 ¥{{
-            fenToYuan(item.coupon.amount)
-          }}
-          元</text
+          ><!-- 门槛不够就地标差价（ADR-0005/IKA00Q），置灰同时给原因 --><text
+          class="coupon-opt__desc"
+          >{{
+            meetsThreshold(item)
+              ? `满 ${fenToYuan(item.coupon.threshold)} 元可用 · 可省 ¥${fenToYuan(item.coupon.amount)} 元`
+              : `还差 ¥${fenToYuan(
+                  item.coupon.threshold - (cart?.productAmount ?? 0),
+                )} 可用`
+          }}</text
           ></view
         ><text class="coupon-opt__mark">✓</text></view
       ><view v-if="!usableCoupons.length" class="coupon-opt coupon-opt--empty"

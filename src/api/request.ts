@@ -19,6 +19,27 @@ function isApiResult<T>(value: unknown): value is ApiResult<T> {
     "data" in value
   );
 }
+/** ADR-0005 错误分类：business=业务拒绝（重试无意义）；network=断网/超时；server=5xx。两者后者才值得「点击重试」 */
+export type ApiErrorKind = "business" | "network" | "server";
+export class ApiError extends Error {
+  readonly kind: ApiErrorKind;
+  readonly status?: number;
+  constructor(message: string, kind: ApiErrorKind, status?: number) {
+    super(message);
+    this.name = "ApiError";
+    this.kind = kind;
+    this.status = status;
+  }
+}
+/** 网络失败/服务故障才可重试（ADR-0005）：页面错误态/重试卡只认这个 */
+export function isRetryable(e: unknown): boolean {
+  return e instanceof ApiError && e.kind !== "business";
+}
+/** Nest 校验管道的 message 是数组（如 ["addressId must be a string"]），拼成一句 */
+function readableMessage(raw: unknown): string {
+  if (Array.isArray(raw)) return raw.filter(Boolean).join("；");
+  return typeof raw === "string" && raw ? raw : "";
+}
 /** 低层 POST：不走统一 request（避免触发 ensureToken 递归），保留状态码供登录回退判断 */
 function post(
   path: string,
@@ -138,23 +159,44 @@ export async function request<T>(
             resolve(res.data.data);
             return;
           }
-          // 非标准信封的报错：429 给人话；Nest 异常体 {statusCode,message} 取 message
-          const nestError =
+          // ADR-0005：错误分类收敛在 request 层，toast 是业务提醒唯一出口，
+          // 页面不得重复提醒；401 不 toast（登录通道已提示）
+          const raw =
             typeof res.data === "object" && res.data !== null
-              ? (res.data as { message?: string }).message
+              ? (res.data as { message?: unknown }).message
               : undefined;
-          const message =
-            res.statusCode === 429
-              ? "操作太频繁，请 1 分钟后再试"
-              : isApiResult<T>(res.data)
-                ? res.data.message
-                : nestError || `请求失败（${res.statusCode}）`;
-          uni.showToast({ title: message || "请求失败", icon: "none" });
-          reject(new Error(message));
+          const detail = readableMessage(
+            isApiResult<T>(res.data) ? res.data.message : raw,
+          );
+          let apiError: ApiError;
+          if (res.statusCode === 401) {
+            apiError = new ApiError("登录已过期，请重试", "business", 401);
+          } else if (res.statusCode === 429) {
+            apiError = new ApiError(
+              "操作太频繁，请 1 分钟后再试",
+              "business",
+              429,
+            );
+          } else if (res.statusCode >= 500) {
+            apiError = new ApiError(
+              "服务暂时不可用，请稍后再试",
+              "server",
+              res.statusCode,
+            );
+          } else {
+            apiError = new ApiError(
+              detail || `请求失败（${res.statusCode}）`,
+              "business",
+              res.statusCode,
+            );
+          }
+          if (res.statusCode !== 401)
+            uni.showToast({ title: apiError.message, icon: "none" });
+          reject(apiError);
         },
-        fail(error) {
-          uni.showToast({ title: "服务暂时不可用", icon: "none" });
-          reject(error);
+        fail() {
+          uni.showToast({ title: "网络异常，请检查网络后重试", icon: "none" });
+          reject(new ApiError("网络异常，请检查网络后重试", "network"));
         },
       });
     });

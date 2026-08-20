@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { isRetryable } from "../../api/request";
 import { fenToYuan } from "../../utils/money";
 import type { AfterSale, Refund } from "../../types";
 /** 售后单状态 → 中文（后端值：pending/approved/rejected） */
@@ -25,7 +26,12 @@ async function load() {
   const [c, r] = await Promise.allSettled([api.afterSales(), api.refunds()]);
   if (c.status === "fulfilled") cases.value = c.value;
   if (r.status === "fulfilled") refunds.value = r.value;
-  if (c.status === "rejected" || r.status === "rejected") error.value = true;
+  // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
+  if (
+    (c.status === "rejected" && isRetryable(c.reason)) ||
+    (r.status === "rejected" && isRetryable(r.reason))
+  )
+    error.value = true;
   loading.value = false;
 }
 </script>

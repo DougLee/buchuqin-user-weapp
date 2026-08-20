@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from "vue";
 import { onHide, onUnload } from "@dcloudio/uni-app";
 import { useCartStore } from "../stores/cart";
 import { fenToYuan } from "../utils/money";
+import type { CartLine } from "../types";
 /**
  * 全局购物车悬浮窗（IK97FD）
  * 跨工位契约：任意页面 uni.$emit('open-cart') 唤起本悬浮窗。
@@ -18,6 +19,13 @@ function open() {
 }
 function close() {
   visible.value = false;
+}
+/** 库存行内标注（ADR-0005/IKA00Q）：cart 接口带回 product.stock，就地提示不用等结算报错 */
+function stockTag(line: CartLine): string {
+  const { stock } = line.product;
+  if (stock <= 0) return "已抢完";
+  if (line.quantity > stock) return `库存不足，仅剩 ${stock} 件`;
+  return "";
 }
 function checkout() {
   if (!cart.cart.items.length) return;
@@ -71,6 +79,10 @@ onUnload(close);
           /><view class="line__main"
             ><text class="line__name">{{ line.product.name }}</text
             ><text class="line__sub">{{ line.product.subtitle }}</text
+            ><!-- 库存行内标注（ADR-0005/IKA00Q） --><text
+              v-if="stockTag(line)"
+              class="line__stock-flag"
+              >{{ stockTag(line) }}</text
             ><view class="line__bottom"
               ><text class="price"
                 ><text class="price__symbol">¥</text
@@ -83,8 +95,12 @@ onUnload(close);
                 >
                   −</button
                 ><text>{{ cart.quantity(line.product.id) }}</text
-                ><button
+                ><!-- 到量即禁加（ADR-0005/IKA00Q）：stock=0 也禁，减出空间自动恢复 --><button
                   aria-label="增加一件"
+                  :disabled="
+                    cart.quantity(line.product.id) >=
+                    Math.max(line.product.stock, 0)
+                  "
                   @tap="cart.set(line.product, cart.quantity(line.product.id) + 1)"
                 >
                   ＋
@@ -208,6 +224,20 @@ onUnload(close);
   color: #667069;
   font-size: 22rpx;
   margin-top: 6rpx;
+}
+/* 库存行内标注 chip（ADR-0005/IKA00Q） */
+.line__stock-flag {
+  display: inline-block;
+  margin-top: 8rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 14rpx;
+  font-size: 20rpx;
+  font-weight: 800;
+  color: $orange;
+  background: $cream;
+}
+.counter button[disabled] {
+  opacity: 0.4;
 }
 .line__bottom {
   display: flex;

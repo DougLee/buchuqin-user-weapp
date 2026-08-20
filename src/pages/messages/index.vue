@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { onReachBottom, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { isRetryable } from "../../api/request";
 import type { Notification } from "../../types";
 const items = ref<Notification[]>([]),
   loading = ref(true),
@@ -19,8 +20,9 @@ async function load(reset = true) {
     const res = await api.notificationsPage(page.value);
     items.value = reset ? res.items : [...items.value, ...res.items];
     total.value = res.total;
-  } catch {
-    error.value = true;
+  } catch (e) {
+    // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
+    if (isRetryable(e)) error.value = true;
   } finally {
     loading.value = false;
   }

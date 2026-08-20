@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { isRetryable } from "../../api/request";
 import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
 import { SERVICE_PHONE } from "../../utils/service";
@@ -27,14 +28,25 @@ async function load() {
   error.value = false;
   try {
     product.value = await api.product(productId.value);
-  } catch {
-    error.value = true;
+  } catch (e) {
+    // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
+    if (isRetryable(e)) error.value = true;
   } finally {
     loading.value = false;
   }
 }
+/** 库存行内引导（ADR-0005/IKA00Q）：售罄置灰禁买、低库存提示余量 */
+const soldOut = computed(() => (product.value?.stock ?? 0) <= 0);
+const stockHint = computed(() => {
+  const rest = product.value?.stock ?? 0;
+  return rest > 0 && rest <= 5 ? `仅剩 ${rest} 件` : "";
+});
 const add = async () => {
   if (!product.value) return;
+  if (soldOut.value) {
+    uni.showToast({ title: "已抢完，看看别的吧", icon: "none" });
+    return;
+  }
   const ok = await cart.set(
     product.value,
     cart.quantity(product.value.id) + 1,
@@ -89,7 +101,12 @@ const gallery = computed(() => {
         ><view class="info__price"
           ><text class="price"
             ><text class="price__symbol">¥</text>{{ fenToYuan(product.price) }}</text
-          ><text class="original">¥{{ fenToYuan(product.originalPrice) }}</text></view
+          ><text class="original">¥{{ fenToYuan(product.originalPrice) }}</text
+          ><!-- 库存行内标注（ADR-0005/IKA00Q） --><text
+            v-if="soldOut"
+            class="stock-flag stock-flag--out"
+            >已抢完</text
+          ><text v-else-if="stockHint" class="stock-flag">{{ stockHint }}</text></view
         ></view
       ><view class="card guarantee"
         ><view
@@ -121,7 +138,13 @@ const gallery = computed(() => {
       <!-- #endif -->
       <button class="bag" @tap="uni.$emit('open-cart')">
         购物车 {{ cart.cart.totalQuantity || "" }}</button
-      ><button class="primary-btn" @tap="add">加入购物车</button></view
+      ><!-- 售罄置灰禁买（ADR-0005/IKA00Q） --><button
+        class="primary-btn"
+        :disabled="soldOut"
+        @tap="add"
+      >
+        {{ soldOut ? "已抢完" : "加入购物车" }}
+      </button></view
     ></view
   >
   <CartOverlay />
@@ -192,6 +215,23 @@ const gallery = computed(() => {
 .original {
   text-decoration: line-through;
   color: #667069;
+}
+/* 库存行内标注（ADR-0005/IKA00Q）：低库存橙底浅 chip，售罄实底 */
+.stock-flag {
+  align-self: center;
+  padding: 4rpx 14rpx;
+  border-radius: 18rpx;
+  font-size: 20rpx;
+  font-weight: 800;
+  color: $orange;
+  background: $cream;
+}
+.stock-flag--out {
+  color: #fff;
+  background: $orange;
+}
+.primary-btn[disabled] {
+  opacity: 0.55;
 }
 /* 底栏客服小按钮（IK9SNU）：弱化的次级入口，灰字细边，别抢主按钮视觉 */
 .service-mini {
