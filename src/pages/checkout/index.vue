@@ -22,6 +22,8 @@ const address = ref<Address>(),
   /** 三态（IK9AWK）：购物车等核心数据失败给整页重试，弱项缺省不阻塞 */
   loading = ref(true),
   error = ref(false),
+  /** 结算失败真实原因（IK9YPJ）：业务错误显示后端 message，网络失败留空走默认文案 */
+  errorReason = ref(""),
   slots = ref<Array<{ id: string; label: string; available: boolean }>>([]);
 const usableCoupons = ref<UserCoupon[]>([]),
   selectedCouponId = ref<string>();
@@ -103,10 +105,19 @@ async function load() {
     loading.value = false;
     return;
   }
+  if (belowThreshold.value) {
+    // 本地已可判定未达起送门槛（IK9YPJ）：不发结算请求（后端必 400），
+    // 页面正常渲染，支付按钮禁用 + 差额提示已有（IK9AWN）
+    loading.value = false;
+    return;
+  }
   try {
     await refresh();
-  } catch {
+  } catch (e) {
     error.value = true;
+    // 业务错误透出真实原因（如「xx库存不足」），网络类失败（非 Error
+    // 实例）保持「网络异常」——不再一律误导为网络问题（IK9YPJ）
+    errorReason.value = e instanceof Error && e.message ? e.message : "";
   }
   loading.value = false;
 }
@@ -116,7 +127,8 @@ onShow(() => {
 });
 async function setMode(value: "instant" | "scheduled") {
   mode.value = value;
-  await refresh();
+  // 门槛守卫（IK9YPJ）：低于起送不发结算请求；失败 toast 由 request 层统一
+  if (!belowThreshold.value) await refresh().catch(() => {});
 }
 async function chooseCoupon(item: UserCoupon | null) {
   if (item && !meetsThreshold(item)) {
@@ -128,7 +140,8 @@ async function chooseCoupon(item: UserCoupon | null) {
     return;
   }
   selectedCouponId.value = item?.id;
-  await refresh();
+  // 门槛守卫（IK9YPJ）：低于起送不发结算请求；失败 toast 由 request 层统一
+  if (!belowThreshold.value) await refresh().catch(() => {});
 }
 async function submit() {
   if (submitting.value) return;
@@ -172,7 +185,7 @@ async function submit() {
       ><view v-for="n in 4" :key="n" class="skeleton-block" /></view
     ><view v-else-if="error" class="retry card" @tap="load"
       ><text class="retry__title">加载失败</text
-      ><text class="muted">网络异常，点击重试</text></view
+      ><text class="muted">{{ errorReason || "网络异常，点击重试" }}</text></view
     ><template v-else
     ><view
       v-if="address"

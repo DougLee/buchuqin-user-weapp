@@ -21,6 +21,20 @@ function close() {
 }
 function checkout() {
   if (!cart.cart.items.length) return;
+  // 低于起送门槛就地拦截（IK9YPJ）：进结算页也只会被后端 400，
+  // 与结算页 belowThreshold 同口径，直接提示差额
+  if (
+    cart.cart.productAmount > 0 &&
+    cart.cart.productAmount < (cart.cart.deliveryThreshold ?? 1000)
+  ) {
+    uni.showToast({
+      title: `还差 ¥${fenToYuan(
+        (cart.cart.deliveryThreshold ?? 1000) - cart.cart.productAmount,
+      )} 起送`,
+      icon: "none",
+    });
+    return;
+  }
   close();
   uni.navigateTo({ url: "/pages/checkout/index" });
 }
