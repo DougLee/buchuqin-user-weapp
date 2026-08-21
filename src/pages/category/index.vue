@@ -8,8 +8,9 @@ import { categoryImage } from "../../utils/categoryImage";
 import { fenToYuan } from "../../utils/money";
 import type { Category, Product } from "../../types";
 /**
- * 侧栏直接用 DB 分类字典（IK9VDJ）：「全部」也是 DB 记录（id 恰为 all、配 biscuit 图），
- * 不再本地合成/去重；active 初始 'all' 与 DB id 天然一致，api.products('all') 后端已兼容。
+ * 侧栏直接用 DB 分类字典（IK9VDJ）；active 初始 'all'，api.products('all') 后端已兼容。
+ * 「全部」是 UI 概念（2026-08-21 数据清理）：原 id=all 的 DB 行随测试分类删除，
+ * 接口列表无 all 时本地补齐，保证侧栏始终有「全部」入口可切回。
  */
 const active = ref("all"),
   keyword = ref(""),
@@ -54,6 +55,8 @@ onShow(async () => {
     }
   }
   // IK9VD3：pick 校验存在性——类别被删/接口降级时回退「全部」，避免侧栏无高亮、标题与列表错位
+  if (!categories.value.some((c) => c.id === "all"))
+    categories.value = [{ id: "all", name: "全部" }, ...categories.value];
   if (pick)
     active.value = categories.value.some((c) => c.id === pick) ? pick : "all";
   await load();
