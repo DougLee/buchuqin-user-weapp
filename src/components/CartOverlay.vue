@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
-import { onHide, onUnload } from "@dcloudio/uni-app";
+import { onHide, onShow, onUnload } from "@dcloudio/uni-app";
 import { useCartStore } from "../stores/cart";
 import { fenToYuan } from "../utils/money";
 import type { CartLine } from "../types";
@@ -51,6 +51,9 @@ onUnmounted(() => uni.$off(EVENT, open));
 // IK9SO2：返回手势/切 Tab/跳页面即关闭弹层——弹层跟着页面走，不留残影
 onHide(close);
 onUnload(close);
+// IKA08U 重开：回到首页（switchTab onShow）兜底再关一次——部分真机
+// onHide 时序漏发，支付后返首页弹层曾残留弹出态
+onShow(close);
 </script>
 <template>
   <view v-if="visible" class="cart-overlay"

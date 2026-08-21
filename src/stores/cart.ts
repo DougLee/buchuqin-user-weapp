@@ -19,13 +19,28 @@ export const useCartStore = defineStore("cart", {
     pending: {} as Record<string, number>,
     /** set() 串行链（IK9AWM）：PUT 全量购物车，并发请求互相覆盖，必须按序 */
     _chain: Promise.resolve() as Promise<unknown>,
+    /**
+     * 本地清车时间戳（IKA08U 重开）：查单落账是异步的，服务端清车可能
+     * 滞后支付弹窗成功几秒；首页 onShow / 弹层唤起的重拉会在窗口期内
+     * 把已购商品"复活"回悬浮条，load() 据此短路
+     */
+    clearedAt: 0,
   }),
   actions: {
     async load() {
       await useSessionStore().ensureLogin();
+      // IKA08U 重开：清车后 60s 内且本地为空 → 跳过重拉；一旦有新加购
+      // （set() 会更新 items 并清零 clearedAt）恢复与服务端同步
+      if (
+        this.clearedAt &&
+        Date.now() - this.clearedAt < 60_000 &&
+        !this.cart.items.length
+      )
+        return;
       this.loading = true;
       try {
         this.cart = await api.cart();
+        if (this.cart.items.length) this.clearedAt = 0;
       } finally {
         this.loading = false;
       }
@@ -42,6 +57,7 @@ export const useCartStore = defineStore("cart", {
         deliveryThreshold: this.cart.deliveryThreshold,
       };
       this.pending = {};
+      this.clearedAt = Date.now();
     },
     /**
      * 设置某商品数量（绝对值），连点安全（IK9AWM）：
@@ -62,6 +78,8 @@ export const useCartStore = defineStore("cart", {
           this.cart = await api.updateCart(
             [...map].map(([productId, q]) => ({ productId, quantity: q })),
           );
+          // IKA08U 重开：加购成功即脱离"刚清空"状态，load() 恢复与服务端同步
+          if (this.cart.items.length) this.clearedAt = 0;
           for (const [id, q] of Object.entries(snapshot))
             if (this.pending[id] === q) delete this.pending[id];
         } catch (error) {

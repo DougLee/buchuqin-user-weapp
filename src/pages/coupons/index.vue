@@ -21,6 +21,18 @@ const statusLabels: Record<UserCouponStatus, string> = {
 function expired(c: UserCoupon) {
   return new Date(c.coupon.expiresAt).getTime() <= Date.now();
 }
+/** IKA57M：卡面右侧只留按钮——可用=「去使用」，不可用=置灰按钮显状态 */
+function usable(c: UserCoupon) {
+  return (
+    (c.status === "claimed" || c.status === "released") && !expired(c)
+  );
+}
+function deadLabel(c: UserCoupon) {
+  if (expired(c)) return "已过期";
+  if (c.status === "used") return "已使用";
+  if (c.status === "locked") return "下单锁定";
+  return statusLabels[c.status];
+}
 onShow(load);
 /**
  * silent（IKA08Y）：静默重拉不切骨架——领取成功后原地更新两列，
@@ -97,33 +109,30 @@ async function claim(coupon: Coupon) {
         class="coupon card"
         v-for="c in mine"
         :key="c.id"
-        :class="{ 'coupon--dead': expired(c) }"
-        ><!-- 金额列（IKA08W）：外层满高居中，内层基线对齐 --><view
+        :class="{ 'coupon--dead': !usable(c) }"
+        ><!-- 金额列（IKA08W 重开）：格子满高由 grid stretch 保证，本层只管居中 --><view
           class="coupon__money"
           ><view class="coupon__money-inner"
             ><text class="symbol">¥</text
             ><text>{{ fenToYuan(c.coupon.amount) }}</text></view
           ></view
         ><view class="coupon__body"
-          ><view class="coupon__name-row"
-            ><text class="coupon__name">{{ c.coupon.name }}</text
-            ><text
-              class="coupon__status"
-              :class="expired(c) ? 'coupon__status--expired' : `coupon__status--${c.status}`"
-              >{{ expired(c) ? "已过期" : statusLabels[c.status] }}</text
-            ></view
+          ><!-- IKA57M：状态文字移出卡面（与按钮重叠），只留在按钮上 --><text
+            class="coupon__name"
+            >{{ c.coupon.name }}</text
           ><text class="muted"
           >满 {{ fenToYuan(c.coupon.threshold) }} 元可用</text
           ><text class="coupon__date"
           >有效期至 {{ c.coupon.expiresAt.slice(0, 10) }}</text
           ></view
-        ><!-- 过期券不再给「去使用」（ADR-0005/IKA00Q） --><button
-          v-if="
-            (c.status === 'claimed' || c.status === 'released') && !expired(c)
-          "
+        ><!-- IKA57M：右侧只显示按钮；不可用置灰 + 按钮文字显状态 --><button
+          v-if="usable(c)"
           @tap="uni.switchTab({ url: '/pages/category/index' })"
         >
           去使用
+        </button>
+        <button v-else class="coupon__btn-dead" disabled>
+          {{ deadLabel(c) }}
         </button></view
       ></view
     ><view v-else class="empty card"
@@ -146,17 +155,18 @@ async function claim(coupon: Coupon) {
 .coupon {
   display: grid;
   grid-template-columns: 150rpx 1fr auto;
-  align-items: center;
+  /* IKA08W 重开：格子满高（stretch），金额条通底；之前 center 收缩成内容高，
+     叠加 height:100% 在 wx 渲染不稳定 → 金额列整体偏移 */
+  align-items: stretch;
   min-height: 190rpx;
   margin-bottom: 22rpx;
   overflow: hidden;
   border: 2rpx solid rgba(37, 185, 90, 0.12);
 }
 .coupon__money {
-  height: 100%;
   background: linear-gradient(135deg, $primary, $primary-dark);
   color: #fff;
-  /* IKA08W：外层满高弹性盒只管垂直居中，基线对齐交给内层 */
+  /* 格子已满高，本层只负责垂直居中；基线对齐交给内层 */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -175,6 +185,10 @@ async function claim(coupon: Coupon) {
 }
 .coupon__body {
   padding: 22rpx;
+  /* IKA08W 重开：卡体内容同样纵向居中，左右视觉平衡 */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .coupon__name,
 .coupon__date {
@@ -185,37 +199,12 @@ async function claim(coupon: Coupon) {
   font-weight: 900;
   margin-bottom: 8rpx;
 }
-.coupon__name-row {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-.coupon__status {
-  font-size: 19rpx;
-  font-weight: 800;
-  padding: 4rpx 12rpx;
-  border-radius: 18rpx;
-  background: $primary-soft;
-  color: $primary-dark;
-}
-.coupon__status--locked {
-  background: $cream;
-  color: $orange;
-}
-.coupon__status--used {
-  background: $line;
-  color: $muted;
-}
 /* 过期券置灰（ADR-0005/IKA00Q）：整体降透明度，金额面去色 */
 .coupon--dead {
   opacity: 0.55;
 }
 .coupon--dead .coupon__money {
   background: linear-gradient(135deg, #aeb8b2, #97a49c);
-}
-.coupon__status--expired {
-  background: $line;
-  color: $muted;
 }
 .coupon__date {
   font-size: 20rpx;
@@ -225,12 +214,20 @@ async function claim(coupon: Coupon) {
 .coupon button {
   min-height: 68rpx;
   margin-right: 20rpx;
+  /* stretch 下防止按钮被拉满行高 */
+  align-self: center;
   background: $primary-soft;
   color: $primary-dark;
   border: 2rpx solid $primary;
   border-radius: 34rpx;
   font-size: 22rpx;
   font-weight: 800;
+}
+/* IKA57M：不可用券的置灰按钮（已使用/已过期/下单锁定），文字即状态 */
+.coupon button.coupon__btn-dead {
+  background: $line;
+  color: $muted;
+  border-color: $line;
 }
 .empty {
   padding: 60rpx 30rpx;

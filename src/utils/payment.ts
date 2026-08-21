@@ -1,4 +1,5 @@
 import { api } from "../api";
+import { useCartStore } from "../stores/cart";
 import type { WechatPayParams } from "../types";
 
 /** 缓存的订阅消息模板 ID（进页预载；首次支付前若未取到则本次跳过授权）。 */
@@ -67,6 +68,9 @@ export async function startPayFlow(orderId: string): Promise<boolean> {
     // 用户取消收银台或支付失败：订单仍为待支付，详情页可继续支付
     return false;
   }
+  // IKA08U 重开：收银台成功 = 钱已付，订单必然落账（回调/查单兜底）。
+  // 不等轮询结论立即清本地购物车——轮询瞬断时旧车曾被带回首屏悬浮条
+  useCartStore().clearLocal();
   const status = await api.paymentStatus(orderId);
   return status.paid;
 }

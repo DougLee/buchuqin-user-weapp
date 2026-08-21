@@ -3,14 +3,27 @@ import { ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { fenToYuan } from "../../utils/money";
-import type { Order } from "../../types";
+import type { Banner, Order } from "../../types";
 const orderId = ref(""),
   order = ref<Order>(),
-  cancelling = ref(false);
+  cancelling = ref(false),
+  /** 支付成功页广告位（IKA57E）：未配置为 null，区域整体不渲染 */
+  ad = ref<Banner | null>(null);
 onLoad(async (q) => {
   orderId.value = String(q?.id || "");
+  // 广告位拉取失败静默（不影响支付结果展示）
+  api
+    .paySuccessBanner()
+    .then((banner) => (ad.value = banner))
+    .catch(() => {});
   if (orderId.value) order.value = await api.order(orderId.value);
 });
+/** 广告点击进图文详情（IKA57E）：复用 Banner 图文基建，storage 传参 */
+function openAd() {
+  if (!ad.value) return;
+  uni.setStorageSync("bannerContent", JSON.stringify(ad.value));
+  uni.navigateTo({ url: "/pages/content/detail" });
+}
 function goHome() {
   // IK9SNY：switchTab 失败（极端栈状态）兜底 reLaunch，确保落到首页而非上一页
   uni.switchTab({
@@ -66,6 +79,14 @@ function openCancel() {
           >{{ order.address.buildingName }} · {{ order.address.room }}</text
         ></view
       ></view
+    ><!-- 支付成功页广告位（IKA57E）：后台配置 placement=pay-success 的 Banner，未配置不占位 -->
+    <view v-if="ad" class="ad card" role="button" @tap="openAd"
+      ><image class="ad__image" :src="ad.image ?? ''" mode="aspectFill" /><view
+        class="ad__meta"
+        ><text class="ad__title">{{ ad.title }}</text
+        ><text v-if="ad.subtitle" class="ad__sub">{{ ad.subtitle }}</text
+        ><text class="ad__go">查看详情 ›</text></view
+      ></view
     ><view class="actions safe-bottom"
       ><button class="primary-btn actions__home" @tap="goHome"
         >返回首页</button
@@ -112,6 +133,50 @@ function openCancel() {
 }
 .order {
   padding: 28rpx;
+}
+/* 广告位（IKA57E）：左图右文横条，点击进图文详情 */
+.ad {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 20rpx;
+  overflow: hidden;
+}
+.ad__image {
+  width: 168rpx;
+  height: 120rpx;
+  border-radius: 16rpx;
+  flex-shrink: 0;
+  background: $line;
+}
+.ad__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6rpx;
+}
+.ad__title {
+  font-size: 28rpx;
+  font-weight: 700;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ad__sub {
+  font-size: 24rpx;
+  color: $muted;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ad__go {
+  font-size: 24rpx;
+  color: $primary;
+  font-weight: 600;
 }
 .order__row {
   display: flex;

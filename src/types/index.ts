@@ -32,6 +32,8 @@ export interface Banner {
   image?: string | null;
   /** 图文详情（IK9SNN）：后台配置的跳转内容，空则不可点 */
   content?: string | null;
+  /** 展示位置（IKA57F）：home 首页轮播 / pay-success 支付成功页广告位 */
+  placement?: "home" | "pay-success";
 }
 export interface CartLine {
   product: Product;
