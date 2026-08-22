@@ -207,6 +207,8 @@ function search() {
   </view>
 
   <TabBar :current="0" />
+  <!-- IKAFP6：加购后左下悬浮购物车球，点开 CartOverlay 弹层 -->
+  <CartFab />
   <CartOverlay />
 </template>
 

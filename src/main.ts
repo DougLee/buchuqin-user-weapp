@@ -2,6 +2,7 @@ import { createSSRApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
 import CartOverlay from "./components/CartOverlay.vue";
+import CartFab from "./components/CartFab.vue";
 import TabBar from "./components/TabBar.vue";
 export function createApp() {
   const app = createSSRApp(App);
@@ -10,6 +11,8 @@ export function createApp() {
   // 因此各页面需写一行 <CartOverlay />（此处全局注册后无需再 import）；
   // 任意页面 uni.$emit('open-cart') 即可唤起。
   app.component("CartOverlay", CartOverlay);
+  // IKAFP6：悬浮购物车球同策略全局注册，首页/商品页挂 <CartFab />
+  app.component("CartFab", CartFab);
   // 自绘 tabBar（2026-08-19）：4 个 tab 页各挂 <TabBar :current="N" />，
   // 原生条在 App.vue onLaunch 即隐藏。
   app.component("TabBar", TabBar);
