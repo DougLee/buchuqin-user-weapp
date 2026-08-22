@@ -66,8 +66,9 @@ function openBanner(banner: Banner) {
   uni.navigateTo({ url: "/pages/content/detail" });
 }
 const add = (p: Product) => cart.set(p, cart.quantity(p.id) + 1);
-/** 首页金刚区展示全部分类（IK9VDJ）：与商品页侧栏同源同序，含「全部」（DB 配图），上限 12 防御 */
-const gridCategories = computed(() => categories.value.slice(0, 12));
+/** 首页分类横滑条：与商品页侧栏同源同序，含「全部」（DB 配图）；
+ *  横滑一行浏览全部分类（2026-08-22 需求），不再按 6 列折行，仅留防御上限 */
+const rowCategories = computed(() => categories.value.slice(0, 24));
 /** 计数器减件（IK9AWL）：ProductCard 数量>0 时展开 − n ＋ */
 const remove = (p: Product) => cart.set(p, cart.quantity(p.id) - 1);
 const open = (id: string) =>
@@ -162,15 +163,24 @@ function search() {
         ></view
       ></view
     >
+    <!-- 分类横滑条（2026-08-22）：单行展示，左右滑动看更多；右缘渐隐暗示可滑 -->
     <view class="categories card"
-      ><view
-        v-for="item in gridCategories"
-        :key="item.id"
-        class="category"
-        @tap="pickCategory(item)"
-        ><view class="category__image"
-          ><image :src="categoryImage(item)" mode="aspectFit" /></view
-        ><text>{{ item.name }}</text></view
+      ><scroll-view
+        scroll-x
+        class="categories__scroll"
+        enhanced
+        :show-scrollbar="false"
+        ><view class="categories__row"
+          ><view
+            v-for="item in rowCategories"
+            :key="item.id"
+            class="category"
+            @tap="pickCategory(item)"
+            ><view class="category__image"
+              ><image :src="categoryImage(item)" mode="aspectFit" /></view
+            ><text class="category__name">{{ item.name }}</text></view
+          ></view
+        ></scroll-view
       ></view
     >
     <view class="section-title"
@@ -389,17 +399,49 @@ function search() {
   color: $muted;
   margin-top: 8rpx;
 }
+/* 分类横滑条（2026-08-22）：单行 scroll-x，项不压缩；右缘白色渐隐提示可滑 */
 .categories {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 8rpx;
+  position: relative;
   margin-top: 22rpx;
-  padding: 24rpx 10rpx;
+  padding: 24rpx 0;
+  overflow: hidden;
+}
+.categories__scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+/* H5 端隐藏滚动条（微信端靠 enhanced show-scrollbar） */
+.categories__scroll ::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.categories__row {
+  display: inline-flex;
+  gap: 24rpx;
+  padding: 0 24rpx;
 }
 .category {
+  flex-shrink: 0;
+  width: 112rpx;
   text-align: center;
   font-size: 20rpx;
-  min-width: 0;
+}
+.category__name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.categories::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 48rpx;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff);
+  pointer-events: none;
 }
 .category__image {
   width: 88rpx;

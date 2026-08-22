@@ -202,13 +202,14 @@ const currentName = () =>
   min-height: 96rpx;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10rpx;
+  /* 分类靠左（2026-08-22）：名称长短不一时图标起点对齐，视觉更整齐 */
+  justify-content: flex-start;
+  gap: 12rpx;
   padding: 12rpx 16rpx;
   font-size: 26rpx;
   font-weight: 700;
   color: $ink;
-  text-align: center;
+  text-align: left;
   border-left: 8rpx solid transparent;
 }
 /* 类别图标（IK9RX0）：小圆角方块，选中态不动态变色（后台图即最终态） */
