@@ -4,7 +4,6 @@ import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
 import { useCartStore } from "../../stores/cart";
-import { categoryImage } from "../../utils/categoryImage";
 import { fenToYuan } from "../../utils/money";
 import type { Category, Product } from "../../types";
 /**
@@ -87,12 +86,9 @@ const currentName = () =>
           class="side__item"
           :class="{ 'side__item--active': active === c.id }"
           @tap="pick(c.id)"
-          ><!-- 类别图（IK9VDJ）：与首页金刚区共享 categoryImage（含「全部」的 DB 配图），未配图回退本地哈希 -->
-          <image
-            class="side__icon"
-            :src="categoryImage(c)"
-            mode="aspectFit"
-          /><text>{{ c.name }}</text></view
+          ><!-- 纯文字侧栏（2026-08-22）：图标挤压文字导致 5 字分类换行、行高不齐；
+          图标识别职责交给首页横滑条，侧栏回归单行导航（美团式分类页形态） -->
+          <text class="side__name">{{ c.name }}</text></view
         ></scroll-view
       ><scroll-view scroll-y class="main"
         ><view class="main__title">{{ currentName() }}</view
@@ -199,26 +195,21 @@ const currentName = () =>
   border: 2rpx solid rgba(32, 74, 45, 0.07);
 }
 .side__item {
-  min-height: 96rpx;
+  /* 触控目标 88rpx=44px 达标；纯文字单行（2026-08-22） */
+  min-height: 88rpx;
   display: flex;
   align-items: center;
-  /* 分类靠左（2026-08-22）：名称长短不一时图标起点对齐，视觉更整齐 */
-  justify-content: flex-start;
-  gap: 12rpx;
   padding: 12rpx 16rpx;
   font-size: 26rpx;
   font-weight: 700;
   color: $ink;
-  text-align: left;
   border-left: 8rpx solid transparent;
 }
-/* 类别图标（IK9RX0）：小圆角方块，选中态不动态变色（后台图即最终态） */
-.side__icon {
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 12rpx;
-  flex-shrink: 0;
-  background: $primary-soft;
+.side__name {
+  /* 单行省略：根治 5 字以上分类换行导致的行高不齐 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .side__item--active {
   background: $primary-soft;
