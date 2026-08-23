@@ -402,10 +402,12 @@ function search() {
   margin-top: 8rpx;
 }
 /* 分类横滑条（2026-08-22）：单行 scroll-x，项不压缩；右缘白色渐隐提示可滑 */
+/* IKAHBA 方案A：整条放大一档（图标 88→112 / 文字 20→24 加粗 / 项宽 112→136 /
+   间距 24→28），触控目标≥44px、间距≥8px；横滑与渐隐逻辑不动 */
 .categories {
   position: relative;
   margin-top: 22rpx;
-  padding: 24rpx 0;
+  padding: 28rpx 0;
   overflow: hidden;
 }
 .categories__scroll {
@@ -420,14 +422,16 @@ function search() {
 }
 .categories__row {
   display: inline-flex;
-  gap: 24rpx;
-  padding: 0 24rpx;
+  gap: 28rpx;
+  padding: 0 28rpx;
 }
 .category {
   flex-shrink: 0;
-  width: 112rpx;
+  width: 136rpx;
   text-align: center;
-  font-size: 20rpx;
+  font-size: 24rpx;
+  color: $ink;
+  font-weight: 700;
 }
 .category__name {
   display: block;
@@ -446,12 +450,17 @@ function search() {
   pointer-events: none;
 }
 .category__image {
-  width: 88rpx;
-  height: 88rpx;
-  margin: 0 auto 10rpx;
+  width: 112rpx;
+  height: 112rpx;
+  margin: 0 auto 12rpx;
   border-radius: 50%;
   background: $primary-soft;
   overflow: hidden;
+  transition: transform 0.12s ease;
+}
+/* IKAHBA：按压反馈，图标缩到 0.92 不移位 */
+.category:active .category__image {
+  transform: scale(0.92);
 }
 .category:nth-child(2n) .category__image {
   background: $cream;
