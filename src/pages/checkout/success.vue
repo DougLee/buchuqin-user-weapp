@@ -48,7 +48,8 @@ function openCancel() {
       try {
         await api.cancelOrder(order.value.id);
         uni.showToast({ title: "订单已取消", icon: "success" });
-        setTimeout(() => uni.switchTab({ url: "/pages/orders/index" }), 600);
+        // IKAHBQ：订单已非 tab 页，改 navigateTo
+        setTimeout(() => uni.navigateTo({ url: "/pages/orders/index" }), 600);
       } finally {
         cancelling.value = false;
       }

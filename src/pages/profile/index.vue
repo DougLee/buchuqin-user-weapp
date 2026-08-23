@@ -38,8 +38,8 @@ onShow(async () => {
   if (o.status === "fulfilled") orderCount.value = o.value.length;
 });
 const go = (url: string) => uni.navigateTo({ url });
-/** 订单列表是 tabBar 页，跳Tab 需 switchTab */
-const goOrders = () => uni.switchTab({ url: "/pages/orders/index" });
+/** IKAHBQ：订单降级普通页（购物车让位 Tab），改 navigateTo 进栈可返回 */
+const goOrders = () => uni.navigateTo({ url: "/pages/orders/index" });
 /** 优惠券/售后列表入口（IK9AWH：原为无入口孤儿页） */
 const goCoupons = () => go("/pages/coupons/index");
 const goSettings = () => go("/pages/profile/settings");

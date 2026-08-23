@@ -6,6 +6,10 @@
       "style": { "navigationBarTitleText": "商品" }
     },
     {
+      "path": "pages/cart/index",
+      "style": { "navigationBarTitleText": "购物车" }
+    },
+    {
       "path": "pages/orders/index",
       "style": { "navigationBarTitleText": "我的订单" }
     },
@@ -59,8 +63,9 @@
       "style": { "navigationBarTitleText": "活动详情" }
     }
   ],
-  // IK97F6: tabBar 由 5 个减为 4 个（去掉购物袋 Tab，购物车改为悬浮窗 IK97FD）。
-  // 2026-08-19 改自绘 tabBar：原生条图标(≈27px)/字号(≈10px)微信写死不可调，
+  // IKAHBQ: 购物车回归 Tab（订单降级普通页，入口在「我的」/支付成功页）。
+  // 悬浮窗 IK97FD 保留，悬浮球 IKAFP6 由 IKAHBR 下线。
+  // 2026-08-19 起自绘 tabBar：原生条图标(≈27px)/字号(≈10px)微信写死不可调，
   // 本配置仅为保留 tab 页身份（switchTab 页面缓存依赖），实际渲染走
   // components/TabBar.vue（4 个 tab 页各挂一份），原生条 App 启动即 hideTabBar。
   "tabBar": {
@@ -82,10 +87,8 @@
         "selectedIconPath": "static/tabbar/tab-category-active.png"
       },
       {
-        "pagePath": "pages/orders/index",
-        "text": "订单",
-        "iconPath": "static/tabbar/tab-orders.png",
-        "selectedIconPath": "static/tabbar/tab-orders-active.png"
+        "pagePath": "pages/cart/index",
+        "text": "购物车"
       },
       {
         "pagePath": "pages/profile/index",

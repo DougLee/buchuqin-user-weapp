@@ -1,19 +1,23 @@
 <script setup lang="ts">
 import { onShow } from "@dcloudio/uni-app";
+import { useCartStore } from "../stores/cart";
 /**
  * 自绘 tabBar（2026-08-19）：原生 tabBar 的图标显示尺寸（约 27px）与文字字号
  * （约 10px）由微信写死不可调，道哥两轮反馈"太小不协调"后改用本组件。
  * 方案：pages.json 保留 tabBar 配置（tab 页身份 + switchTab 页面缓存依赖它），
  * 但原生条永久 uni.hideTabBar 隐藏，4 个 tab 页各自挂 <TabBar :current="N" />。
- * current：0 首页 / 1 商品 / 2 订单 / 3 我的（各页写死自己的下标）。
+ * current：0 首页 / 1 商品 / 2 购物车 / 3 我的（各页写死自己的下标）。
+ * IKAHBQ：订单位换购物车，图标走 CSS 购物袋（无 png 资产）+ 件数角标，
+ * 角标口径同 CartFab——totalQuantity>0 才显示，超 99 显 99+。
  */
 const TABS = [
   { text: "首页", path: "/pages/index/index", icon: "home" },
   { text: "商品", path: "/pages/category/index", icon: "category" },
-  { text: "订单", path: "/pages/orders/index", icon: "orders" },
+  { text: "购物车", path: "/pages/cart/index", icon: "cart" },
   { text: "我的", path: "/pages/profile/index", icon: "profile" },
 ] as const;
 const props = defineProps<{ current: number }>();
+const cart = useCartStore();
 function go(index: number) {
   if (index === props.current) return; // 已在当前页，避免重复触发 onShow
   uni.switchTab({ url: TABS[index].path });
@@ -32,15 +36,30 @@ onShow(() => uni.hideTabBar({ animation: false, fail: () => {} }));
       :aria-selected="index === current"
       :aria-label="tab.text"
       @tap="go(index)"
-      ><image
-        class="tabbar__icon"
-        :src="`/static/tabbar/tab-${tab.icon}${index === current ? '-active' : ''}.png`"
-      />
+      ><!-- 购物车 tab（IKAHBQ）：CSS 购物袋 + 件数角标，其余 tab 走 png 图标 -->
+      <view class="tabbar__icon-wrap"
+        ><view v-if="tab.icon === 'cart'" class="tabbar__bag"
+          ><view class="tabbar__handle"
+        /></view
+        ><image
+          v-else
+          class="tabbar__icon"
+          :src="`/static/tabbar/tab-${tab.icon}${index === current ? '-active' : ''}.png`"
+        />
+        <text
+          v-if="tab.icon === 'cart' && cart.cart.totalQuantity > 0"
+          class="tabbar__badge"
+          >{{
+            cart.cart.totalQuantity > 99 ? "99+" : cart.cart.totalQuantity
+          }}</text
+        ></view
+      >
       <text class="tabbar__text">{{ tab.text }}</text>
     </view>
   </view>
 </template>
 <style lang="scss" scoped>
+@import "../styles/theme.scss";
 .tabbar {
   position: fixed;
   left: 0;
@@ -66,6 +85,58 @@ onShow(() => uni.hideTabBar({ animation: false, fail: () => {} }));
   display: block;
   transition: transform 0.12s ease;
 }
+/* 购物车图标槽（IKAHBQ）：png 同尺寸占位，袋子/角标以它为定位基准 */
+.tabbar__icon-wrap {
+  position: relative;
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tabbar__bag {
+  position: relative;
+  width: 44rpx;
+  height: 36rpx;
+  border: 5rpx solid currentColor;
+  border-radius: 8rpx 8rpx 14rpx 14rpx;
+  box-sizing: border-box;
+  color: #747b76;
+  transition: transform 0.12s ease;
+}
+.tabbar__handle {
+  position: absolute;
+  left: 50%;
+  top: -15rpx;
+  width: 24rpx;
+  height: 18rpx;
+  border: 5rpx solid currentColor;
+  border-bottom: 0;
+  border-radius: 12rpx 12rpx 0 0;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+}
+.tabbar__item--active .tabbar__bag {
+  color: #25b95a;
+}
+/* 件数角标（IKAHBQ）：口径同 CartFab，白描边在白底条上立得住 */
+.tabbar__badge {
+  position: absolute;
+  top: -8rpx;
+  right: -18rpx;
+  min-width: 32rpx;
+  height: 32rpx;
+  padding: 0 7rpx;
+  border-radius: 16rpx;
+  background: $orange;
+  color: #fff;
+  font-size: 19rpx;
+  font-weight: 900;
+  line-height: 32rpx;
+  text-align: center;
+  border: 3rpx solid #fff;
+  box-sizing: border-box;
+}
 .tabbar__text {
   margin-top: 6rpx;
   font-size: 20rpx;
@@ -77,7 +148,8 @@ onShow(() => uni.hideTabBar({ animation: false, fail: () => {} }));
   color: #25b95a;
   font-weight: 600;
 }
-.tabbar__item:active .tabbar__icon {
+.tabbar__item:active .tabbar__icon,
+.tabbar__item:active .tabbar__bag {
   transform: scale(0.88);
 }
 @media (min-width: 560px) {
