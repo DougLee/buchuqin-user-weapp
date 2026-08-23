@@ -129,6 +129,13 @@ const gallery = computed(() => {
           ><text class="guarantee__title">最快 30 分钟</text
           ><text class="muted">楼长送到寝室</text></view
         ></view
+      ><!-- 临期合规提示（IKAHFH/ADR-0006）：clearance 活动硬性展示项，常驻不可关 --><view
+        v-if="product.promotion?.type === 'clearance'"
+        class="card clearance"
+        ><text class="clearance__title">临期特惠</text
+        ><text class="clearance__text"
+          >本商品临近保质期，请在保质期内尽快食用；介意慎拍，售出后不支持以此为由退换。</text
+        ></view
       ><!-- 商品介绍（IKAHAU）：后台维护的纯文本，空不渲染，换行保留 -->
       <view v-if="product.description" class="card desc"
         ><text class="desc__title">商品介绍</text
@@ -290,6 +297,26 @@ const gallery = computed(() => {
   background: linear-gradient(135deg, #f3fff5, #fff);
 }
 /* 商品介绍（IKAHAU）：pre-line 保留后台录入的换行 */
+/* 临期合规提示（IKAHFH）：暖黄底强调但不吓退，条目常驻 */
+.clearance {
+  margin-top: 22rpx;
+  padding: 26rpx;
+  background: linear-gradient(135deg, #fff8ec, #fff);
+  border: 2rpx solid rgba(230, 162, 60, 0.35);
+}
+.clearance__title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 900;
+  color: #b1560f;
+  margin-bottom: 12rpx;
+}
+.clearance__text {
+  display: block;
+  font-size: 25rpx;
+  line-height: 1.8;
+  color: $ink;
+}
 .desc {
   margin-top: 22rpx;
   padding: 26rpx;
