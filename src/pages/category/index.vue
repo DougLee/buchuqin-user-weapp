@@ -147,7 +147,7 @@ const currentName = () =>
           ></template
         ></scroll-view
       ></view
-    ><TabBar :current="1" /><CartFab /><CartOverlay /></view
+    ><TabBar :current="1" /><CartOverlay /></view
   >
 </template>
 <style scoped lang="scss">
