@@ -13,6 +13,7 @@ import type { Category, Product } from "../../types";
  */
 const active = ref("all"),
   keyword = ref(""),
+  draft = ref(""),
   categories = ref<Category[]>([]),
   products = ref<Product[]>([]),
   loading = ref(true),
@@ -31,11 +32,20 @@ async function load() {
     loading.value = false;
   }
 }
+/** 搜索即全品类（IKAHBJ）：任何搜索动作先把分类重置回「全部」再拉列表 */
+async function search() {
+  keyword.value = draft.value.trim();
+  active.value = "all";
+  await load();
+}
 onShow(async () => {
-  // 首页搜索关键词传递（IK9AWP）：switchTab 不支持 query，走 storage 携带
+  // 首页搜索关键词传递（IK9AWP）：switchTab 不支持 query，走 storage 携带。
+  // IKAHBJ：点分类会清关键词（退出搜索），故同词重搜时 kw 必 ≠ 已清空的
+  // keyword，「 kw !== keyword 」守卫不再漏掉重置回「全部」的时机
   const kw = (uni.getStorageSync("searchKeyword") as string) || "";
   if (kw !== keyword.value) {
     keyword.value = kw;
+    draft.value = kw;
     active.value = "all";
   }
   uni.removeStorageSync("searchKeyword");
@@ -60,24 +70,30 @@ onShow(async () => {
     active.value = categories.value.some((c) => c.id === pick) ? pick : "all";
   await load();
 });
+/** 点分类=退出搜索（IKAHBJ）：清空关键词回该分类完整列表，不做结果内筛选 */
 async function pick(id: string) {
   active.value = id;
+  keyword.value = "";
+  draft.value = "";
   await load();
 }
 const open = (id: string) =>
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
+/** 搜索态标题（IKAHBJ）：让「在全部分类中搜」的范围可见 */
 const currentName = () =>
-  categories.value.find((c) => c.id === active.value)?.name || "全部商品";
+  keyword.value
+    ? `“${keyword.value}” · 全部分类`
+    : categories.value.find((c) => c.id === active.value)?.name || "全部商品";
 </script>
 <template>
   <view class="page"
     ><view class="search card"
       ><input
-        v-model="keyword"
+        v-model="draft"
         placeholder="今天想吃什么？"
         confirm-type="search"
-        @confirm="load"
-      /><button @tap="load">搜索</button></view
+        @confirm="search"
+      /><button @tap="search">搜索</button></view
     ><view class="body"
       ><scroll-view scroll-y class="side"
         ><view
