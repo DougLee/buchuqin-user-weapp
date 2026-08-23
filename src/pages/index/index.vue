@@ -216,6 +216,8 @@ function search() {
 @import "../../styles/theme.scss";
 .home {
   padding-top: calc(30rpx + env(safe-area-inset-top));
+  /* 底部补偿（2026-08-23）：推荐网格末行不压在自绘 TabBar 下 */
+  padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
 }
 .brand-row {
   display: flex;

@@ -186,6 +186,10 @@ onUnload(stopTicker);
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
+.page {
+  /* 底部补偿（2026-08-23）：末张订单卡不被自绘 TabBar 压住 */
+  padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
+}
 .tabs {
   white-space: nowrap;
   margin-bottom: 26rpx;

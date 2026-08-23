@@ -138,6 +138,8 @@ const onlineServiceFallback = () =>
 @import "../../styles/theme.scss";
 .profile {
   padding-top: calc(64rpx + env(safe-area-inset-top));
+  /* 底部补偿（2026-08-23）：底部入口不被自绘 TabBar 压住 */
+  padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
   background: linear-gradient(180deg, #dff7e4 0, $paper 500rpx);
 }
 .profile__top {

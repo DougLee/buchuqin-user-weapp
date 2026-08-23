@@ -185,6 +185,9 @@ const currentName = () =>
   gap: 20rpx;
   margin-top: 24rpx;
   min-height: 0;
+  /* 底部补偿（2026-08-23）：自绘 TabBar 高约 118rpx+安全区，滚动区不留
+   * 余量时最后一张商品卡被条压住只露半截；140rpx 含 22rpx 呼吸 */
+  padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
 }
 .side {
   width: 196rpx;
