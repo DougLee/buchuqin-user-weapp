@@ -13,6 +13,8 @@ export interface Product {
   image: string;
   /** 详情多图（IK9SNR）：后台维护的图集，首图兼容旧字段 image */
   images?: string[];
+  /** 商品介绍（IKAHAU）：详情接口返回，空 = 不渲染区块；列表不带 */
+  description?: string;
   weight: number;
 }
 export interface Category {

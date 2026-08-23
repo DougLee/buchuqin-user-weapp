@@ -116,6 +116,11 @@ const gallery = computed(() => {
           ><text class="guarantee__title">最快 30 分钟</text
           ><text class="muted">楼长送到寝室</text></view
         ></view
+      ><!-- 商品介绍（IKAHAU）：后台维护的纯文本，空不渲染，换行保留 -->
+      <view v-if="product.description" class="card desc"
+        ><text class="desc__title">商品介绍</text
+        ><text class="desc__text">{{ product.description }}</text
+        ></view
       ><!-- 假「商品演示」卡已摘除（IK9AWT）：占位图+生成文案冒充商品信息，仅保留真实流程说明（下方 story） -->
       <view class="story"
         ><text class="story__eyebrow">今晚的快乐很简单</text
@@ -255,6 +260,25 @@ const gallery = computed(() => {
   margin-top: 22rpx;
   padding: 26rpx;
   background: linear-gradient(135deg, #f3fff5, #fff);
+}
+/* 商品介绍（IKAHAU）：pre-line 保留后台录入的换行 */
+.desc {
+  margin-top: 22rpx;
+  padding: 26rpx;
+}
+.desc__title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 900;
+  margin-bottom: 12rpx;
+}
+.desc__text {
+  display: block;
+  font-size: 25rpx;
+  line-height: 1.8;
+  color: $ink;
+  white-space: pre-line;
+  word-break: break-all;
 }
 .guarantee > view + view {
   border-left: 2rpx solid $line;
