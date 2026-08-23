@@ -1,12 +1,20 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onUnmounted, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import ProductCard from "../../components/ProductCard.vue";
 import { useCartStore } from "../../stores/cart";
 import { useSessionStore } from "../../stores/session";
 import { categoryImage } from "../../utils/categoryImage";
-import type { Address, Banner, Category, Product } from "../../types";
+import { fenToYuan } from "../../utils/money";
+import { countdownText, PROMO_TITLE } from "../../utils/promotion";
+import type {
+  Address,
+  Banner,
+  Category,
+  HomePromotion,
+  Product,
+} from "../../types";
 
 const cart = useCartStore(),
   campus = ref("湖北工业大学"),
@@ -15,6 +23,8 @@ const cart = useCartStore(),
   products = ref<Product[]>([]),
   /** 首页轮播（IK9RX2）：DB 数据为准，本地渐变仅为兜底占位（后台无 Banner 时极简展示） */
   banners = ref<Banner[]>([]),
+  /** 促销分组（IKAHFG/ADR-0006）：进行中活动，空 = 不渲染模块卡 */
+  promotions = ref<HomePromotion[]>([]),
   loading = ref(true);
 /** 分类图标：共享 categoryImage（IK9VD3），商品页侧栏同款回退，两边恒一致 */
 /** 地址栏：默认地址的楼栋+寝室；无地址时引导去选择 */
@@ -32,8 +42,37 @@ onShow(async () => {
   categories.value = home.categories;
   banners.value = home.banners;
   products.value = home.hotProducts;
+  promotions.value = home.promotions ?? [];
   await cart.load();
   loading.value = false;
+});
+/* ---------- 促销模块卡（IKAHFG/ADR-0006）：秒杀/临期各一块，倒计时走秒级跳动 ---------- */
+/** 倒计时心跳：模块卡存在才渲染时间，秒级刷新；页面卸载即清 */
+const now = ref(Date.now());
+const promoTicker = setInterval(() => (now.value = Date.now()), 1000);
+onUnmounted(() => clearInterval(promoTicker));
+/** 按 type 分组渲染（同组共用标题），组倒计时取最早结束的活动 */
+const promoGroups = computed(() => {
+  const groups: Array<{
+    type: string;
+    title: string;
+    endsAt: string;
+    items: HomePromotion[];
+  }> = [];
+  for (const type of ["seckill", "clearance"]) {
+    const items = promotions.value.filter((x) => x.type === type);
+    if (!items.length) continue;
+    groups.push({
+      type,
+      title: PROMO_TITLE[type],
+      endsAt: items.reduce(
+        (min, x) => (x.endsAt < min ? x.endsAt : min),
+        items[0].endsAt,
+      ),
+      items,
+    });
+  }
+  return groups;
 });
 /** Banner 主题：预置键映射渐变，自定义 hex 走内联底色。 */
 const BANNER_THEMES: Record<string, string> = {
@@ -179,6 +218,42 @@ function search() {
             ><view class="category__image"
               ><image :src="categoryImage(item)" mode="aspectFit" /></view
             ><text class="category__name">{{ item.name }}</text></view
+          ></view
+        ></scroll-view
+      ></view
+    >
+    <!-- 促销模块卡（IKAHFG/ADR-0006）：秒杀/临期分组，横滑+倒计时，无活动不占位 -->
+    <view v-for="g in promoGroups" :key="g.type" class="promo card"
+      ><view class="promo__head"
+        ><text class="promo__title">{{ g.title }}</text
+        ><text class="promo__countdown"
+          >距结束 {{ countdownText(g.endsAt, now) }}</text
+        ></view
+      ><scroll-view
+        scroll-x
+        class="promo__scroll"
+        enhanced
+        :show-scrollbar="false"
+        ><view class="promo__row"
+          ><view
+            v-for="item in g.items"
+            :key="item.id"
+            class="promo__item"
+            @tap="open(item.product.id)"
+            ><image
+              class="promo__image"
+              :src="item.product.image"
+              mode="aspectFit"
+              :alt="item.product.name"
+            /><text class="promo__name">{{ item.product.name }}</text
+            ><view class="promo__bottom"
+              ><text class="price"
+                ><text class="price__symbol">¥</text
+                >{{ fenToYuan(item.product.price) }}</text
+              ><text class="promo__strike"
+                >¥{{ fenToYuan(item.product.originalPrice) }}</text
+              ></view
+            ></view
           ></view
         ></scroll-view
       ></view
@@ -468,6 +543,86 @@ function search() {
 .category__image image {
   width: 100%;
   height: 100%;
+}
+/* ---------- 促销模块卡（IKAHFG/ADR-0006）：形态对齐分类横滑条 ---------- */
+.promo {
+  position: relative;
+  margin-top: 22rpx;
+  overflow: hidden;
+}
+.promo::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 48rpx;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff);
+  pointer-events: none;
+}
+.promo__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 26rpx 28rpx 8rpx;
+}
+.promo__title {
+  font-size: 30rpx;
+  font-weight: 900;
+}
+.promo__countdown {
+  font-size: 22rpx;
+  font-weight: 800;
+  color: $orange;
+  font-variant-numeric: tabular-nums;
+}
+.promo__scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+.promo__scroll ::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.promo__row {
+  display: inline-flex;
+  gap: 20rpx;
+  padding: 16rpx 28rpx 24rpx;
+}
+.promo__item {
+  flex-shrink: 0;
+  width: 176rpx;
+}
+.promo__image {
+  width: 176rpx;
+  height: 176rpx;
+  border-radius: 20rpx;
+  background: $primary-soft;
+  display: block;
+}
+.promo__name {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 700;
+  margin-top: 10rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.promo__bottom {
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
+  margin-top: 4rpx;
+}
+.promo__bottom .price {
+  color: #ff4d18;
+}
+.promo__strike {
+  text-decoration: line-through;
+  color: $muted;
+  font-size: 20rpx;
 }
 .grid-empty {
   display: flex;

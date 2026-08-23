@@ -15,7 +15,24 @@ export interface Product {
   images?: string[];
   /** 商品介绍（IKAHAU）：详情接口返回，空 = 不渲染区块；列表不带 */
   description?: string;
+  /** 限时特价（ADR-0006）：活动期 price 即促销价、originalPrice 划线让位为商品原价 */
+  promotion?: {
+    id: string;
+    type: "seckill" | "clearance";
+    /** 促销价，单位：分 */
+    price: number;
+    endsAt: string;
+  };
   weight: number;
+}
+/** /home 促销分组条目（IKAHFG/ADR-0006）：活动 + 商品视图 */
+export interface HomePromotion {
+  id: string;
+  type: "seckill" | "clearance";
+  /** 促销价，单位：分 */
+  price: number;
+  endsAt: string;
+  product: Product;
 }
 export interface Category {
   id: string;

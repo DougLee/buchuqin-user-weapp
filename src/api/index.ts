@@ -7,6 +7,7 @@ import type {
   Cart,
   Category,
   CouponBundle,
+  HomePromotion,
   LoginResult,
   Notification,
   Order,
@@ -57,6 +58,8 @@ export const api = {
       banners: Banner[];
       categories: Category[];
       hotProducts: Product[];
+      /** 促销分组（IKAHFG/ADR-0006）：进行中活动，空数组 = 首页不渲染模块卡 */
+      promotions?: HomePromotion[];
     }>("/home"),
   /** 支付成功页广告位（IKA57E）：未配置时返回 null，页面不渲染不占位 */
   paySuccessBanner: () =>

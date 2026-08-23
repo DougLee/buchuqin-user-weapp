@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onUnmounted, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
 import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
+import { countdownText, PROMO_TAG } from "../../utils/promotion";
 import { SERVICE_PHONE } from "../../utils/service";
 import type { Product } from "../../types";
 const product = ref<Product>(),
@@ -12,6 +13,10 @@ const product = ref<Product>(),
   productId = ref(""),
   loading = ref(true),
   error = ref(false);
+/* 促销倒计时（IKAHFG/ADR-0006）：详情页秒级跳动，离开页面即清 */
+const now = ref(Date.now());
+const promoTicker = setInterval(() => (now.value = Date.now()), 1000);
+onUnmounted(() => clearInterval(promoTicker));
 onLoad(async (q) => {
   productId.value = String(q?.id || "");
   await cart.load();
@@ -92,7 +97,10 @@ const gallery = computed(() => {
       </swiper>
       <text
         class="visual__tag"
-        >{{ product.tag }}</text
+        :class="{ 'visual__tag--promo': product.promotion }"
+        >{{
+          product.promotion ? PROMO_TAG[product.promotion.type] : product.tag
+        }}</text
       ></view
     ><view class="content"
       ><view class="card info"
@@ -102,6 +110,11 @@ const gallery = computed(() => {
           ><text class="price"
             ><text class="price__symbol">¥</text>{{ fenToYuan(product.price) }}</text
           ><text class="original">¥{{ fenToYuan(product.originalPrice) }}</text
+          ><!-- 促销倒计时（IKAHFG/ADR-0006）：价格即促销价，划线为商品原价 --><text
+            v-if="product.promotion"
+            class="promo-count"
+            >{{ PROMO_TAG[product.promotion.type] }} · 距结束
+            {{ countdownText(product.promotion.endsAt, now) }}</text
           ><!-- 库存行内标注（ADR-0005/IKA00Q） --><text
             v-if="soldOut"
             class="stock-flag stock-flag--out"
@@ -220,6 +233,21 @@ const gallery = computed(() => {
 .original {
   text-decoration: line-through;
   color: #667069;
+}
+/* 促销倒计时（IKAHFG/ADR-0006）：橙字等宽数字，价格即促销价 */
+.promo-count {
+  align-self: center;
+  padding: 4rpx 14rpx;
+  border-radius: 18rpx;
+  font-size: 20rpx;
+  font-weight: 800;
+  color: $orange;
+  background: $cream;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.visual__tag--promo {
+  background: $orange;
 }
 /* 库存行内标注（ADR-0005/IKA00Q）：低库存橙底浅 chip，售罄实底 */
 .stock-flag {

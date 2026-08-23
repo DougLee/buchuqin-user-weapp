@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Product } from "../types";
 import { fenToYuan } from "../utils/money";
+import { PROMO_TAG } from "../utils/promotion";
 defineProps<{ product: Product; quantity?: number }>();
 const emit = defineEmits<{
   add: [Product];
@@ -16,13 +17,25 @@ const emit = defineEmits<{
         :src="product.image"
         mode="aspectFit"
         :alt="product.name"
-      /><text class="product__tag">{{ product.tag }}</text></view
+      /><text
+        class="product__tag"
+        :class="{ 'product__tag--promo': product.promotion }"
+        >{{
+          product.promotion ? PROMO_TAG[product.promotion.type] : product.tag
+        }}</text
+      ></view
     ><view class="product__body"
       ><text class="product__name">{{ product.name }}</text
       ><text class="product__sub">{{ product.subtitle }}</text
       ><view class="product__bottom"
-        ><text class="price"
-          ><text class="price__symbol">¥</text>{{ fenToYuan(product.price) }}</text
+        ><view class="product__price"
+          ><text class="price"
+            ><text class="price__symbol">¥</text>{{ fenToYuan(product.price) }}</text
+          ><!-- 促销划线（ADR-0006）：活动期 originalPrice 即商品原价 --><text
+            v-if="product.promotion"
+            class="product__strike"
+            >¥{{ fenToYuan(product.originalPrice) }}</text
+          ></view
         ><!-- 加减计数器（IK9AWL）：数量>0 时展开 − n ＋，数字不再是隐形加号 -->
         <view v-if="quantity" class="counter" @tap.stop
           ><button
@@ -78,6 +91,22 @@ const emit = defineEmits<{
   padding: 5rpx 13rpx;
   font-size: 20rpx;
   font-weight: 700;
+}
+/* 促销角标（ADR-0006）：橙底白字压过常规 tag */
+.product__tag--promo {
+  background: $orange;
+  color: #fff;
+}
+.product__price {
+  display: flex;
+  align-items: baseline;
+  gap: 10rpx;
+  min-width: 0;
+}
+.product__strike {
+  text-decoration: line-through;
+  color: $muted;
+  font-size: 20rpx;
 }
 .product__body {
   padding: 18rpx;
