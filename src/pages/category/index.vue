@@ -40,10 +40,11 @@ async function search() {
 }
 onShow(async () => {
   // 首页搜索关键词传递（IK9AWP）：switchTab 不支持 query，走 storage 携带。
-  // IKAHBJ：点分类会清关键词（退出搜索），故同词重搜时 kw 必 ≠ 已清空的
-  // keyword，「 kw !== keyword 」守卫不再漏掉重置回「全部」的时机
+  // IKAHBJ：kw 非空 = 一次新的全品类搜索，无条件重置回「全部」——切分类
+  // 保留关键词（2026-08-23 优化）后同词重搜也必须落回全品类，不能卡在单分类；
+  // kw 空 = 普通往返切 Tab，保留关键词/分类现场
   const kw = (uni.getStorageSync("searchKeyword") as string) || "";
-  if (kw !== keyword.value) {
+  if (kw) {
     keyword.value = kw;
     draft.value = kw;
     active.value = "all";
@@ -66,24 +67,30 @@ onShow(async () => {
   // IK9VD3：pick 校验存在性——类别被删/接口降级时回退「全部」，避免侧栏无高亮、标题与列表错位
   if (!categories.value.some((c) => c.id === "all"))
     categories.value = [{ id: "all", name: "全部" }, ...categories.value];
-  if (pick)
+  if (pick) {
     active.value = categories.value.some((c) => c.id === pick) ? pick : "all";
+    // 金刚区带分类跳（IK9SOB）是「干净浏览该分类」意图，清掉残留搜索词
+    keyword.value = "";
+    draft.value = "";
+  }
   await load();
 });
-/** 点分类=退出搜索（IKAHBJ）：清空关键词回该分类完整列表，不做结果内筛选 */
+/** 切分类带着搜索条件（2026-08-23 道哥反馈，优化 IKAHBJ 决策）：关键词保留，
+ *  在当前搜索结果内缩小到该分类；清空输入再点搜索 = 退出搜索回全品类 */
 async function pick(id: string) {
   active.value = id;
-  keyword.value = "";
-  draft.value = "";
   await load();
 }
 const open = (id: string) =>
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
-/** 搜索态标题（IKAHBJ）：让「在全部分类中搜」的范围可见 */
-const currentName = () =>
-  keyword.value
-    ? `“${keyword.value}” · 全部分类`
-    : categories.value.find((c) => c.id === active.value)?.name || "全部商品";
+/** 搜索态标题（IKAHBJ）：关键词 + 当前分类联动，让筛选范围始终可见 */
+const currentName = () => {
+  const base =
+    active.value === "all"
+      ? "全部分类"
+      : categories.value.find((c) => c.id === active.value)?.name || "全部商品";
+  return keyword.value ? `“${keyword.value}” · ${base}` : base;
+};
 </script>
 <template>
   <view class="page"
