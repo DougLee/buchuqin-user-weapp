@@ -9,6 +9,9 @@ const session = useSessionStore(),
   addresses = ref<Address[]>([]),
   usableCouponCount = ref(0),
   orderCount = ref(0),
+  /** 进群二维码（IKAJSZ）：null = 后台未配置楼栋群/校园群，入口不渲染 */
+  group = ref<{ image: string; scope: "building" | "campus" } | null>(null),
+  groupOpen = ref(false),
   /** 首拉完成标记（2026-08-24）：统计/地址文案加载中不抢跑——
    *  0 闪现像「没订单」，「去添加」闪现误导已有地址的用户 */
   loaded = ref(false);
@@ -24,12 +27,15 @@ onShow(async () => {
   await session.ensureLogin();
   // 各请求独立容错（IK9AWK）：部分失败不清零其他栏位
   // （IK9SO5：消息中心入口已隐藏，notifications 不再拉取）
-  const [a, b, o] = await Promise.allSettled([
+  const [a, b, o, g] = await Promise.allSettled([
     api.addresses(),
     api.coupons(),
     api.orders(),
+    // IKAJSZ：进群码拉取失败静默（入口隐藏，不影响其它栏位）
+    api.wechatGroup(),
   ]);
   if (a.status === "fulfilled") addresses.value = a.value;
+  if (g.status === "fulfilled") group.value = g.value;
   if (b.status === "fulfilled") {
     const now = Date.now();
     usableCouponCount.value = b.value.mine.filter(
@@ -113,6 +119,11 @@ const onlineServiceFallback = () =>
           ><text>{{ roomSummary || (loaded ? "去添加" : "—") }}</text
           ></view
         ></view
+      ><!-- 进群入口（IKAJSZ）：后台配了楼栋群/校园群才显示 --><view v-if="group" @tap="groupOpen = true"
+        ><text>{{ group.scope === "building" ? "加入楼栋群" : "加入校园群" }}</text
+        ><view class="menu__cell"
+          ><text>长按识别进群</text></view
+        ></view
       ><view @tap="callService"
         ><text>电话客服</text
         ><view class="menu__cell"
@@ -137,6 +148,24 @@ const onlineServiceFallback = () =>
     ><view class="brand-foot"
       ><text>不出寝｜食社</text
       ><text class="muted">校园零食日用，送到寝室</text></view
+    ></view
+  >
+  <!-- 进群弹窗（IKAJSZ）：show-menu-by-longpress 让长按弹「识别二维码」 -->
+  <view v-if="groupOpen && group" class="group-mask" @tap="groupOpen = false"
+    ><view class="group-pop" @tap.stop
+      ><text class="group-pop__title">{{
+        group.scope === "building" ? "本楼栋群" : "校园大群"
+      }}</text
+      ><image
+        class="group-pop__qr"
+        :src="group.image"
+        mode="widthFix"
+        show-menu-by-longpress
+      ></image
+      ><text class="group-pop__tip">长按识别二维码，加入群聊</text
+      ><button class="group-pop__close" @tap="groupOpen = false">
+        我知道了 </button
+      ></view
     ></view
   >
   <TabBar :current="3" />
@@ -296,5 +325,51 @@ const onlineServiceFallback = () =>
   font-size: 22rpx;
   margin-top: 8rpx;
   font-weight: 400;
+}
+/* 进群弹窗（IKAJSZ）：居中卡片 + 长按识别二维码 */
+.group-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 30, 18, 0.55);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.group-pop {
+  width: 560rpx;
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 40rpx 36rpx 30rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.group-pop__title {
+  font-size: 32rpx;
+  font-weight: 900;
+  color: $ink;
+}
+.group-pop__qr {
+  width: 440rpx;
+  margin: 28rpx 0 8rpx;
+  border-radius: 12rpx;
+}
+.group-pop__tip {
+  font-size: 24rpx;
+  color: $muted;
+  margin-bottom: 26rpx;
+}
+.group-pop__close {
+  width: 100%;
+  min-height: 84rpx;
+  background: $primary-soft;
+  border-radius: 20rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: $primary-dark;
+}
+.group-pop__close::after {
+  border: none;
 }
 </style>

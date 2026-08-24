@@ -64,6 +64,11 @@ export const api = {
   /** 支付成功页广告位（IKA57E）：未配置时返回 null，页面不渲染不占位 */
   paySuccessBanner: () =>
     request<Banner | null>("/banners/current?placement=pay-success"),
+  /** 进群二维码（IKAJSZ）：楼栋群→校园大群回落；null = 后台未配置，入口不显示 */
+  wechatGroup: () =>
+    request<{ image: string; scope: "building" | "campus" } | null>(
+      "/wechat-group",
+    ),
   /** 商品分类列表（IK97FA：分类页直连，替代 /home 聚合里的分类字段） */
   categories: () => request<Category[]>("/categories"),
   products: async (categoryId = "all", keyword = "") =>
