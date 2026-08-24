@@ -210,14 +210,26 @@ function search() {
         enhanced
         :show-scrollbar="false"
         ><view class="categories__row"
-          ><view
-            v-for="item in rowCategories"
-            :key="item.id"
-            class="category"
-            @tap="pickCategory(item)"
-            ><view class="category__image"
-              ><image :src="categoryImage(item)" mode="aspectFit" /></view
-            ><text class="category__name">{{ item.name }}</text></view
+          ><!-- 加载占位（2026-08-24）：骨架圆+名条与真条同构，数据到达零跳变 --><template
+            v-if="loading"
+            ><view
+              v-for="n in 8"
+              :key="n"
+              class="category category--skeleton"
+              ><view class="category__image" /><text class="category__name"
+                >　</text
+              ></view
+            ></template
+          ><template v-else
+            ><view
+              v-for="item in rowCategories"
+              :key="item.id"
+              class="category"
+              @tap="pickCategory(item)"
+              ><view class="category__image"
+                ><image :src="categoryImage(item)" mode="aspectFit" /></view
+              ><text class="category__name">{{ item.name }}</text></view
+            ></template
           ></view
         ></scroll-view
       ></view
@@ -543,6 +555,25 @@ function search() {
 .category__image image {
   width: 100%;
   height: 100%;
+}
+/* 加载占位（2026-08-24）：圆图+名条与真条同宽高，shimmer 与全端同款 */
+.category--skeleton .category__image {
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: categories-pulse 1.2s infinite;
+}
+.category--skeleton .category__name {
+  height: 24rpx;
+  margin: 12rpx auto 0;
+  border-radius: 12rpx;
+  overflow: hidden;
+  color: transparent;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: categories-pulse 1.2s infinite;
+}
+@keyframes categories-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 /* ---------- 促销模块卡（IKAHFG/ADR-0006）：形态对齐分类横滑条 ---------- */
 .promo {

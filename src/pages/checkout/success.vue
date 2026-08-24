@@ -7,6 +7,8 @@ import type { Banner, Order } from "../../types";
 const orderId = ref(""),
   order = ref<Order>(),
   cancelling = ref(false),
+  /** 订单卡加载中（2026-08-24）：拉单期间给同构占位，卡片不突兀弹入 */
+  loading = ref(true),
   /** 支付成功页广告位（IKA57E）：未配置为 null，区域整体不渲染 */
   ad = ref<Banner | null>(null);
 onLoad(async (q) => {
@@ -16,7 +18,11 @@ onLoad(async (q) => {
     .paySuccessBanner()
     .then((banner) => (ad.value = banner))
     .catch(() => {});
-  if (orderId.value) order.value = await api.order(orderId.value);
+  try {
+    if (orderId.value) order.value = await api.order(orderId.value);
+  } finally {
+    loading.value = false;
+  }
 });
 /** 广告点击进图文详情（IKA57E）：复用 Banner 图文基建，storage 传参 */
 function openAd() {
@@ -65,7 +71,11 @@ function openCancel() {
       ><text class="banner__sub"
         >这一袋已经从校园仓出发接力，留意消息通知</text
       ></view
-    ><view v-if="order" class="order card"
+    ><!-- 订单卡骨架（2026-08-24）：三行同构占位 --><view
+      v-if="loading"
+      class="order success-skeleton"
+      ><view v-for="n in 3" :key="n" class="success-skeleton__row" /></view
+    ><view v-else-if="order" class="order card"
       ><view class="order__row"
         ><text class="muted">订单编号</text
         ><text>{{ order.orderNo }}</text></view
@@ -134,6 +144,19 @@ function openCancel() {
 }
 .order {
   padding: 28rpx;
+}
+/* 订单卡骨架（2026-08-24）：shimmer 与全端同款 */
+.success-skeleton__row {
+  height: 44rpx;
+  border-radius: 12rpx;
+  margin: 22rpx 0;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: success-pulse 1.2s infinite;
+}
+@keyframes success-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 /* 广告位（IKA57E）：左图右文横条，点击进图文详情 */
 .ad {

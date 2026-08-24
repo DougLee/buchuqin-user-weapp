@@ -40,6 +40,12 @@ async function load() {
     ><view v-if="error" class="as-retry card" @tap="load"
       ><text class="as-retry__title">加载失败</text
       ><text class="muted">网络异常，点击重试</text></view
+    ><!-- 加载骨架（2026-08-24）：loading 变量早已存在，此处补接线（汇总卡+记录行） --><view
+      v-else-if="loading"
+      class="as-skeleton"
+      ><view class="as-skeleton__summary" /><view class="as-skeleton__row" /><view
+        class="as-skeleton__row"
+      /></view
     ><template v-else
     ><view class="summary card"
       ><text class="summary__value"
@@ -86,6 +92,25 @@ async function load() {
 .as-retry {
   padding: 110rpx 30rpx;
   text-align: center;
+}
+/* 加载骨架（2026-08-24）：汇总大卡 + 两行记录占位，shimmer 与全端同款 */
+.as-skeleton__summary,
+.as-skeleton__row {
+  border-radius: 24rpx;
+  margin-bottom: 20rpx;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: as-pulse 1.2s infinite;
+}
+.as-skeleton__summary {
+  height: 180rpx;
+}
+.as-skeleton__row {
+  height: 130rpx;
+}
+@keyframes as-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 .as-retry__title {
   display: block;

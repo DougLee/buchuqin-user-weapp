@@ -8,7 +8,10 @@ import type { Address } from "../../types";
 const session = useSessionStore(),
   addresses = ref<Address[]>([]),
   usableCouponCount = ref(0),
-  orderCount = ref(0);
+  orderCount = ref(0),
+  /** 首拉完成标记（2026-08-24）：统计/地址文案加载中不抢跑——
+   *  0 闪现像「没订单」，「去添加」闪现误导已有地址的用户 */
+  loaded = ref(false);
 const defaultAddress = computed(
   () => addresses.value.find((item) => item.isDefault) || addresses.value[0],
 );
@@ -36,6 +39,7 @@ onShow(async () => {
     ).length;
   }
   if (o.status === "fulfilled") orderCount.value = o.value.length;
+  loaded.value = true;
 });
 const go = (url: string) => uni.navigateTo({ url });
 /** IKAHBQ：订单降级普通页（购物车让位 Tab），改 navigateTo 进栈可返回 */
@@ -74,17 +78,19 @@ const onlineServiceFallback = () =>
               defaultAddress.buildingName +
               " " +
               defaultAddress.room
-            : "点击添加寝室地址，楼长才能送到门口"
+            : loaded
+              ? "点击添加寝室地址，楼长才能送到门口"
+              : "　"
         }}</text
         ></view
       ></view
     ><view class="motto">“ 今天不出寝，<br />想吃的照样有。 ”</view
     ><view class="stats card"
       ><view @tap="goCoupons"
-        ><text class="stats__value">{{ usableCouponCount }}</text
+        ><text class="stats__value">{{ loaded ? usableCouponCount : "—" }}</text
         ><text class="muted">可用优惠券</text></view
       ><view @tap="goOrders"
-        ><text class="stats__value">{{ orderCount }}</text
+        ><text class="stats__value">{{ loaded ? orderCount : "—" }}</text
         ><text class="muted">我的订单</text></view
       ></view
     ><view class="menu card"
@@ -96,13 +102,15 @@ const onlineServiceFallback = () =>
       ><view @tap="goCoupons"
         ><text>优惠券</text
         ><view class="menu__cell"
-          ><text>{{ usableCouponCount }} 张可用</text
+          ><text>{{
+            loaded ? `${usableCouponCount} 张可用` : "—"
+          }}</text
           ></view
         ></view
       ><!-- ADR-0004：试点期不退款，售后入口隐藏，走下方在线/电话客服 --><view @tap="go('/pages/address/index')"
         ><text>寝室地址</text
         ><view class="menu__cell"
-          ><text>{{ roomSummary || "去添加" }}</text
+          ><text>{{ roomSummary || (loaded ? "去添加" : "—") }}</text
           ></view
         ></view
       ><view @tap="callService"

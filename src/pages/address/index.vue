@@ -5,11 +5,17 @@ import { api } from "../../api";
 import type { Address } from "../../types";
 const addresses = ref<Address[]>([]),
   selectedId = ref(""),
-  busy = ref(false);
+  busy = ref(false),
+  /** 首次加载标记（2026-08-24 骨架屏）：盖住首帧，「还没有地址」引导不再抢跑 */
+  booted = ref(false);
 async function refresh() {
-  addresses.value = await api.addresses();
-  selectedId.value =
-    uni.getStorageSync("selectedAddressId") || addresses.value[0]?.id || "";
+  try {
+    addresses.value = await api.addresses();
+    selectedId.value =
+      uni.getStorageSync("selectedAddressId") || addresses.value[0]?.id || "";
+  } finally {
+    booted.value = true;
+  }
 }
 onShow(refresh);
 function select(a: Address) {
@@ -54,7 +60,11 @@ async function makeDefault(a: Address) {
 <template>
   <view class="page"
     ><view class="notice">当前版本固定配送湖北工业大学校内寝室</view
-    ><view v-if="!addresses.length" class="empty-hint"
+    ><!-- 加载骨架（2026-08-24）：地址卡同构占位 --><view
+      v-if="!booted && !addresses.length"
+      class="addr-skeleton"
+      ><view v-for="n in 3" :key="n" class="addr-skeleton__card" /></view
+    ><view v-else-if="!addresses.length" class="empty-hint"
       ><text class="empty-hint__title">还没有寝室地址</text
       ><text class="muted">点下方按钮添加一间，楼长才知道送到哪</text></view
     ><view
@@ -100,6 +110,19 @@ async function makeDefault(a: Address) {
 .empty-hint {
   text-align: center;
   padding: 110rpx 0 40rpx;
+}
+/* 加载骨架（2026-08-24）：与 .address 卡同构，shimmer 与全端同款 */
+.addr-skeleton__card {
+  height: 252rpx;
+  border-radius: 24rpx;
+  margin-bottom: 20rpx;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: addr-pulse 1.2s infinite;
+}
+@keyframes addr-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 .empty-hint__title {
   display: block;

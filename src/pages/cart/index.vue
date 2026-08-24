@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
@@ -9,7 +10,13 @@ import type { CartLine } from "../../types";
  * 悬浮球由 IKAHBR 下线）。
  */
 const cart = useCartStore();
-onShow(() => void cart.load());
+/** 首次加载标记（骨架屏）：store.loading 在 ensureLogin 之后才置真，
+ *  首帧会闪空态——用本地 booted 盖住首帧，拉完才允许展示空车引导 */
+const booted = ref(false);
+onShow(async () => {
+  await cart.load();
+  booted.value = true;
+});
 /** 库存行内标注（ADR-0005/IKA00Q）：与悬浮窗同口径，就地提示不等结算报错 */
 function stockTag(line: CartLine): string {
   const { stock } = line.product;
@@ -41,7 +48,11 @@ const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
     ><view class="cart-head"
       ><text class="cart-head__title">购物车</text
       ><text class="muted">{{ cart.cart.totalQuantity }} 件</text></view
-    ><view v-if="!cart.cart.items.length" class="cart-empty"
+    ><!-- 加载骨架（2026-08-24）：行卡同构占位，空车引导不再抢跑闪断 --><view
+      v-if="!booted && !cart.cart.items.length"
+      class="cart-list card"
+      ><view v-for="n in 3" :key="n" class="cart-skeleton__line" /></view
+    ><view v-else-if="!cart.cart.items.length" class="cart-empty"
       ><text class="cart-empty__mark">空</text
       ><text class="cart-empty__title">购物车还空着</text
       ><text class="muted">去挑点今晚想吃的吧</text
@@ -165,6 +176,19 @@ const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
 .cart-list {
   margin: 0 28rpx;
   padding: 6rpx 28rpx;
+}
+/* 加载骨架（2026-08-24）：与 .line 同高的行卡占位，shimmer 与全端同款 */
+.cart-skeleton__line {
+  height: 184rpx;
+  border-radius: 20rpx;
+  margin: 22rpx 0;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: cart-pulse 1.2s infinite;
+}
+@keyframes cart-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 .line {
   display: flex;
