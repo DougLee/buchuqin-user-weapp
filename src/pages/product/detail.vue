@@ -146,7 +146,7 @@ const gallery = computed(() => {
         ><text class="story__eyebrow">今晚的快乐很简单</text
         ><text class="story__title">不用换鞋，不用下楼。</text
         ><text class="muted"
-          >下单后从湖工大校园仓出发，经配送员送到楼下，再由楼长送到你的寝室门口。</text
+          >下单后从你所在校区的校园仓出发，经配送员送到楼下，再由楼长送到你的寝室门口。</text
         ></view
       ></view
     ><view class="bottom safe-bottom"

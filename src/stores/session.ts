@@ -57,6 +57,15 @@ export const useSessionStore = defineStore("session", {
         (!user.nickname || user.nickname === "微信用户");
       this.ready = true;
     },
+    /**
+     * 切换校区（IKAJT2）：JWT 带 campusId claim，后端换发新 token，
+     * 这里按登录同款落库（token 覆写 + user 刷新），页面 onShow 重拉即新校区口径。
+     */
+    async switchCampus(campusId: string) {
+      const result = await api.selectCampus(campusId);
+      uni.setStorageSync("token", result.token);
+      this.applyUser(result.user);
+    },
     /** 改昵称（IK9ROG）：落库为准，成功后本地 storage 双写做展示加速 */
     async setNickname(name: string) {
       const value = name.trim().slice(0, 12);

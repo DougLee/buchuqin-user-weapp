@@ -144,7 +144,7 @@ async function claim(coupon: Coupon) {
     ><view class="rules"
       ><text class="rules__title">使用说明</text
       ><text>· 每笔订单最多使用一张优惠券</text
-      ><text>· 优惠券仅限湖北工业大学校园仓商品</text
+      ><text>· 优惠券仅限本校区校园仓商品</text
       ><text>· 退款是否返券以活动规则为准</text></view
     ></template
     ></view

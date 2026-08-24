@@ -6,13 +6,24 @@ import type { Address } from "../../types";
 const addresses = ref<Address[]>([]),
   selectedId = ref(""),
   busy = ref(false),
+  /** 当前校区名（IKAJT2 去硬编码）：提示条随切换的校区走 */
+  campusName = ref(""),
   /** 首次加载标记（2026-08-24 骨架屏）：盖住首帧，「还没有地址」引导不再抢跑 */
   booted = ref(false);
 async function refresh() {
   try {
-    addresses.value = await api.addresses();
-    selectedId.value =
-      uni.getStorageSync("selectedAddressId") || addresses.value[0]?.id || "";
+    const [list, campus] = await Promise.allSettled([
+      api.addresses(),
+      api.currentCampus(),
+    ]);
+    if (list.status === "fulfilled") {
+      addresses.value = list.value;
+      selectedId.value =
+        uni.getStorageSync("selectedAddressId") ||
+        addresses.value[0]?.id ||
+        "";
+    }
+    if (campus.status === "fulfilled") campusName.value = campus.value.name;
   } finally {
     booted.value = true;
   }
@@ -59,7 +70,9 @@ async function makeDefault(a: Address) {
 </script>
 <template>
   <view class="page"
-    ><view class="notice">当前版本固定配送湖北工业大学校内寝室</view
+    ><view class="notice"
+      >当前配送{{ campusName || "所在校区" }}校内寝室</view
+    >
     ><!-- 加载骨架（2026-08-24）：地址卡同构占位 --><view
       v-if="!booted && !addresses.length"
       class="addr-skeleton"
@@ -100,7 +113,7 @@ async function makeDefault(a: Address) {
     ><view class="help"
       ><text class="help__title">为什么只支持校内地址？</text
       ><text class="muted"
-        >商品从湖工大校园仓出发，通过配送员与楼长两段接力，才能送到你的寝室门口。</text
+        >商品从{{ campusName || "所在校区" }}的校园仓出发，通过配送员与楼长两段接力，才能送到你的寝室门口。</text
       ></view
     ></view
   >

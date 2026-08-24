@@ -39,6 +39,10 @@
       "style": { "navigationBarTitleText": "寝室地址" }
     },
     {
+      "path": "pages/campus/index",
+      "style": { "navigationBarTitleText": "选择校区" }
+    },
+    {
       "path": "pages/address/edit",
       "style": { "navigationBarTitleText": "添加寝室" }
     },

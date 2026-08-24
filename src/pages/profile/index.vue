@@ -12,6 +12,8 @@ const session = useSessionStore(),
   /** 进群二维码（IKAJSZ）：null = 后台未配置楼栋群/校园群，入口不渲染 */
   group = ref<{ image: string; scope: "building" | "campus" } | null>(null),
   groupOpen = ref(false),
+  /** 当前校区名（IKAJT2）：接口下发，无地址时「当前校区」行也有正确文案 */
+  campusName = ref(""),
   /** 首拉完成标记（2026-08-24）：统计/地址文案加载中不抢跑——
    *  0 闪现像「没订单」，「去添加」闪现误导已有地址的用户 */
   loaded = ref(false);
@@ -27,14 +29,17 @@ onShow(async () => {
   await session.ensureLogin();
   // 各请求独立容错（IK9AWK）：部分失败不清零其他栏位
   // （IK9SO5：消息中心入口已隐藏，notifications 不再拉取）
-  const [a, b, o, g] = await Promise.allSettled([
+  const [a, b, o, g, c] = await Promise.allSettled([
     api.addresses(),
     api.coupons(),
     api.orders(),
     // IKAJSZ：进群码拉取失败静默（入口隐藏，不影响其它栏位）
     api.wechatGroup(),
+    // IKAJT2：当前校区名（切换后 onShow 重拉即刷新）
+    api.currentCampus(),
   ]);
   if (a.status === "fulfilled") addresses.value = a.value;
+  if (c.status === "fulfilled") campusName.value = c.value.name;
   if (g.status === "fulfilled") group.value = g.value;
   if (b.status === "fulfilled") {
     const now = Date.now();
@@ -112,6 +117,11 @@ const onlineServiceFallback = () =>
             loaded ? `${usableCouponCount} 张可用` : "—"
           }}</text
           ></view
+        ></view
+      ><!-- IKAJT2：当前校区/切换入口，商品价格按校区生效 --><view @tap="go('/pages/campus/index')"
+        ><text>当前校区</text
+        ><view class="menu__cell"
+          ><text>{{ campusName || (loaded ? "去选择" : "—") }}</text></view
         ></view
       ><!-- ADR-0004：试点期不退款，售后入口隐藏，走下方在线/电话客服 --><view @tap="go('/pages/address/index')"
         ><text>寝室地址</text

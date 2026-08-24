@@ -97,6 +97,25 @@ export const api = {
   /** 当前校园的楼栋预设列表（地址表单楼栋选择器） */
   buildings: () =>
     request<Building[]>("/campuses/current/buildings"),
+  /** 校区选项（IKAJT2 选校区）：开放中校区列表 */
+  campuses: () =>
+    request<Array<{ id: string; name: string; shortName: string }>>(
+      "/campuses",
+    ),
+  /** 我的校区详情（IKAJT2）：名称/仓名/配送费门槛，随切换即时生效 */
+  currentCampus: () =>
+    request<{
+      id: string;
+      name: string;
+      shortName: string;
+      warehouseName: string;
+    }>("/campus/current"),
+  /** 切换校区（IKAJT2）：返回换发 token（JWT 含新 campusId），会话按登录同款落库 */
+  selectCampus: (campusId: string) =>
+    request<LoginResult>("/auth/campuses/select", {
+      method: "POST",
+      data: { campusId },
+    }),
   coupons: () => request<CouponBundle>("/coupons"),
   claimCoupon: (couponId: string) =>
     request<UserCoupon>(`/coupons/${couponId}/claim`, { method: "POST" }),

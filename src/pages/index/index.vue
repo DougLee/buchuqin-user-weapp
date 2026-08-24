@@ -17,7 +17,8 @@ import type {
 } from "../../types";
 
 const cart = useCartStore(),
-  campus = ref("湖北工业大学"),
+  // IKAJT2：校区名接口下发（home().campus.name），空串时模板兜底「选择校区」
+  campus = ref(""),
   defaultAddress = ref<Address | null>(null),
   categories = ref<Category[]>([]),
   products = ref<Product[]>([]),
@@ -80,6 +81,13 @@ const BANNER_THEMES: Record<string, string> = {
   orange: "linear-gradient(120deg, #e25c05 0%, #ff7a21 60%, #ffa24d 100%)",
   dark: "linear-gradient(120deg, #1e2520 0%, #2f4436 60%, #159447 100%)",
 };
+/** 配送栏双入口（IKAJT2）：校区切换页 / 寝室地址页 */
+function goCampus() {
+  uni.navigateTo({ url: "/pages/campus/index" });
+}
+function goAddress() {
+  uni.navigateTo({ url: "/pages/address/index" });
+}
 function bannerStyle(banner: Banner) {
   const theme = BANNER_THEMES[banner.color];
   if (theme) return { background: theme };
@@ -134,12 +142,13 @@ function search() {
     <view class="brand-row"
       ><text class="brand">不出寝食社</text><view class="brand-dot"
     /></view>
-    <view
-      class="location"
-      @tap="uni.navigateTo({ url: '/pages/address/index' })"
-      ><text class="pin">●</text
-      ><text>配送至：{{ campus }} · {{ addressText }}</text
-      ><text class="down">⌄</text></view
+    <view class="location"
+      ><!-- IKAJT2：校区/地址双入口——点校区名换校区（商品价格随之刷新），点地址去选寝室 -->
+      <text class="pin">●</text
+      ><text class="loc-campus" @tap.stop="goCampus">{{ campus || "选择校区" }}</text
+      ><text class="loc-sep"> · </text
+      ><text class="loc-addr" @tap.stop="goAddress">{{ addressText }}</text
+      ><text class="down" @tap.stop="goCampus">⌄</text></view
     >
     <view class="search"
       ><text class="search__glass">⌕</text
@@ -334,6 +343,16 @@ function search() {
 }
 .down {
   color: $primary-dark;
+}
+/* IKAJT2：双入口命中区放大（IK9AWL 同款 ≥88rpx 热区规范） */
+.loc-campus,
+.loc-addr {
+  min-height: 88rpx;
+  display: inline-flex;
+  align-items: center;
+}
+.loc-sep {
+  color: $muted;
 }
 .search {
   height: 84rpx;

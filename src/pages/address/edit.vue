@@ -6,6 +6,8 @@ import type { Building } from "../../types";
 const editId = ref(""),
   saving = ref(false),
   buildings = ref<Building[]>([]),
+  /** 配送学校名（IKAJT2 去硬编码）：接口下发 */
+  campusName = ref(""),
   form = reactive({
     buildingName: "",
     floor: undefined as number | undefined,
@@ -36,7 +38,12 @@ onLoad(async (q) => {
   editId.value = String(q?.id || "");
   if (editId.value)
     uni.setNavigationBarTitle({ title: "编辑寝室地址" });
-  buildings.value = await api.buildings();
+  const [buildingRes, campusRes] = await Promise.allSettled([
+    api.buildings(),
+    api.currentCampus(),
+  ]);
+  if (buildingRes.status === "fulfilled") buildings.value = buildingRes.value;
+  if (campusRes.status === "fulfilled") campusName.value = campusRes.value.name;
   if (!editId.value) return;
   const list = await api.addresses();
   const found = list.find((a) => a.id === editId.value);
@@ -108,8 +115,10 @@ async function save() {
   <view class="page"
     ><view class="campus card"
       ><text class="campus__label">配送学校</text
-      ><text class="campus__name">湖北工业大学</text
-      ><text class="muted">当前试点校园，不可切换</text></view
+      ><text class="campus__name">{{
+        campusName || "当前校区"
+      }}</text
+      ><text class="muted">配送范围为校内寝室，可在「我的-当前校区」切换</text></view
     ><view class="form card"
       ><label
         ><text>宿舍楼栋</text
