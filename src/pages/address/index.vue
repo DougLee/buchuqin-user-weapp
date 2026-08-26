@@ -72,7 +72,6 @@ async function makeDefault(a: Address) {
   <view class="page"
     ><view class="notice"
       >当前配送{{ campusName || "所在校区" }}校内寝室</view
-    >
     ><!-- 加载骨架（2026-08-24）：地址卡同构占位 --><view
       v-if="!booted && !addresses.length"
       class="addr-skeleton"
