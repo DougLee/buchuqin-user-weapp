@@ -9,14 +9,14 @@ const orderId = ref(""),
   cancelling = ref(false),
   /** 订单卡加载中（2026-08-24）：拉单期间给同构占位，卡片不突兀弹入 */
   loading = ref(true),
-  /** 支付成功页广告位（IKA57E）：未配置为 null，区域整体不渲染 */
-  ad = ref<Banner | null>(null);
+  /** 支付成功页广告位（IKA57E→IKB87P 大卡版）：最多 2 条，空数组不渲染 */
+  ads = ref<Banner[]>([]);
 onLoad(async (q) => {
   orderId.value = String(q?.id || "");
   // 广告位拉取失败静默（不影响支付结果展示）
   api
-    .paySuccessBanner()
-    .then((banner) => (ad.value = banner))
+    .paySuccessBanners()
+    .then((list) => (ads.value = (list ?? []).slice(0, 2)))
     .catch(() => {});
   try {
     if (orderId.value) order.value = await api.order(orderId.value);
@@ -25,9 +25,8 @@ onLoad(async (q) => {
   }
 });
 /** 广告点击进图文详情（IKA57E）：复用 Banner 图文基建，storage 传参 */
-function openAd() {
-  if (!ad.value) return;
-  uni.setStorageSync("bannerContent", JSON.stringify(ad.value));
+function openAd(banner: Banner) {
+  uni.setStorageSync("bannerContent", JSON.stringify(banner));
   uni.navigateTo({ url: "/pages/content/detail" });
 }
 function goHome() {
@@ -90,15 +89,35 @@ function openCancel() {
           >{{ order.address.buildingName }} · {{ order.address.room }}</text
         ></view
       ></view
-    ><!-- 支付成功页广告位（IKA57E）：后台配置 placement=pay-success 的 Banner，未配置不占位 -->
-    <view v-if="ad" class="ad card" role="button" @tap="openAd"
-      ><image class="ad__image" :src="ad.image ?? ''" mode="aspectFill" /><view
-        class="ad__meta"
-        ><text class="ad__title">{{ ad.title }}</text
-        ><text v-if="ad.subtitle" class="ad__sub">{{ ad.subtitle }}</text
-        ><text class="ad__go">查看详情 ›</text></view
-      ></view
-    ><view class="actions safe-bottom"
+    ><!-- 支付成功页广告位（IKA57E→IKB87P 大卡版）：图上文下，最多 2 条，未配置不占位 -->
+    <view v-if="ads.length" class="ads">
+      <text class="ads__caption">为你推荐</text>
+      <view
+        v-for="banner in ads"
+        :key="banner.id"
+        class="ad card"
+        role="button"
+        @tap="openAd(banner)"
+        ><view
+          class="ad__media"
+          :class="`ad__media--${banner.color || 'green'}`"
+          ><image
+            v-if="banner.image"
+            class="ad__image"
+            :src="banner.image"
+            mode="aspectFill"
+          /><text v-if="banner.badge" class="ad__badge">{{
+            banner.badge
+          }}</text></view
+        ><view class="ad__meta"
+          ><text class="ad__title">{{ banner.title }}</text
+          ><text v-if="banner.subtitle" class="ad__sub">{{
+            banner.subtitle
+          }}</text
+          ><text class="ad__go">查看详情 ›</text></view
+        ></view
+      >
+    </view><view class="actions safe-bottom"
       ><button class="primary-btn actions__home" @tap="goHome"
         >返回首页</button
       ><button
@@ -158,41 +177,69 @@ function openCancel() {
     opacity: 0.55;
   }
 }
-/* 广告位（IKA57E）：左图右文横条，点击进图文详情；
-   IKB5PB：与上方支付信息卡拉开间距（.card 本身无外边距，不设会贴住） */
+/* 广告位大卡（IKA57E→IKB87P）：图上文下、图满卡宽，整卡可点；
+   IKB5PB 间距保留（与支付信息卡 28rpx），两卡之间 24rpx */
+.ads {
+  margin-top: 28rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+.ads__caption {
+  color: $muted;
+  font-size: 24rpx;
+  padding-left: 4rpx;
+}
 .ad {
   display: flex;
-  align-items: center;
-  gap: 20rpx;
-  margin-top: 28rpx;
-  padding: 20rpx;
+  flex-direction: column;
   overflow: hidden;
 }
+/* 媒体区：有图铺图（aspectFill 防跳版），无图落主题色块（角标仍在） */
+.ad__media {
+  position: relative;
+  height: 300rpx;
+  background: linear-gradient(135deg, $primary, $primary-dark);
+}
+.ad__media--orange {
+  background: linear-gradient(135deg, #ffa04d, $orange);
+}
+.ad__media--dark {
+  background: linear-gradient(135deg, #3c5a4e, #1f2e28);
+}
 .ad__image {
-  width: 168rpx;
-  height: 120rpx;
-  border-radius: 16rpx;
-  flex-shrink: 0;
-  background: $line;
+  width: 100%;
+  height: 100%;
+}
+.ad__badge {
+  position: absolute;
+  left: 20rpx;
+  top: 20rpx;
+  background: rgba(255, 255, 255, 0.94);
+  color: $primary-dark;
+  font-size: 22rpx;
+  font-weight: 700;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
 }
 .ad__meta {
-  flex: 1;
-  min-width: 0;
+  padding: 26rpx 28rpx 28rpx;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6rpx;
 }
 .ad__title {
-  font-size: 28rpx;
-  font-weight: 700;
+  font-size: 32rpx;
+  font-weight: 800;
+  color: $ink;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .ad__sub {
-  font-size: 24rpx;
+  margin-top: 10rpx;
+  font-size: 26rpx;
   color: $muted;
   max-width: 100%;
   overflow: hidden;
@@ -200,9 +247,10 @@ function openCancel() {
   white-space: nowrap;
 }
 .ad__go {
-  font-size: 24rpx;
+  margin-top: 18rpx;
+  font-size: 26rpx;
   color: $primary;
-  font-weight: 600;
+  font-weight: 700;
 }
 .order__row {
   display: flex;

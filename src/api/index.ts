@@ -61,9 +61,9 @@ export const api = {
       /** 促销分组（IKAHFG/ADR-0006）：进行中活动，空数组 = 首页不渲染模块卡 */
       promotions?: HomePromotion[];
     }>("/home"),
-  /** 支付成功页广告位（IKA57E）：未配置时返回 null，页面不渲染不占位 */
-  paySuccessBanner: () =>
-    request<Banner | null>("/banners/current?placement=pay-success"),
+  /** 支付成功页广告位（IKA57E→IKB87P）：大卡列表，sort 升序最多 2 条；空数组不占位 */
+  paySuccessBanners: () =>
+    request<Banner[]>("/banners/current?placement=pay-success"),
   /** 进群二维码（IKAJSZ）：楼栋群→校园大群回落；null = 后台未配置，入口不显示 */
   wechatGroup: () =>
     request<{ image: string; scope: "building" | "campus" } | null>(
