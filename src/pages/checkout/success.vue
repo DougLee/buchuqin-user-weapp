@@ -158,11 +158,13 @@ function openCancel() {
     opacity: 0.55;
   }
 }
-/* 广告位（IKA57E）：左图右文横条，点击进图文详情 */
+/* 广告位（IKA57E）：左图右文横条，点击进图文详情；
+   IKB5PB：与上方支付信息卡拉开间距（.card 本身无外边距，不设会贴住） */
 .ad {
   display: flex;
   align-items: center;
   gap: 20rpx;
+  margin-top: 28rpx;
   padding: 20rpx;
   overflow: hidden;
 }
