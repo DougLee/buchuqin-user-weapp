@@ -90,11 +90,7 @@ async function load() {
         (item.status === "claimed" || item.status === "released") &&
         new Date(item.coupon.expiresAt).getTime() > now,
     );
-    // 默认选用抵扣最多的可用券
-    const best = usableCoupons.value
-      .filter(meetsThreshold)
-      .sort((x, y) => y.coupon.amount - x.coupon.amount)[0];
-    selectedCouponId.value = best?.id;
+    // IKB3K1：默认不选券，用户主动选择（不再自动勾选抵扣最多的券）
   }
   if (!cart.value) {
     // ADR-0005(IKA00Q)：仅网络/服务故障给整页错误态；业务拒绝由 request 层 toast
@@ -143,6 +139,16 @@ async function chooseCoupon(item: UserCoupon | null) {
       icon: "none",
     });
     return;
+  }
+  // IKB3K1：抵扣超过订单金额（商品+运费）的券不可用，选了会算出负数单
+  if (item) {
+    const pot =
+      (cart.value?.productAmount ?? 0) +
+      (settlement.value?.deliveryFee ?? 0);
+    if (item.coupon.amount > pot) {
+      uni.showToast({ title: "该单无法使用此优惠券", icon: "none" });
+      return;
+    }
   }
   selectedCouponId.value = item?.id;
   // 门槛守卫（IK9YPJ）：低于起送不发结算请求；失败 toast 由 request 层统一

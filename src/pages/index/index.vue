@@ -52,7 +52,8 @@ onShow(async () => {
 const now = ref(Date.now());
 const promoTicker = setInterval(() => (now.value = Date.now()), 1000);
 onUnmounted(() => clearInterval(promoTicker));
-/** 按 type 分组渲染（同组共用标题），组倒计时取最早结束的活动 */
+/** 按 type 分组渲染（同组共用标题），组倒计时取最早结束的活动。
+ *  IKB3NR：条目/分组按剩余时间过滤——归零那一秒本地即回落，不等下次 onShow。 */
 const promoGroups = computed(() => {
   const groups: Array<{
     type: string;
@@ -61,16 +62,19 @@ const promoGroups = computed(() => {
     items: HomePromotion[];
   }> = [];
   for (const type of ["seckill", "clearance"]) {
-    const items = promotions.value.filter((x) => x.type === type);
-    if (!items.length) continue;
+    // 先剔除本地时钟已归零的活动（后端窗口判断的兜底）
+    const alive = promotions.value.filter(
+      (x) => x.type === type && new Date(x.endsAt).getTime() > now.value,
+    );
+    if (!alive.length) continue;
     groups.push({
       type,
       title: PROMO_TITLE[type],
-      endsAt: items.reduce(
+      endsAt: alive.reduce(
         (min, x) => (x.endsAt < min ? x.endsAt : min),
-        items[0].endsAt,
+        alive[0].endsAt,
       ),
-      items,
+      items: alive,
     });
   }
   return groups;
