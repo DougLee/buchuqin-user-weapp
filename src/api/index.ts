@@ -78,6 +78,8 @@ export const api = {
       )
     ).items,
   product: (id: string) => request<Product>(`/products/${id}`),
+  /** 限时秒杀商品（IKBW0K）：进行中 seckill 活动带促销价（分类页伪分类用）。 */
+  seckillProducts: () => request<Product[]>("/promotions/seckill"),
   cart: () => request<Cart>("/cart"),
   updateCart: (items: Array<{ productId: string; quantity: number }>) =>
     request<Cart>("/cart", { method: "PUT", data: { items } }),

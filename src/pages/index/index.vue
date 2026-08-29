@@ -7,7 +7,7 @@ import { useCartStore } from "../../stores/cart";
 import { useSessionStore } from "../../stores/session";
 import { categoryImage } from "../../utils/categoryImage";
 import { fenToYuan } from "../../utils/money";
-import { countdownText, PROMO_TITLE } from "../../utils/promotion";
+import { PROMO_TITLE } from "../../utils/promotion";
 import type {
   Address,
   Banner,
@@ -125,6 +125,13 @@ const remove = (p: Product) => cart.set(p, cart.quantity(p.id) - 1);
 const open = (id: string) =>
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
 const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
+/** 促销版块入口（IKBW0K）：整卡跳分类页「限时秒杀」特殊分类——点击秒杀商品
+ *  /版块都进专区列表（switchTab 不支持 query，走 storage 传递）；
+ *  临期版块暂无专区，直接进分类页。 */
+function goPromoCategory(type: string) {
+  if (type === "seckill") uni.setStorageSync("categoryPick", "seckill");
+  goCategory();
+}
 /**
  * 金刚区点击带分类 id 跳商品页（IK9SOB）：switchTab 不支持 query，
  * 与搜索词同走 storage 传递；商品页 onShow 消费后选中对应分类。
@@ -247,13 +254,19 @@ function search() {
         ></scroll-view
       ></view
     >
-    <!-- 促销模块卡（IKAHFG/ADR-0006）：秒杀/临期分组，横滑+倒计时，无活动不占位 -->
-    <view v-for="g in promoGroups" :key="g.type" class="promo card"
+    <!-- 促销模块卡（IKAHFG/ADR-0006）：秒杀/临期分组，横滑，无活动不占位。
+         IKBW0K：倒计时移除（多活动结束时间不一，单一倒计时失真）；整卡改为
+         分类页「限时秒杀」入口——点击秒杀商品/版块均跳分类页特殊分类 -->
+    <view
+      v-for="g in promoGroups"
+      :key="g.type"
+      class="promo card"
+      role="button"
+      @tap="goPromoCategory(g.type)"
       ><view class="promo__head"
         ><text class="promo__title">{{ g.title }}</text
-        ><text class="promo__countdown"
-          >距结束 {{ countdownText(g.endsAt, now) }}</text
-        ></view
+        ><text class="link-chip">{{ g.type === "seckill" ? "去抢购" : "去看看" }}</text
+      ></view
       ><scroll-view
         scroll-x
         class="promo__scroll"
@@ -264,7 +277,6 @@ function search() {
             v-for="item in g.items"
             :key="item.id"
             class="promo__item"
-            @tap="open(item.product.id)"
             ><image
               class="promo__image"
               :src="item.product.image"
@@ -533,7 +545,8 @@ function search() {
 .categories__row {
   display: inline-flex;
   gap: 28rpx;
-  padding: 0 28rpx;
+  /* IKBW0J：右侧不留 padding——末位分类被卡片边缘硬切「只露一半」，暗示可滑动 */
+  padding: 0 0 0 28rpx;
 }
 .category {
   flex-shrink: 0;
@@ -549,16 +562,8 @@ function search() {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.categories::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 48rpx;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff);
-  pointer-events: none;
-}
+/* IKBW0J：原右缘 48rpx 白色渐隐已移除——渐隐会把「露一半」的末位图标罩白，
+   改由 overflow:hidden 硬裁切出半个图标（更明确的可滑动暗示） */
 .category__image {
   width: 112rpx;
   height: 112rpx;

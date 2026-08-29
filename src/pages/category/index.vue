@@ -24,7 +24,11 @@ async function load() {
   loading.value = true;
   error.value = false;
   try {
-    products.value = await api.products(active.value, keyword.value);
+    // IKBW0K：限时秒杀伪分类走专区接口（进行中活动带促销价），搜索词不生效
+    products.value =
+      active.value === "seckill"
+        ? await api.seckillProducts()
+        : await api.products(active.value, keyword.value);
   } catch (e) {
     // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
     if (isRetryable(e)) error.value = true;
@@ -67,6 +71,11 @@ onShow(async () => {
   // IK9VD3：pick 校验存在性——类别被删/接口降级时回退「全部」，避免侧栏无高亮、标题与列表错位
   if (!categories.value.some((c) => c.id === "all"))
     categories.value = [{ id: "all", name: "全部" }, ...categories.value];
+  // IKBW0K：「限时秒杀」特殊分类插在「全部」之后（伪分类，不落 DB，
+  // 点入走 /promotions/seckill 专区数据）
+  const allIdx = categories.value.findIndex((c) => c.id === "all");
+  if (allIdx >= 0 && !categories.value.some((c) => c.id === "seckill"))
+    categories.value.splice(allIdx + 1, 0, { id: "seckill", name: "限时秒杀" });
   if (pick) {
     active.value = categories.value.some((c) => c.id === pick) ? pick : "all";
     // 金刚区带分类跳（IK9SOB）是「干净浏览该分类」意图，清掉残留搜索词
@@ -137,9 +146,14 @@ const currentName = () => {
               ><text class="item__name">{{ p.name }}</text
               ><text class="item__sub">{{ p.subtitle }}</text
               ><view class="item__bottom"
-                ><text class="price"
-                  ><text class="price__symbol">¥</text
-                  >{{ fenToYuan(p.price) }}</text
+                ><view class="item__pricegrp"
+                  ><text class="price"
+                    ><text class="price__symbol">¥</text
+                    >{{ fenToYuan(p.price) }}</text
+                  ><!-- IKBW0K：秒杀商品带划线原价（活动期 originalPrice=原价） -->
+                  <text v-if="p.originalPrice" class="item__strike"
+                    >¥{{ fenToYuan(p.originalPrice) }}</text
+                  ></view
                 ><!-- 计数器（IK9AWL）：数量>0 时展开 − n ＋，数字不再是隐形加号 -->
                 <view v-if="cart.quantity(p.id)" class="counter" @tap.stop
                   ><button
@@ -295,6 +309,18 @@ const currentName = () => {
   align-items: center;
   justify-content: space-between;
   margin-top: 16rpx;
+}
+/* IKBW0K：促销价 + 划线原价左组（原价来自活动期 originalPrice） */
+.item__pricegrp {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+.item__strike {
+  margin-left: 10rpx;
+  font-size: 20rpx;
+  color: $muted;
+  text-decoration: line-through;
 }
 /* 触控热区（IK9AWL）：64rpx 视觉 + 透明外圈 ::after ≈ 88rpx 命中 */
 .add,
