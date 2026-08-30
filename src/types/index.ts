@@ -49,7 +49,9 @@ export interface Banner {
   /** 预置主题键 green/orange/dark 或自定义 #RRGGBB */
   color: string;
   image?: string | null;
-  /** 图文详情（IK9SNN）：后台配置的跳转内容，空则不可点 */
+  /** 图文详情长图（IKC1AD）：点击 Banner 进详情页通铺展示的主口径 */
+  detailImage?: string | null;
+  /** 旧版逐行文字详情（IK9SNN），保留兼容；detailImage 优先 */
   content?: string | null;
   /** 展示位置（IKA57F）：home 首页轮播 / pay-success 支付成功页广告位 */
   placement?: "home" | "pay-success";

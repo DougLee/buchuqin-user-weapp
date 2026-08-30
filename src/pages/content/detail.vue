@@ -10,6 +10,8 @@ const title = ref(""),
   subtitle = ref(""),
   badge = ref(""),
   image = ref(""),
+  /** 长图详情（IKC1AD）：配置了 detailImage 时整页通铺展示长图 */
+  longImage = ref(""),
   /** 文本行 / 图片行 判别后的渲染项 */
   blocks = ref<Array<{ type: "text" | "image"; value: string }>>([]);
 onLoad(() => {
@@ -21,12 +23,14 @@ onLoad(() => {
     subtitle?: string;
     badge?: string;
     image?: string | null;
+    detailImage?: string | null;
     content?: string | null;
   };
   title.value = banner.title ?? "";
   subtitle.value = banner.subtitle ?? "";
   badge.value = banner.badge ?? "";
   image.value = banner.image ?? "";
+  longImage.value = banner.detailImage?.trim() ?? "";
   blocks.value = String(banner.content ?? "")
     .split(/\n+/)
     .map((line) => line.trim())
@@ -40,9 +44,14 @@ onLoad(() => {
 </script>
 <template>
   <view class="page content"
-    ><view v-if="image" class="content__cover"
-      ><image :src="image" mode="aspectFill" /></view
-    ><view class="content__head"
+    ><!-- IKC1AD：长图详情模式——无封面/标题栏/卡片包裹，整宽通铺看长图 -->
+    <view v-if="longImage" class="content__long"
+      ><image :src="longImage" mode="widthFix"
+    /></view>
+    <template v-else
+      ><view v-if="image" class="content__cover"
+        ><image :src="image" mode="aspectFill" /></view
+      ><view class="content__head"
       ><text v-if="badge" class="content__badge">{{ badge }}</text
       ><text class="content__title">{{ title }}</text
       ><text v-if="subtitle" class="content__sub">{{ subtitle }}</text></view
@@ -59,8 +68,9 @@ onLoad(() => {
           <text v-else class="content__line">{{ b.value }}</text></template
         ></template
       ><text v-else class="content__line muted">暂无详细介绍</text></view
-    ></view
-  >
+    ></template
+  ></view
+>
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
@@ -73,6 +83,14 @@ onLoad(() => {
 .content__cover image {
   width: 100%;
   height: 100%;
+}
+/* IKC1AD：长图详情通铺（对冲 page 内边距，widthFix 自撑高） */
+.content__long {
+  margin: -10rpx;
+}
+.content__long image {
+  display: block;
+  width: 100%;
 }
 .content__head {
   padding: 0 6rpx;

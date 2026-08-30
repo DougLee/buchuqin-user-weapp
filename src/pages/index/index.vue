@@ -79,6 +79,22 @@ const promoGroups = computed(() => {
   }
   return groups;
 });
+/** 秒杀版块固定窗口（IKC1A9）：默认展示 4 个，「换一批」向后轮换循环 */
+const SECKILL_PAGE_SIZE = 4;
+const seckillOffset = ref(0);
+const seckillWindow = computed(() => {
+  const g = promoGroups.value.find((x) => x.type === "seckill");
+  if (!g) return [];
+  const items = g.items;
+  if (items.length <= SECKILL_PAGE_SIZE) return items;
+  const out: HomePromotion[] = [];
+  for (let i = 0; i < SECKILL_PAGE_SIZE; i++)
+    out.push(items[(seckillOffset.value + i) % items.length]);
+  return out;
+});
+function nextSeckillBatch() {
+  seckillOffset.value += SECKILL_PAGE_SIZE;
+}
 /** Banner 主题：预置键映射渐变，自定义 hex 走内联底色。 */
 const BANNER_THEMES: Record<string, string> = {
   green: "linear-gradient(120deg, #07883b 0%, #25b95a 60%, #41ce69 100%)",
@@ -99,11 +115,12 @@ function bannerStyle(banner: Banner) {
   return { background: banner.color || "#07883b" };
 }
 /**
- * Banner 点击跳图文详情（IK9SNN）：后台配了 content 才可点，
+ * Banner 点击跳图文详情（IK9SNN）：后台配了详情内容才可点，
  * 数据经 storage 传给图文页（/home 已拉全量，不建详情端点）。
+ * IKC1AD：详情主口径改为「长图」（detailImage），旧文字 content 保留兼容。
  */
 function openBanner(banner: Banner) {
-  if (!banner.content?.trim()) return; // 无内容 Banner 不跳转
+  if (!banner.detailImage?.trim() && !banner.content?.trim()) return;
   uni.setStorageSync(
     "bannerContent",
     JSON.stringify({
@@ -111,11 +128,15 @@ function openBanner(banner: Banner) {
       subtitle: banner.subtitle,
       badge: banner.badge,
       image: banner.image,
-      content: banner.content,
+      detailImage: banner.detailImage ?? "",
+      content: banner.content ?? "",
     }),
   );
   uni.navigateTo({ url: "/pages/content/detail" });
 }
+/** Banner 可点性（IKC1AD）：配了长图或旧文字详情才算可点（驱动按压反馈样式） */
+const hasBannerDetail = (banner: Banner) =>
+  Boolean(banner.detailImage?.trim() || banner.content?.trim());
 const add = (p: Product) => cart.set(p, cart.quantity(p.id) + 1);
 /** 首页分类横滑条：与商品页侧栏同源同序，含「全部」（DB 配图）；
  *  横滑一行浏览全部分类（2026-08-22 需求），不再按 6 列折行，仅留防御上限 */
@@ -185,7 +206,7 @@ function search() {
       ><swiper-item v-for="banner in banners" :key="banner.id"
         ><view
           class="hero__slide"
-          :class="{ 'hero__slide--link': banner.content?.trim() }"
+          :class="{ 'hero__slide--link': hasBannerDetail(banner) }"
           :style="bannerStyle(banner)"
           @tap="openBanner(banner)"
           ><image
@@ -193,12 +214,20 @@ function search() {
             class="hero__bg"
             :src="banner.image"
             mode="aspectFill"
-          /><view class="hero__mask" v-if="banner.image && banner.badge"></view
-          ><text v-if="banner.badge" class="hero__tag">{{ banner.badge }}</text
-          ><text v-if="banner.title" class="hero__title">{{ banner.title }}</text
-          ><text v-if="banner.subtitle" class="hero__sub">{{
-            banner.subtitle
-          }}</text></view
+          /><!-- IKC1AD：用户端 Banner 只显示图片，标题/副标题/角标退为内部字段；
+               文字仅在无图兜底帧（渐变底）保留，纯色块无字不可读 -->
+          ><view class="hero__mask" v-if="!banner.image && banner.badge"></view
+          ><template v-if="!banner.image"
+            ><text v-if="banner.badge" class="hero__tag">{{
+              banner.badge
+            }}</text
+            ><text v-if="banner.title" class="hero__title">{{
+              banner.title
+            }}</text
+            ><text v-if="banner.subtitle" class="hero__sub">{{
+              banner.subtitle
+            }}</text></template
+          ></view
         ></swiper-item
       ></swiper
     >
@@ -265,8 +294,13 @@ function search() {
       @tap="goPromoCategory(g.type)"
       ><view class="promo__head"
         ><text class="promo__title">{{ g.title }}</text
-        ><text class="link-chip">{{ g.type === "seckill" ? "去抢购" : "去看看" }}</text
-      ></view
+        ><!-- IKC1A9：秒杀固定 4 商品，「换一批」轮换（替代原「去抢购」） -->
+        <text
+          v-if="g.type === 'seckill' && g.items.length > 4"
+          class="link-chip"
+          @tap.stop="nextSeckillBatch"
+          >换一批</text
+        ></view
       ><scroll-view
         scroll-x
         class="promo__scroll"
@@ -274,7 +308,7 @@ function search() {
         :show-scrollbar="false"
         ><view class="promo__row"
           ><view
-            v-for="item in g.items"
+            v-for="item in g.type === 'seckill' ? seckillWindow : g.items"
             :key="item.id"
             class="promo__item"
             ><image
