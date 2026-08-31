@@ -79,9 +79,9 @@ const promoGroups = computed(() => {
   }
   return groups;
 });
-/** 秒杀版块固定窗口（IKC1A9 → PM 0831 细化）：默认展示 4 个，**定时自动
- *  换一批**（5s 轮换循环，取消手动「换一批」）；整卡点击跳分类页看更多 */
-const SECKILL_PAGE_SIZE = 4;
+/** 秒杀版块固定窗口（IKC1A9 → PM 0831 细化）：一行 3 个，**定时自动
+ *  换一批**（5s 轮换循环）；整卡点击跳分类页看更多 */
+const SECKILL_PAGE_SIZE = 3;
 const SECKILL_ROTATE_MS = 5000;
 const seckillOffset = ref(0);
 const seckillWindow = computed(() => {
@@ -302,7 +302,7 @@ function search() {
         ><text class="promo__title">{{ g.title }}</text
         ><!-- IKC1A9 优化：秒杀区右上角「换一组」icon（手动换组，与 5s 自动轮换并存） -->
         <text
-          v-if="g.type === 'seckill' && g.items.length > 4"
+          v-if="g.type === 'seckill' && g.items.length > 3"
           class="promo__refresh"
           role="button"
           aria-label="换一组秒杀商品"
@@ -722,8 +722,8 @@ function search() {
    图（圆角大图）→ 名称（常规字重）→ 价格（纵排，单一强调色） */
 .promo__grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20rpx;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18rpx;
   padding: 24rpx 28rpx 28rpx;
 }
 .promo__item--grid {
@@ -733,12 +733,12 @@ function search() {
 .promo__image--grid {
   display: block;
   width: 100%;
-  height: 130rpx;
+  height: 160rpx;
   border-radius: 14rpx;
 }
 .promo__item--grid .promo__name {
   margin: 12rpx 0 0;
-  font-size: 20rpx;
+  font-size: 22rpx;
   font-weight: 500;
 }
 .promo__bottom--grid {
@@ -747,15 +747,15 @@ function search() {
 }
 .promo__bottom--grid .price {
   display: block;
-  font-size: 24rpx;
+  font-size: 26rpx;
 }
 .promo__bottom--grid .price__symbol {
-  font-size: 16rpx;
+  font-size: 17rpx;
 }
 .promo__bottom--grid .promo__strike {
   display: block;
   margin-top: 2rpx;
-  font-size: 17rpx;
+  font-size: 18rpx;
 }
 /* 右上角「换一组」icon：56rpx 视觉 + ::after 外扩热区 ≈88rpx（触控目标 ≥44px） */
 .promo__refresh {
