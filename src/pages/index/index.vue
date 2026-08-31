@@ -300,15 +300,45 @@ function search() {
       @tap="goPromoCategory(g.type)"
       ><view class="promo__head"
         ><text class="promo__title">{{ g.title }}</text
+        ><!-- IKC1A9 优化：秒杀区右上角「换一组」icon（手动换组，与 5s 自动轮换并存） -->
+        <text
+          v-if="g.type === 'seckill' && g.items.length > 4"
+          class="promo__refresh"
+          role="button"
+          aria-label="换一组秒杀商品"
+          @tap.stop="nextSeckillBatch"
+          >⟳</text
+        ></view
+      ><!-- IKBW0K 优化：秒杀组 grid 等分一屏恰好 4 个（原横滑第 4 个被裁） -->
+      <view v-if="g.type === 'seckill'" class="promo__grid"
+        ><view
+          v-for="item in seckillWindow"
+          :key="item.id"
+          class="promo__item promo__item--grid"
+          ><image
+            class="promo__image promo__image--grid"
+            :src="item.product.image"
+            mode="aspectFill"
+            :alt="item.product.name"
+          /><text class="promo__name">{{ item.product.name }}</text
+          ><view class="promo__bottom"
+            ><text class="price"
+              ><text class="price__symbol">¥</text
+              >{{ fenToYuan(item.product.price) }}</text
+            ><text class="promo__strike"
+              >¥{{ fenToYuan(item.product.originalPrice) }}</text
+            ></view
+          ></view
         ></view
       ><scroll-view
+        v-else
         scroll-x
         class="promo__scroll"
         enhanced
         :show-scrollbar="false"
         ><view class="promo__row"
           ><view
-            v-for="item in g.type === 'seckill' ? seckillWindow : g.items"
+            v-for="item in g.items"
             :key="item.id"
             class="promo__item"
             ><image
@@ -328,7 +358,7 @@ function search() {
           ></view
         ></scroll-view
       ></view
-    >
+   >
     <view class="section-title"
       ><text class="section-title__main">为你推荐</text
       ><text class="section-title__sub" @tap="goCategory"
@@ -686,6 +716,49 @@ function search() {
 .promo__item {
   flex-shrink: 0;
   width: 176rpx;
+}
+/* IKBW0K 优化：秒杀组 grid 四等分，一屏恰好完整 4 个（原横滑第 4 个被裁） */
+.promo__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16rpx;
+  padding: 16rpx 28rpx 24rpx;
+}
+.promo__item--grid {
+  width: auto;
+  min-width: 0;
+}
+.promo__image--grid {
+  width: 100%;
+  height: 150rpx;
+  border-radius: 16rpx;
+}
+/* 右上角「换一组」icon：56rpx 视觉 + ::after 外扩热区 ≈88rpx（触控目标 ≥44px） */
+.promo__refresh {
+  flex: none;
+  align-self: center;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: $primary-soft;
+  color: $primary;
+  font-size: 32rpx;
+  font-weight: 900;
+  line-height: 56rpx;
+  text-align: center;
+  position: relative;
+  transition: background 0.15s ease;
+}
+.promo__refresh::after {
+  content: "";
+  position: absolute;
+  top: -16rpx;
+  right: -16rpx;
+  bottom: -16rpx;
+  left: -16rpx;
+}
+.promo__refresh:active {
+  background: #dcefe0;
 }
 .promo__image {
   width: 176rpx;
