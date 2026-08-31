@@ -79,8 +79,10 @@ const promoGroups = computed(() => {
   }
   return groups;
 });
-/** 秒杀版块固定窗口（IKC1A9）：默认展示 4 个，「换一批」向后轮换循环 */
+/** 秒杀版块固定窗口（IKC1A9 → PM 0831 细化）：默认展示 4 个，**定时自动
+ *  换一批**（5s 轮换循环，取消手动「换一批」）；整卡点击跳分类页看更多 */
 const SECKILL_PAGE_SIZE = 4;
+const SECKILL_ROTATE_MS = 5000;
 const seckillOffset = ref(0);
 const seckillWindow = computed(() => {
   const g = promoGroups.value.find((x) => x.type === "seckill");
@@ -95,6 +97,8 @@ const seckillWindow = computed(() => {
 function nextSeckillBatch() {
   seckillOffset.value += SECKILL_PAGE_SIZE;
 }
+const seckillTicker = setInterval(nextSeckillBatch, SECKILL_ROTATE_MS);
+onUnmounted(() => clearInterval(seckillTicker));
 /** Banner 主题：预置键映射渐变，自定义 hex 走内联底色。 */
 const BANNER_THEMES: Record<string, string> = {
   green: "linear-gradient(120deg, #07883b 0%, #25b95a 60%, #41ce69 100%)",
@@ -296,12 +300,6 @@ function search() {
       @tap="goPromoCategory(g.type)"
       ><view class="promo__head"
         ><text class="promo__title">{{ g.title }}</text
-        ><!-- IKC1A9：秒杀固定 4 商品，「换一批」轮换（替代原「去抢购」） -->
-        <text
-          v-if="g.type === 'seckill' && g.items.length > 4"
-          class="link-chip"
-          @tap.stop="nextSeckillBatch"
-          >换一批</text
         ></view
       ><scroll-view
         scroll-x
