@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 /**
  * 图文详情页（IK9SNN）：首页 Banner 点击跳转的活动/公告内容。
  * 数据经 storage 传递（Banner 已在 /home 拉取，不重复建后端详情端点），

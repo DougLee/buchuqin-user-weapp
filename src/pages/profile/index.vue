@@ -5,6 +5,8 @@ import { api } from "../../api";
 import { useSessionStore } from "../../stores/session";
 import { SERVICE_HOURS, SERVICE_PHONE } from "../../utils/service";
 import type { Address } from "../../types";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 const session = useSessionStore(),
   addresses = ref<Address[]>([]),
   usableCouponCount = ref(0),

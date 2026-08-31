@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { onShareAppMessage, onShareTimeline, onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
 import { useCartStore } from "../../stores/cart";
@@ -21,6 +21,27 @@ onLoad(async (q) => {
   productId.value = String(q?.id || "");
   await cart.load();
   await load();
+});
+/** 商品分享（IKC7V6）：头图直传 + 价格标题钩子（「¥12.9 商品名 点击抢购>>」），
+ *  落地本页带商品 id；price 为生效价（促销期即促销价，productView 单一事实）。
+ *  商品未加载/缺头图时 imageUrl 缺省——微信自动截当前页兜底 */
+onShareAppMessage(() => {
+  const p = product.value;
+  if (!p)
+    return { title: "不出寝，零食送到寝室", path: "/pages/index/index" };
+  return {
+    title: `¥${fenToYuan(p.price)} ${p.name} 点击抢购>>`,
+    path: `/pages/product/detail?id=${p.id}`,
+    imageUrl: p.image || undefined,
+  };
+});
+onShareTimeline(() => {
+  const p = product.value;
+  if (!p) return { title: "不出寝，零食送到寝室" };
+  return {
+    title: `¥${fenToYuan(p.price)} ${p.name} 点击抢购>>`,
+    query: `id=${p.id}`,
+  };
 });
 /** 详情三态（IK9AWK）：加载骨架 / 失败重试 / 内容；无 id 视为链接无效 */
 async function load() {
@@ -154,6 +175,10 @@ const gallery = computed(() => {
       <!-- #ifdef MP-WEIXIN -->
       <button class="service-mini" open-type="contact" aria-label="客服">
         客服
+      </button>
+      <!-- 分享入口（IKC7V6）：open-type=share 唤起转发面板，走页面 onShareAppMessage -->
+      <button class="service-mini" open-type="share" aria-label="分享">
+        分享
       </button>
       <!-- #endif -->
       <!-- #ifndef MP-WEIXIN -->

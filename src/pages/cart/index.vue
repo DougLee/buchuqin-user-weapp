@@ -4,6 +4,8 @@ import { onShow } from "@dcloudio/uni-app";
 import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
 import type { CartLine } from "../../types";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 /**
  * 购物车 Tab 页（IKAHBQ）：订单让位降级普通页，购物车回归 Tab 形态。
  * 行编辑/库存标注/起送拦截与悬浮窗 CartOverlay 同口径（IK97FD 保留并存，

@@ -2,6 +2,8 @@
 import { computed, ref, watch } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { useSessionStore } from "../../stores/session";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 const session = useSessionStore(),
   nicknameInput = ref(""),
   savingNickname = ref(false);

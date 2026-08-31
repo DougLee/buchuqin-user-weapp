@@ -3,6 +3,8 @@ import { computed, reactive, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import type { Building } from "../../types";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 const editId = ref(""),
   saving = ref(false),
   buildings = ref<Building[]>([]),

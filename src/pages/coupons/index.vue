@@ -5,6 +5,8 @@ import { api } from "../../api";
 import { isRetryable } from "../../api/request";
 import { fenToYuan } from "../../utils/money";
 import type { Coupon, UserCoupon, UserCouponStatus } from "../../types";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 const claimable = ref<Coupon[]>([]),
   mine = ref<UserCoupon[]>([]),
   claiming = ref(""),

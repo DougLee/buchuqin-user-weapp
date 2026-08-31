@@ -7,6 +7,8 @@ import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
 import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
 import type { Address, Cart, UserCoupon } from "../../types";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 /** 结算金额字段单位均为分（契约 API-3），展示统一经 fenToYuan */
 interface Settlement {
   productAmount: number;

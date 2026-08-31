@@ -8,6 +8,8 @@ import { fenToYuan } from "../../utils/money";
 import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
 import { SERVICE_PHONE } from "../../utils/service";
 import type { Order } from "../../types";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 const orderId = ref(""),
   order = ref<Order>(),
   confirming = ref(false),

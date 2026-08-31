@@ -4,6 +4,8 @@ import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { fenToYuan } from "../../utils/money";
 import type { Banner, Order } from "../../types";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 const orderId = ref(""),
   order = ref<Order>(),
   cancelling = ref(false),

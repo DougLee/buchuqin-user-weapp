@@ -3,6 +3,8 @@ import { reactive, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { AFTER_SALE_TYPES } from "../../utils/afterSale";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 const orderId = ref(""),
   submitting = ref(false),
   uploading = ref(false),

@@ -5,6 +5,8 @@ import { api } from "../../api";
 import { isRetryable } from "../../api/request";
 import { fenToYuan } from "../../utils/money";
 import type { AfterSale, Refund } from "../../types";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 /** 售后单状态 → 中文（后端值：pending/approved/rejected） */
 const AFTERSALE_STATUS_TEXT: Record<string, string> = {
   pending: "待处理",

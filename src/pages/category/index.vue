@@ -6,6 +6,8 @@ import { isRetryable } from "../../api/request";
 import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
 import type { Category, Product } from "../../types";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 /**
  * 侧栏直接用 DB 分类字典（IK9VDJ）；active 初始 'all'，api.products('all') 后端已兼容。
  * 「全部」是 UI 概念（2026-08-21 数据清理）：原 id=all 的 DB 行随测试分类删除，

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onShareAppMessage, onShareTimeline, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import ProductCard from "../../components/ProductCard.vue";
 import { useCartStore } from "../../stores/cart";
@@ -142,6 +142,12 @@ function openBanner(banner: Banner) {
 const hasBannerDetail = (banner: Banner) =>
   Boolean(banner.detailImage?.trim() || banner.content?.trim());
 const add = (p: Product) => cart.set(p, cart.quantity(p.id) + 1);
+/** 分享（IKC7V6）：默认分享——微信自动截当前页为分享图，落地首页 */
+onShareAppMessage(() => ({
+  title: "不出寝，零食送到寝室",
+  path: "/pages/index/index",
+}));
+onShareTimeline(() => ({ title: "不出寝，零食送到寝室" }));
 /** 首页分类横滑条：与商品页侧栏同源同序，含「全部」（DB 配图）；
  *  横滑一行浏览全部分类（2026-08-22 需求），不再按 6 列折行，仅留防御上限 */
 const rowCategories = computed(() => categories.value.slice(0, 24));

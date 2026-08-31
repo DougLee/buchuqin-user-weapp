@@ -3,6 +3,8 @@ import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { useSessionStore } from "../../stores/session";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 const session = useSessionStore(),
   options = ref<Array<{ id: string; name: string; shortName: string }>>([]),
   busy = ref(false),

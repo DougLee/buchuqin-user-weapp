@@ -3,6 +3,8 @@ import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import type { Address } from "../../types";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 const addresses = ref<Address[]>([]),
   selectedId = ref(""),
   busy = ref(false),

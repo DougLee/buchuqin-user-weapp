@@ -7,6 +7,8 @@ import { isRetryable } from "../../api/request";
 import { fenToYuan } from "../../utils/money";
 import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
 import type { Order } from "../../types";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 /** 与后端支付超时关单保持一致（15 分钟，Cron + 懒执行） */
 const PAY_WINDOW_MS = 15 * 60 * 1000;
 const orders = ref<Order[]>([]),

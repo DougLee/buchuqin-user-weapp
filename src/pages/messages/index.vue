@@ -4,6 +4,8 @@ import { onReachBottom, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
 import type { Notification } from "../../types";
+import { setupDefaultShare } from "../../utils/share";
+setupDefaultShare();
 const items = ref<Notification[]>([]),
   loading = ref(true),
   error = ref(false),
