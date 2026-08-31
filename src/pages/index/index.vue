@@ -321,7 +321,7 @@ function search() {
             mode="aspectFill"
             :alt="item.product.name"
           /><text class="promo__name">{{ item.product.name }}</text
-          ><view class="promo__bottom"
+          ><view class="promo__bottom promo__bottom--grid"
             ><text class="price"
               ><text class="price__symbol">¥</text
               >{{ fenToYuan(item.product.price) }}</text
@@ -721,8 +721,8 @@ function search() {
 .promo__grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16rpx;
-  padding: 16rpx 28rpx 24rpx;
+  gap: 14rpx;
+  padding: 18rpx 24rpx 24rpx;
 }
 .promo__item--grid {
   width: auto;
@@ -730,8 +730,29 @@ function search() {
 }
 .promo__image--grid {
   width: 100%;
-  height: 150rpx;
-  border-radius: 16rpx;
+  height: 158rpx;
+  border-radius: 14rpx;
+}
+/* 窄列（1/4 屏宽）文字层级：名称收窄、价格纵排不再并排挤压 */
+.promo__item--grid .promo__name {
+  font-size: 21rpx;
+  margin-top: 10rpx;
+}
+.promo__bottom--grid {
+  display: block;
+  margin-top: 6rpx;
+}
+.promo__bottom--grid .price {
+  display: block;
+  font-size: 27rpx;
+}
+.promo__bottom--grid .price__symbol {
+  font-size: 20rpx;
+}
+.promo__bottom--grid .promo__strike {
+  display: block;
+  margin-top: 2rpx;
+  font-size: 19rpx;
 }
 /* 右上角「换一组」icon：56rpx 视觉 + ::after 外扩热区 ≈88rpx（触控目标 ≥44px） */
 .promo__refresh {
