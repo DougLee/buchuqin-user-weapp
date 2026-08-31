@@ -718,30 +718,35 @@ function search() {
   width: 176rpx;
 }
 /* IKBW0K 优化：秒杀组 grid 四等分，一屏恰好完整 4 个（原横滑第 4 个被裁）。
-   PM 0831 反馈卡片偏大——内容区收窄+图与文字等比降档（等比例调小） */
+   IKC1A9 二轮：坑位卡片化——独立浅底+内边距+圆角，图不再裸排紧贴，
+   间距有边界感；名称/价格与图之间留出呼吸空间 */
 .promo__grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14rpx;
-  padding: 18rpx 52rpx 28rpx;
+  padding: 20rpx 28rpx 26rpx;
 }
 .promo__item--grid {
   width: auto;
   min-width: 0;
+  background: $cream;
+  border-radius: 16rpx;
+  padding: 8rpx 8rpx 12rpx;
 }
 .promo__image--grid {
+  display: block;
   width: 100%;
-  height: 144rpx;
+  height: 138rpx;
   border-radius: 12rpx;
 }
 /* 窄列（1/4 屏宽）文字层级：名称收窄、价格纵排不再并排挤压 */
 .promo__item--grid .promo__name {
+  margin: 10rpx 6rpx 0;
   font-size: 20rpx;
-  margin-top: 8rpx;
 }
 .promo__bottom--grid {
   display: block;
-  margin-top: 4rpx;
+  margin: 4rpx 6rpx 0;
 }
 .promo__bottom--grid .price {
   display: block;
