@@ -717,48 +717,45 @@ function search() {
   flex-shrink: 0;
   width: 176rpx;
 }
-/* IKBW0K 优化：秒杀组 grid 四等分，一屏恰好完整 4 个（原横滑第 4 个被裁）。
-   IKC1A9 二轮：坑位卡片化——独立浅底+内边距+圆角，图不再裸排紧贴，
-   间距有边界感；名称/价格与图之间留出呼吸空间 */
+/* IKBW0K 三轮重设计（IKC1A9）：无卡化网格——去掉坑位底色，图即视觉锚点，
+   靠大留白 + 排版层级做高级感（与首页白卡×绿点缀的原生语言一致）：
+   图（圆角大图）→ 名称（常规字重）→ 价格（纵排，单一强调色） */
 .promo__grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14rpx;
-  padding: 20rpx 28rpx 26rpx;
+  gap: 20rpx;
+  padding: 24rpx 28rpx 28rpx;
 }
 .promo__item--grid {
   width: auto;
   min-width: 0;
-  background: $cream;
-  border-radius: 16rpx;
-  padding: 8rpx 8rpx 12rpx;
 }
 .promo__image--grid {
   display: block;
   width: 100%;
-  height: 138rpx;
-  border-radius: 12rpx;
+  height: 130rpx;
+  border-radius: 14rpx;
 }
-/* 窄列（1/4 屏宽）文字层级：名称收窄、价格纵排不再并排挤压 */
 .promo__item--grid .promo__name {
-  margin: 10rpx 6rpx 0;
+  margin: 12rpx 0 0;
   font-size: 20rpx;
+  font-weight: 500;
 }
 .promo__bottom--grid {
   display: block;
-  margin: 4rpx 6rpx 0;
+  margin-top: 6rpx;
 }
 .promo__bottom--grid .price {
   display: block;
-  font-size: 25rpx;
+  font-size: 24rpx;
 }
 .promo__bottom--grid .price__symbol {
-  font-size: 18rpx;
+  font-size: 16rpx;
 }
 .promo__bottom--grid .promo__strike {
   display: block;
   margin-top: 2rpx;
-  font-size: 18rpx;
+  font-size: 17rpx;
 }
 /* 右上角「换一组」icon：56rpx 视觉 + ::after 外扩热区 ≈88rpx（触控目标 ≥44px） */
 .promo__refresh {
