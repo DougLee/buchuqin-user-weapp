@@ -215,8 +215,10 @@ function search() {
             :src="banner.image"
             mode="aspectFill"
           /><!-- IKC1AD：用户端 Banner 只显示图片，标题/副标题/角标退为内部字段；
-               文字仅在无图兜底帧（渐变底）保留，纯色块无字不可读 -->
-          ><view class="hero__mask" v-if="!banner.image && banner.badge"></view
+               文字仅在无图兜底帧（渐变底）保留，纯色块无字不可读 --><view
+            class="hero__mask"
+            v-if="!banner.image && banner.badge"
+          ></view
           ><template v-if="!banner.image"
             ><text v-if="banner.badge" class="hero__tag">{{
               banner.badge
