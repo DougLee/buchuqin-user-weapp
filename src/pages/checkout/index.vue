@@ -48,6 +48,8 @@ function meetsThreshold(item: UserCoupon) {
   return (cart.value?.productAmount ?? 0) >= item.coupon.threshold;
 }
 async function refresh() {
+  // IKCIAG：无地址不发结算预览——后端校验 400 必然失败，红色提醒卡已引导去添加
+  if (!address.value) return;
   settlement.value = await api.checkout(payload.value);
 }
 /** 低于起送门槛时禁付并提示差额（IK9AWN） */
@@ -349,9 +351,14 @@ async function submit() {
   font-size: 22rpx;
   font-weight: 800;
 }
-/* 无地址引导卡（IK9AWI） */
+/* 无地址引导卡（IK9AWI → IKCIAG 红色醒目警示，替代原品牌绿） */
+.address--empty {
+  border-left-color: #d4380d;
+  background: linear-gradient(135deg, #fff1ec, #fff);
+}
+.address--empty .address__flag,
 .address--empty .address__room {
-  color: $primary-dark;
+  color: #d4380d;
 }
 .checkout__skeleton {
   padding-top: 20rpx;
