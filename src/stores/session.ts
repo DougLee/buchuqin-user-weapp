@@ -20,6 +20,9 @@ function wxLoginCode(): Promise<string> {
   );
 }
 // #endif
+/** 并发登录去重句柄（IKC7WB）：模块级变量，不进 Pinia state（Promise 不可序列化） */
+let loginInFlight: Promise<void> | null = null;
+
 export const useSessionStore = defineStore("session", {
   state: () => ({
     ready: false,
@@ -33,6 +36,7 @@ export const useSessionStore = defineStore("session", {
   actions: {
     async ensureLogin() {
       if (this.ready) return;
+      if (loginInFlight) return loginInFlight;
       const cached = uni.getStorageSync("token") as string;
       if (cached) {
         // 已有 token：静默换取用户信息即可，不再每次刷新都打登录接口（限流 10 次/分/IP）。
@@ -45,9 +49,17 @@ export const useSessionStore = defineStore("session", {
       // #ifndef MP-WEIXIN
       throw new Error("请在微信小程序中打开");
       // #endif
-      const result = await api.wechatLogin(await wxLoginCode());
-      uni.setStorageSync("token", result.token);
-      this.applyUser(result.user);
+      // IKC7WB：登录主体挂到 loginInFlight，并发调用复用同一请求
+      loginInFlight = (async () => {
+        const result = await api.wechatLogin(await wxLoginCode());
+        uni.setStorageSync("token", result.token);
+        this.applyUser(result.user);
+      })();
+      try {
+        await loginInFlight;
+      } finally {
+        loginInFlight = null;
+      }
     },
     /** 写入会话用户并完成初始化（登录 / token 换取资料两条路径共用） */
     applyUser(user: SessionUser) {
