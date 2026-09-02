@@ -79,11 +79,11 @@ const promoGroups = computed(() => {
   }
   return groups;
 });
-/** 秒杀版块固定窗口（IKC1A9 → PM 0831 细化 → IKCN5W → 0902 定稿：3 列风格
- *  满意后道哥要求一行 4 个，图缩小+margin 间距保持不挤）：5s 定时自动换批
- *  （换批时整组从下往上滑入，见模板 :key=offset）；整卡点击跳分类页专区 */
+/** 秒杀版块固定窗口（IKC1A9 → PM 0831 细化 → IKCN5W → 0902 终稿：一行 4 个、
+ *  无倒计时、3s 自动换批（换批时整组从下往上滑入，见模板 :key=offset）；
+ *  整卡点击跳分类页专区 */
 const SECKILL_PAGE_SIZE = 4;
-const SECKILL_ROTATE_MS = 5000;
+const SECKILL_ROTATE_MS = 3000;
 const seckillOffset = ref(0);
 const seckillWindow = computed(() => {
   const g = promoGroups.value.find((x) => x.type === "seckill");
@@ -100,24 +100,6 @@ function nextSeckillBatch() {
 }
 const seckillTicker = setInterval(nextSeckillBatch, SECKILL_ROTATE_MS);
 onUnmounted(() => clearInterval(seckillTicker));
-/** IKCN5W：秒杀倒计时回归——组内最早结束的活动（promoGroups.endsAt 口径），
- *  HH:MM:SS 补零，随 promoTicker 秒级跳动；归零自动回落 00:00:00 */
-const countdownText = computed(() => {
-  const g = promoGroups.value.find((x) => x.type === "seckill");
-  if (!g) return "";
-  const diff = Math.max(
-    0,
-    Math.floor((new Date(g.endsAt).getTime() - now.value) / 1000),
-  );
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    pad(Math.floor(diff / 3600)) +
-    ":" +
-    pad(Math.floor((diff % 3600) / 60)) +
-    ":" +
-    pad(diff % 60)
-  );
-});
 /** Banner 主题：预置键映射渐变，自定义 hex 走内联底色。 */
 const BANNER_THEMES: Record<string, string> = {
   green: "linear-gradient(120deg, #07883b 0%, #25b95a 60%, #41ce69 100%)",
@@ -206,7 +188,9 @@ function search() {
     <view class="location"
       ><!-- IKAJT2：校区/地址双入口——点校区名换校区（商品价格随之刷新），点地址去选寝室 -->
       <text class="pin">●</text
-      ><text class="loc-campus" @tap.stop="goCampus">{{ campus || "选择校区" }}</text
+      ><text class="loc-campus" @tap.stop="goCampus">{{
+        campus || "选择校区"
+      }}</text
       ><text class="loc-sep"> · </text
       ><text class="loc-addr" @tap.stop="goAddress">{{ addressText }}</text
       ><text class="down" @tap.stop="goCampus">⌄</text></view
@@ -292,10 +276,7 @@ function search() {
         ><view class="categories__row"
           ><!-- 加载占位（2026-08-24）：骨架圆+名条与真条同构，数据到达零跳变 --><template
             v-if="loading"
-            ><view
-              v-for="n in 8"
-              :key="n"
-              class="category category--skeleton"
+            ><view v-for="n in 8" :key="n" class="category category--skeleton"
               ><view class="category__image" /><text class="category__name"
                 >　</text
               ></view
@@ -324,24 +305,14 @@ function search() {
       role="button"
       @tap="goPromoCategory(g.type)"
       ><view class="promo__head"
-        ><view class="promo__head-left"
-          ><text
-            class="promo__title"
-            :class="{ 'promo__title--hot': g.type === 'seckill' }"
-            >{{ g.title }}</text
-          ><!-- IKCN5W：倒计时回归，组内最早结束活动，HH:MM:SS 秒级跳动 --><text
-            v-if="g.type === 'seckill'"
-            class="promo__countdown"
-            >{{ countdownText }}</text
-          ></view
-        ><!-- IKCN5W：右上「超值购 ›」入口已按道哥 0902 要求移除——
-             整卡点击仍跳秒杀专区 --></view
+        ><!-- IKCN5W 终稿：倒计时移除（道哥 0902），头部只留标题 --><text
+          class="promo__title"
+          :class="{ 'promo__title--hot': g.type === 'seckill' }"
+          >{{ g.title }}</text
+        ></view
       ><!-- IKCN5W：一行 4 个（去商品名，图即锚点）；:key=offset 换批时整组
            重建触发从下往上入场动画（四项同步，无错峰） -->
-      <view
-        v-if="g.type === 'seckill'"
-        class="promo__grid"
-        :key="seckillOffset"
+      <view v-if="g.type === 'seckill'" class="promo__grid" :key="seckillOffset"
         ><view
           v-for="item in seckillWindow"
           :key="seckillOffset + '-' + item.id"
@@ -367,10 +338,7 @@ function search() {
         enhanced
         :show-scrollbar="false"
         ><view class="promo__row"
-          ><view
-            v-for="item in g.items"
-            :key="item.id"
-            class="promo__item"
+          ><view v-for="item in g.items" :key="item.id" class="promo__item"
             ><image
               class="promo__image"
               :src="item.product.image"
@@ -388,13 +356,13 @@ function search() {
           ></view
         ></scroll-view
       ></view
-   >
+    >
     <view class="section-title"
       ><text class="section-title__main">为你推荐</text
       ><text class="section-title__sub" @tap="goCategory"
         ><!-- IK9VQ3：chevron 形状即 >，改 chip 暗示可点 -->
         <text class="link-chip">更多</text></text
-    ></view
+      ></view
     >
     <view v-if="loading" class="grid"
       ><view v-for="n in 4" :key="n" class="skeleton" /></view
@@ -719,13 +687,6 @@ function search() {
   justify-content: space-between;
   padding: 26rpx 28rpx 8rpx;
 }
-/* IKCN5W：左「标题+倒计时」一组，右「超值购 ›」入口 */
-.promo__head-left {
-  display: flex;
-  align-items: baseline;
-  gap: 16rpx;
-  min-width: 0;
-}
 .promo__title {
   font-size: 30rpx;
   font-weight: 900;
@@ -734,15 +695,7 @@ function search() {
 .promo__title--hot {
   color: #ff4d18;
 }
-/* 倒计时：红色粗体等宽数字秒级跳动 */
-.promo__countdown {
-  font-size: 26rpx;
-  font-weight: 900;
-  color: #ff4d18;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 1rpx;
-}
-/* 右上「超值购 ›」入口样式已随 IKCN5W 0902 移除；head-left 独占一行 */
+/* 倒计时/「超值购 ›」均已随 IKCN5W 终稿移除（道哥 0902） */
 .promo__scroll {
   width: 100%;
   white-space: nowrap;
@@ -799,9 +752,8 @@ function search() {
 .promo__image--grid {
   display: block;
   width: 100%;
-  /* 正方形图框 + aspectFit + 浅灰图底：商品图多为白底图，白底贴白卡边界
-     糊（「挤」的根因）——灰底让每张图边界清晰（电商灰底图通用做法） */
-  height: 150rpx;
+  /* 126rpx：道哥手调 100 偏小（aspectFit 扁框两侧灰边吃图）与不挤的平衡点 */
+  height: 126rpx;
   border-radius: 12rpx;
   background: #f7f8f7;
 }
