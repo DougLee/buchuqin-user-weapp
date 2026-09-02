@@ -334,14 +334,8 @@ function search() {
             class="promo__countdown"
             >{{ countdownText }}</text
           ></view
-        ><!-- IKCN5W：右上「超值购 ›」文字入口，同整卡跳转（原 ⟳ 换组移除） --><text
-          v-if="g.type === 'seckill'"
-          class="promo__more"
-          role="button"
-          aria-label="进入限时秒杀专区"
-          @tap.stop="goPromoCategory('seckill')"
-          >超值购 ›</text
-        ></view
+        ><!-- IKCN5W：右上「超值购 ›」入口已按道哥 0902 要求移除——
+             整卡点击仍跳秒杀专区 --></view
       ><!-- IKCN5W：一行 3 个（去商品名，图即锚点）；:key=offset 换批时整组
            重建触发从下往上入场动画（三项同步，无错峰） -->
       <view
@@ -748,25 +742,7 @@ function search() {
   font-variant-numeric: tabular-nums;
   letter-spacing: 1rpx;
 }
-/* 右上「超值购 ›」入口：muted 灰 + chevron；::after 外扩热区 ≥88rpx */
-.promo__more {
-  flex: none;
-  font-size: 24rpx;
-  font-weight: 600;
-  color: $muted;
-  position: relative;
-}
-.promo__more::after {
-  content: "";
-  position: absolute;
-  top: -20rpx;
-  right: -20rpx;
-  bottom: -20rpx;
-  left: -20rpx;
-}
-.promo__more:active {
-  color: $primary;
-}
+/* 右上「超值购 ›」入口样式已随 IKCN5W 0902 移除；head-left 独占一行 */
 .promo__scroll {
   width: 100%;
   white-space: nowrap;
