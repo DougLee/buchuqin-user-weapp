@@ -79,9 +79,10 @@ const promoGroups = computed(() => {
   }
   return groups;
 });
-/** 秒杀版块固定窗口（IKC1A9 → PM 0831 细化）：一行 3 个，**定时自动
- *  换一批**（5s 轮换循环）；整卡点击跳分类页看更多 */
-const SECKILL_PAGE_SIZE = 3;
+/** 秒杀版块固定窗口（IKC1A9 → PM 0831 细化 → IKCN5W 截图重做）：一行 4 个，
+ *  5s 定时自动换批（换批时整组从下往上滑入，见模板 :key=offset）；整卡点击
+ *  跳分类页专区，右上「超值购 ›」同入口（原 ⟳ 手动换组已移除） */
+const SECKILL_PAGE_SIZE = 4;
 const SECKILL_ROTATE_MS = 5000;
 const seckillOffset = ref(0);
 const seckillWindow = computed(() => {
@@ -99,6 +100,24 @@ function nextSeckillBatch() {
 }
 const seckillTicker = setInterval(nextSeckillBatch, SECKILL_ROTATE_MS);
 onUnmounted(() => clearInterval(seckillTicker));
+/** IKCN5W：秒杀倒计时回归——组内最早结束的活动（promoGroups.endsAt 口径），
+ *  HH:MM:SS 补零，随 promoTicker 秒级跳动；归零自动回落 00:00:00 */
+const countdownText = computed(() => {
+  const g = promoGroups.value.find((x) => x.type === "seckill");
+  if (!g) return "";
+  const diff = Math.max(
+    0,
+    Math.floor((new Date(g.endsAt).getTime() - now.value) / 1000),
+  );
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    pad(Math.floor(diff / 3600)) +
+    ":" +
+    pad(Math.floor((diff % 3600) / 60)) +
+    ":" +
+    pad(diff % 60)
+  );
+});
 /** Banner 主题：预置键映射渐变，自定义 hex 走内联底色。 */
 const BANNER_THEMES: Record<string, string> = {
   green: "linear-gradient(120deg, #07883b 0%, #25b95a 60%, #41ce69 100%)",
@@ -305,29 +324,41 @@ function search() {
       role="button"
       @tap="goPromoCategory(g.type)"
       ><view class="promo__head"
-        ><text class="promo__title">{{ g.title }}</text
-        ><!-- IKC1A9 优化：秒杀区右上角「换一组」icon（手动换组，与 5s 自动轮换并存） -->
-        <text
-          v-if="g.type === 'seckill' && g.items.length > 3"
-          class="promo__refresh"
+        ><view class="promo__head-left"
+          ><text
+            class="promo__title"
+            :class="{ 'promo__title--hot': g.type === 'seckill' }"
+            >{{ g.title }}</text
+          ><!-- IKCN5W：倒计时回归，组内最早结束活动，HH:MM:SS 秒级跳动 --><text
+            v-if="g.type === 'seckill'"
+            class="promo__countdown"
+            >{{ countdownText }}</text
+          ></view
+        ><!-- IKCN5W：右上「超值购 ›」文字入口，同整卡跳转（原 ⟳ 换组移除） --><text
+          v-if="g.type === 'seckill'"
+          class="promo__more"
           role="button"
-          aria-label="换一组秒杀商品"
-          @tap.stop="nextSeckillBatch"
-          >⟳</text
+          aria-label="进入限时秒杀专区"
+          @tap.stop="goPromoCategory('seckill')"
+          >超值购 ›</text
         ></view
-      ><!-- IKBW0K 优化：秒杀组 grid 等分一屏恰好 4 个（原横滑第 4 个被裁） -->
-      <view v-if="g.type === 'seckill'" class="promo__grid"
+      ><!-- IKCN5W：一排 4 个（去商品名，图即锚点）；:key=offset 换批时整组
+           重建触发从下往上入场动画（逐项 60ms stagger） -->
+      <view
+        v-if="g.type === 'seckill'"
+        class="promo__grid"
+        :key="seckillOffset"
         ><view
-          v-for="item in seckillWindow"
-          :key="item.id"
+          v-for="(item, index) in seckillWindow"
+          :key="seckillOffset + '-' + item.id"
           class="promo__item promo__item--grid"
+          :style="{ animationDelay: index * 60 + 'ms' }"
           ><image
             class="promo__image promo__image--grid"
             :src="item.product.image"
             mode="aspectFill"
             :alt="item.product.name"
-          /><text class="promo__name">{{ item.product.name }}</text
-          ><view class="promo__bottom promo__bottom--grid"
+          /><view class="promo__bottom promo__bottom--grid"
             ><text class="price"
               ><text class="price__symbol">¥</text
               >{{ fenToYuan(item.product.price) }}</text
@@ -691,19 +722,51 @@ function search() {
 }
 .promo__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   padding: 26rpx 28rpx 8rpx;
+}
+/* IKCN5W：左「标题+倒计时」一组，右「超值购 ›」入口 */
+.promo__head-left {
+  display: flex;
+  align-items: baseline;
+  gap: 16rpx;
+  min-width: 0;
 }
 .promo__title {
   font-size: 30rpx;
   font-weight: 900;
 }
+/* 秒杀标题红色强调（截图促销调，与价格色呼应） */
+.promo__title--hot {
+  color: #ff4d18;
+}
+/* 倒计时：红色粗体等宽数字秒级跳动 */
 .promo__countdown {
-  font-size: 22rpx;
-  font-weight: 800;
-  color: $orange;
+  font-size: 26rpx;
+  font-weight: 900;
+  color: #ff4d18;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 1rpx;
+}
+/* 右上「超值购 ›」入口：muted 灰 + chevron；::after 外扩热区 ≥88rpx */
+.promo__more {
+  flex: none;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: $muted;
+  position: relative;
+}
+.promo__more::after {
+  content: "";
+  position: absolute;
+  top: -20rpx;
+  right: -20rpx;
+  bottom: -20rpx;
+  left: -20rpx;
+}
+.promo__more:active {
+  color: $primary;
 }
 .promo__scroll {
   width: 100%;
@@ -723,73 +786,58 @@ function search() {
   flex-shrink: 0;
   width: 176rpx;
 }
-/* IKBW0K 三轮重设计（IKC1A9）：无卡化网格——去掉坑位底色，图即视觉锚点，
-   靠大留白 + 排版层级做高级感（与首页白卡×绿点缀的原生语言一致）：
-   图（圆角大图）→ 名称（常规字重）→ 价格（纵排，单一强调色） */
+/* IKBW0K 无卡化网格 → IKCN5W 截图重做：一排 4 个、去商品名（图即锚点）、
+   价格放大强调；换批时整组 :key 重建，商品从下往上滑入（逐项 stagger） */
 .promo__grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18rpx;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14rpx;
   padding: 24rpx 28rpx 28rpx;
 }
 .promo__item--grid {
   width: auto;
   min-width: 0;
+  animation: seckill-rise 0.32s ease both;
+}
+@keyframes seckill-rise {
+  from {
+    transform: translateY(48rpx);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .promo__item--grid {
+    animation: none;
+  }
 }
 .promo__image--grid {
   display: block;
   width: 100%;
-  height: 160rpx;
+  height: 150rpx;
   border-radius: 14rpx;
-}
-.promo__item--grid .promo__name {
-  margin: 12rpx 0 0;
-  font-size: 22rpx;
-  font-weight: 500;
 }
 .promo__bottom--grid {
   display: block;
-  margin-top: 6rpx;
+  margin-top: 8rpx;
 }
 .promo__bottom--grid .price {
   display: block;
-  font-size: 26rpx;
+  font-size: 30rpx;
+  font-weight: 900;
 }
 .promo__bottom--grid .price__symbol {
-  font-size: 17rpx;
+  font-size: 19rpx;
 }
 .promo__bottom--grid .promo__strike {
   display: block;
   margin-top: 2rpx;
   font-size: 18rpx;
 }
-/* 右上角「换一组」icon：56rpx 视觉 + ::after 外扩热区 ≈88rpx（触控目标 ≥44px） */
-.promo__refresh {
-  flex: none;
-  align-self: center;
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 50%;
-  background: $primary-soft;
-  color: $primary;
-  font-size: 32rpx;
-  font-weight: 900;
-  line-height: 56rpx;
-  text-align: center;
-  position: relative;
-  transition: background 0.15s ease;
-}
-.promo__refresh::after {
-  content: "";
-  position: absolute;
-  top: -16rpx;
-  right: -16rpx;
-  bottom: -16rpx;
-  left: -16rpx;
-}
-.promo__refresh:active {
-  background: #dcefe0;
-}
+/* 右上角「换一组」icon 已随 IKCN5W 移除（自动轮换 + 上滑过渡承担“换”的感知） */
 .promo__image {
   width: 176rpx;
   height: 176rpx;
