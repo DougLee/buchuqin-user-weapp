@@ -46,11 +46,8 @@ onShow(async () => {
   promotions.value = home.promotions ?? [];
   await cart.load();
   loading.value = false;
-  // IKCNRB：数据渲染后量宽判溢出；首次进入 1s 后播一次滑动引导
-  setTimeout(() => {
-    measureCategoryOverflow();
-    setTimeout(playCategoryHint, 1000);
-  }, 200);
+  // IKCNRB：数据渲染后量宽判溢出（决定右缘指示是否显示）
+  setTimeout(measureCategoryOverflow, 200);
 });
 /* ---------- 促销模块卡（IKAHFG/ADR-0006）：秒杀/临期各一块，倒计时走秒级跳动 ---------- */
 /** 倒计时心跳：模块卡存在才渲染时间，秒级刷新；页面卸载即清 */
@@ -157,17 +154,11 @@ onShareTimeline(() => ({ title: "不出寝，零食送到寝室" }));
 /** 首页分类横滑条：与商品页侧栏同源同序，含「全部」（DB 配图）；
  *  横滑一行浏览全部分类（2026-08-22 需求），不再按 6 列折行，仅留防御上限 */
 const rowCategories = computed(() => categories.value.slice(0, 24));
-/* ---------- IKCNRB：分类横滑可滑动感知（右缘「›」指示 + 首次引导动画） ---------- */
-const categoryScrollLeft = ref(0);
+/* ---------- IKCNRB：分类横滑可滑动感知——右缘「›」指示（滑到最右淡出） ---------- */
 const categoryOverflow = ref(false);
 const categoryCanScrollRight = ref(false);
-const HINT_KEY = "categorySwipeHintDone";
-const categoryHintDone = ref(
-  Boolean(uni.getStorageSync(HINT_KEY)),
-);
 let categoryViewportW = 0;
-let categoryHintPlaying = false;
-/** 量宽判定内容是否溢出（溢出才显示右缘指示/播引导） */
+/** 量宽判定内容是否溢出（溢出才显示右缘指示） */
 function measureCategoryOverflow() {
   const instance = getCurrentInstance()?.proxy;
   if (!instance) return;
@@ -185,46 +176,10 @@ function measureCategoryOverflow() {
       if (categoryOverflow.value) categoryCanScrollRight.value = true;
     });
 }
-function markCategoryHintDone() {
-  if (categoryHintDone.value) return;
-  categoryHintDone.value = true;
-  uni.setStorageSync(HINT_KEY, "1");
-}
-/** 用户碰到分类条即视为已知可滑，引导不再播 */
-function onCategoryTouch() {
-  markCategoryHintDone();
-}
 function onCategoryScroll(event: { detail: { scrollLeft: number; scrollWidth: number } }) {
   const { scrollLeft, scrollWidth } = event.detail;
-  if (!categoryHintPlaying) markCategoryHintDone();
   const max = scrollWidth - categoryViewportW;
   categoryCanScrollRight.value = scrollLeft < max - 8;
-}
-/** 首次引导动画：scroll-left 0→56→0（~1.2s）演示可滑，仅播一次。
- *  注：weapp JS 层拿不到 prefers-reduced-motion，动画短促且仅一次 */
-function playCategoryHint() {
-  if (categoryHintDone.value || !categoryOverflow.value || categoryHintPlaying)
-    return;
-  categoryHintPlaying = true;
-  const PEEK = 56;
-  const STEPS = 12;
-  let step = 0;
-  const timer = setInterval(() => {
-    step += 1;
-    if (step > STEPS * 2) {
-      clearInterval(timer);
-      categoryHintPlaying = false;
-      categoryScrollLeft.value = 0;
-      markCategoryHintDone();
-      return;
-    }
-    const t = step <= STEPS ? step / STEPS : (step - STEPS) / STEPS;
-    // 去程 ease-out 0→PEEK，回程 ease-in PEEK→0
-    categoryScrollLeft.value =
-      step <= STEPS
-        ? Math.round(PEEK * (1 - Math.pow(1 - t, 2)))
-        : Math.round(PEEK * (1 - t * t));
-  }, 50);
 }
 /** 计数器减件（IK9AWL）：ProductCard 数量>0 时展开 − n ＋ */
 const remove = (p: Product) => cart.set(p, cart.quantity(p.id) - 1);
@@ -341,17 +296,14 @@ function search() {
       ></view
     >
     <!-- 分类横滑条（2026-08-22）：单行展示，左右滑动看更多。
-         IKCNRB：可滑动感知增强——右缘渐隐+「›」指示（滑到最右淡出）、
-         首次进入自动左滑回弹演示一次（touchstart/scroll 即标记不再播） -->
+         IKCNRB：可滑动感知——右缘渐隐+「›」指示，滑到最右淡出 -->
     <view class="categories card"
       ><scroll-view
         scroll-x
         class="categories__scroll"
         enhanced
         :show-scrollbar="false"
-        :scroll-left="categoryScrollLeft"
         @scroll="onCategoryScroll"
-        @touchstart="onCategoryTouch"
         ><view class="categories__row"
           ><!-- 加载占位（2026-08-24）：骨架圆+名条与真条同构，数据到达零跳变 --><template
             v-if="loading"
