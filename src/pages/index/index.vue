@@ -349,7 +349,7 @@ function search() {
           ><image
             class="promo__image promo__image--grid"
             :src="item.product.image"
-            mode="aspectFill"
+            mode="aspectFit"
             :alt="item.product.name"
           /><view class="promo__bottom promo__bottom--grid"
             ><text class="price"
@@ -799,7 +799,9 @@ function search() {
 .promo__image--grid {
   display: block;
   width: 100%;
-  height: 132rpx;
+  /* 正方形图框 + aspectFit：商品完整显示不裁切（aspectFill 扁框横向裁切
+     是 0902 截图「图胀/不齐」的根因）；白底图贴白卡无缝，间隙观感统一 */
+  height: 158rpx;
   border-radius: 12rpx;
 }
 .promo__bottom--grid {
