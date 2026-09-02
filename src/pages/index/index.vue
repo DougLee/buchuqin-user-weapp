@@ -785,23 +785,31 @@ function search() {
   flex-shrink: 0;
   width: 176rpx;
 }
-/* IKBW0K 无卡化网格 → IKCN5W 截图重做：一排 4 个、去商品名（图即锚点）、
-   价格放大强调；换批时整组 :key 重建，商品同时从下往上滑入。
+/* IKBW0K 无卡化网格 → IKCN5W 截图重做 → 0902 真机返工：一排 4 个独立小卡
+   （米色底+内边距，图不贴白底，间隙视觉清晰）、去商品名、价格强调收敛。
    间距不用 grid gap——部分微信内核（安卓旧 WebView）不认，4 张图会挤死，
    改 flex 等分 + margin-left（首项清零），全端兼容 */
 .promo__grid {
   display: flex;
-  padding: 24rpx 28rpx 28rpx;
+  padding: 20rpx 24rpx 24rpx;
 }
 .promo__item--grid {
   flex: 1;
   width: auto;
   min-width: 0;
-  margin-left: 14rpx;
+  margin-left: 16rpx;
+  background: $cream;
+  border-radius: 16rpx;
+  padding: 12rpx 12rpx 14rpx;
+  box-sizing: border-box;
   animation: seckill-rise 0.32s ease both;
+  transition: opacity 0.15s ease;
 }
 .promo__item--grid:first-child {
   margin-left: 0;
+}
+.promo__item--grid:active {
+  opacity: 0.88;
 }
 @keyframes seckill-rise {
   from {
@@ -821,25 +829,25 @@ function search() {
 .promo__image--grid {
   display: block;
   width: 100%;
-  height: 150rpx;
-  border-radius: 14rpx;
+  height: 120rpx;
+  border-radius: 12rpx;
 }
 .promo__bottom--grid {
   display: block;
-  margin-top: 8rpx;
+  margin-top: 10rpx;
 }
 .promo__bottom--grid .price {
   display: block;
-  font-size: 30rpx;
+  font-size: 26rpx;
   font-weight: 900;
 }
 .promo__bottom--grid .price__symbol {
-  font-size: 19rpx;
+  font-size: 16rpx;
 }
 .promo__bottom--grid .promo__strike {
   display: block;
   margin-top: 2rpx;
-  font-size: 18rpx;
+  font-size: 16rpx;
 }
 /* 右上角「换一组」icon 已随 IKCN5W 移除（自动轮换 + 上滑过渡承担“换”的感知） */
 .promo__image {
