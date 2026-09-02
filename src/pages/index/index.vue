@@ -771,7 +771,7 @@ function search() {
   flex: 1;
   width: auto;
   min-width: 0;
-  margin-left: 20rpx;
+  margin-left: 30rpx;
   animation: seckill-rise 0.32s ease both;
   transition: opacity 0.15s ease;
 }
@@ -799,10 +799,11 @@ function search() {
 .promo__image--grid {
   display: block;
   width: 100%;
-  /* 正方形图框 + aspectFit：商品完整显示不裁切（aspectFill 扁框横向裁切
-     是 0902 截图「图胀/不齐」的根因）；白底图贴白卡无缝，间隙观感统一 */
-  height: 158rpx;
+  /* 正方形图框 + aspectFit + 浅灰图底：商品图多为白底图，白底贴白卡边界
+     糊（「挤」的根因）——灰底让每张图边界清晰（电商灰底图通用做法） */
+  height: 150rpx;
   border-radius: 12rpx;
+  background: #f7f8f7;
 }
 .promo__bottom--grid {
   display: block;
