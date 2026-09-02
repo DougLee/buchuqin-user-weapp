@@ -343,16 +343,15 @@ function search() {
           >超值购 ›</text
         ></view
       ><!-- IKCN5W：一排 4 个（去商品名，图即锚点）；:key=offset 换批时整组
-           重建触发从下往上入场动画（逐项 60ms stagger） -->
+           重建触发从下往上入场动画（四项同步，无错峰） -->
       <view
         v-if="g.type === 'seckill'"
         class="promo__grid"
         :key="seckillOffset"
         ><view
-          v-for="(item, index) in seckillWindow"
+          v-for="item in seckillWindow"
           :key="seckillOffset + '-' + item.id"
           class="promo__item promo__item--grid"
-          :style="{ animationDelay: index * 60 + 'ms' }"
           ><image
             class="promo__image promo__image--grid"
             :src="item.product.image"
@@ -787,17 +786,22 @@ function search() {
   width: 176rpx;
 }
 /* IKBW0K 无卡化网格 → IKCN5W 截图重做：一排 4 个、去商品名（图即锚点）、
-   价格放大强调；换批时整组 :key 重建，商品从下往上滑入（逐项 stagger） */
+   价格放大强调；换批时整组 :key 重建，商品同时从下往上滑入。
+   间距不用 grid gap——部分微信内核（安卓旧 WebView）不认，4 张图会挤死，
+   改 flex 等分 + margin-left（首项清零），全端兼容 */
 .promo__grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14rpx;
+  display: flex;
   padding: 24rpx 28rpx 28rpx;
 }
 .promo__item--grid {
+  flex: 1;
   width: auto;
   min-width: 0;
+  margin-left: 14rpx;
   animation: seckill-rise 0.32s ease both;
+}
+.promo__item--grid:first-child {
+  margin-left: 0;
 }
 @keyframes seckill-rise {
   from {
