@@ -776,8 +776,8 @@ function search() {
 }
 /* 右上角「换一组」icon 已随 IKCN5W 移除（自动轮换 + 上滑过渡承担“换”的感知） */
 .promo__image {
-  width: 176rpx;
-  height: 176rpx;
+  width: 130rpx;
+  height: 130rpx;
   border-radius: 20rpx;
   background: $primary-soft;
   display: block;
