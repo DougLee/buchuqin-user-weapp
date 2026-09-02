@@ -79,10 +79,10 @@ const promoGroups = computed(() => {
   }
   return groups;
 });
-/** 秒杀版块固定窗口（IKC1A9 → PM 0831 细化 → IKCN5W → 0902 拍板一行 3 个）：
- *  5s 定时自动换批（换批时整组从下往上滑入，见模板 :key=offset）；整卡点击
- *  跳分类页专区，右上「超值购 ›」同入口（原 ⟳ 手动换组已移除） */
-const SECKILL_PAGE_SIZE = 3;
+/** 秒杀版块固定窗口（IKC1A9 → PM 0831 细化 → IKCN5W → 0902 定稿：3 列风格
+ *  满意后道哥要求一行 4 个，图缩小+margin 间距保持不挤）：5s 定时自动换批
+ *  （换批时整组从下往上滑入，见模板 :key=offset）；整卡点击跳分类页专区 */
+const SECKILL_PAGE_SIZE = 4;
 const SECKILL_ROTATE_MS = 5000;
 const seckillOffset = ref(0);
 const seckillWindow = computed(() => {
@@ -336,8 +336,8 @@ function search() {
           ></view
         ><!-- IKCN5W：右上「超值购 ›」入口已按道哥 0902 要求移除——
              整卡点击仍跳秒杀专区 --></view
-      ><!-- IKCN5W：一行 3 个（去商品名，图即锚点）；:key=offset 换批时整组
-           重建触发从下往上入场动画（三项同步，无错峰） -->
+      ><!-- IKCN5W：一行 4 个（去商品名，图即锚点）；:key=offset 换批时整组
+           重建触发从下往上入场动画（四项同步，无错峰） -->
       <view
         v-if="g.type === 'seckill'"
         class="promo__grid"
@@ -761,9 +761,8 @@ function search() {
   flex-shrink: 0;
   width: 176rpx;
 }
-/* IKBW0K 无卡化网格 → IKCN5W 截图重做 → 0902 拍板一行 3 个：干净的图+价
-   形态（无卡底），间距 24rpx。间距不用 grid gap——部分微信内核（安卓旧
-   WebView）不认，改 flex 等分 + margin-left（首项清零），全端兼容 */
+/* IKCN5W 0902 定稿：3 列风格（干净图+价无卡底）+ 一行 4 个——图缩小到
+   132rpx、margin 20rpx（flex 等分，不用 grid gap：部分微信内核不认） */
 .promo__grid {
   display: flex;
   padding: 24rpx 28rpx 28rpx;
@@ -772,7 +771,7 @@ function search() {
   flex: 1;
   width: auto;
   min-width: 0;
-  margin-left: 24rpx;
+  margin-left: 20rpx;
   animation: seckill-rise 0.32s ease both;
   transition: opacity 0.15s ease;
 }
@@ -800,25 +799,25 @@ function search() {
 .promo__image--grid {
   display: block;
   width: 100%;
-  height: 170rpx;
-  border-radius: 14rpx;
+  height: 132rpx;
+  border-radius: 12rpx;
 }
 .promo__bottom--grid {
   display: block;
-  margin-top: 10rpx;
+  margin-top: 8rpx;
 }
 .promo__bottom--grid .price {
   display: block;
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 900;
 }
 .promo__bottom--grid .price__symbol {
-  font-size: 18rpx;
+  font-size: 16rpx;
 }
 .promo__bottom--grid .promo__strike {
   display: block;
   margin-top: 2rpx;
-  font-size: 18rpx;
+  font-size: 16rpx;
 }
 /* 右上角「换一组」icon 已随 IKCN5W 移除（自动轮换 + 上滑过渡承担“换”的感知） */
 .promo__image {
