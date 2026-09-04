@@ -954,7 +954,8 @@ function search() {
 }
 .homeblocks__card {
   position: relative;
-  min-height: 164rpx;
+  /* 加高（道哥 25.png 反馈）：164→200rpx */
+  min-height: 200rpx;
   border-radius: 28rpx;
   padding: 24rpx 24rpx;
   display: flex;
@@ -963,11 +964,12 @@ function search() {
   overflow: hidden;
   border: 2rpx solid rgba(21, 148, 71, 0.06);
 }
-/* 卡片背景图（COS static.buchuqin.com）：图自带右侧装饰，right center/cover 保住装饰区，
+/* 卡片背景图 v2（COS static.buchuqin.com）：v1 源图自带白边导致卡片两侧露白，
+   v2 已裁掉白边；图自带右侧装饰，right center/cover 保住装饰区，
    文字压左侧留白区，底色取图上同色兜底 */
 .homeblocks__card--wheel {
   background:
-    url("https://static.buchuqin.com/app/public/home-card-wheel.webp") right
+    url("https://static.buchuqin.com/app/public/home-card-wheel-v2.webp") right
       center / cover no-repeat,
     #e2f7e4;
   border-color: rgba(37, 185, 90, 0.28);
@@ -982,7 +984,7 @@ function search() {
 }
 .homeblocks__card--group {
   background:
-    url("https://static.buchuqin.com/app/public/home-card-group.webp") right
+    url("https://static.buchuqin.com/app/public/home-card-group-v2.webp") right
       center / cover no-repeat,
     #fff1e2;
   border-color: rgba(255, 122, 33, 0.24);
