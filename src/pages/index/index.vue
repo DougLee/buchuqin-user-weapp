@@ -1184,15 +1184,16 @@ function search() {
       rgba(230, 58, 23, 0.85) 100%
     ),
     url("https://static.buchuqin.com/app/public/wheel-bg-festive-v2.webp") center
-      top / cover no-repeat,
+      top / 100% auto no-repeat,
     #e63a17;
   padding-bottom: 28rpx;
 }
-/* 弹层头（IKDDHF 三轮）：v2 背景图自带标题+副标题胶囊，页头不再放文字元素，
-   纯留白避让——图 750×1333 在 620rpx 宽弹层内 cover 显示高约 1102rpx，
-   图中胶囊下沿约 24.8% ≈ 273rpx，留白 306rpx 让转盘指针与图中胶囊之间留约 19rpx 呼吸位 */
+/* 弹层头（IKDDHF 四轮）：v2 背景图自带标题+副标题胶囊，页头纯留白避让。
+   背景 100% auto 宽度锁定（cover 在 tall 屏按高度放大会把胶囊压低导致指针叠压），
+   图 750×1333 在 620rpx 宽弹层内恒显示 1102rpx 高，图中胶囊下沿恒在 24.8% ≈ 273rpx；
+   留白 326rpx → 转盘整体下移，指针与图中胶囊留约 39rpx 间距 */
 .wheel-sheet__head {
-  padding-top: 306rpx;
+  padding-top: 326rpx;
 }
 .wheel-sheet__panel {
   padding: 0 24rpx;

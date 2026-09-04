@@ -183,11 +183,7 @@ function goCoupons() {
       </view>
       <view class="wheel-rules__line">
         <text class="wheel-rules__num">3</text>
-        <text class="wheel-rules__text">异业合作福利抽中后展示图文，请长按识别二维码领取；</text>
-      </view>
-      <view class="wheel-rules__line">
-        <text class="wheel-rules__num">4</text>
-        <text class="wheel-rules__text">奖品随机发放，与历史抽奖结果无关。</text>
+        <text class="wheel-rules__text">异业合作福利抽中后按指引领取，到店出示即可使用。</text>
       </view>
     </view>
 

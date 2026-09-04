@@ -21,17 +21,18 @@ import WheelPanel from "../../components/WheelPanel.vue";
 <style scoped lang="scss">
 .wheel-page {
   min-height: 100vh;
-  /* IKDDHF 三轮：COS 背景图 v2（static.buchuqin.com，图自带标题+副标题胶囊） */
-  background: url("https://static.buchuqin.com/app/public/wheel-bg-festive-v2.webp") center top / cover no-repeat, #e63a17;
+  /* IKDDHF 四轮：COS 背景图 v2（static.buchuqin.com，图自带标题+副标题胶囊）；
+     100% auto 宽度锁定（cover 在 tall 屏按高度放大导致胶囊位置漂移） */
+  background: url("https://static.buchuqin.com/app/public/wheel-bg-festive-v2.webp") center top / 100% auto no-repeat, #e63a17;
   padding-bottom: 60rpx;
 }
 .wheel-page__statusbar {
   height: 88rpx;
 }
-/* 页头（IKDDHF 三轮）：v2 图自带标题+胶囊副标题，页头不再放文字元素，纯留白避让——
-   图 750×1333 全屏 cover 显示高约 1333rpx，图中胶囊下沿约 24.8% ≈ 331rpx */
+/* 页头（IKDDHF 四轮）：v2 图自带标题+胶囊副标题，页头纯留白避让——
+   100% auto 下图中胶囊下沿恒在 24.8% × 1333rpx ≈ 331rpx，留白 384rpx 让转盘整体下移 */
 .wheel-page__head {
-  padding-top: 356rpx;
+  padding-top: 384rpx;
 }
 .wheel-page__panel {
   padding: 0 28rpx;
