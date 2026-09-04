@@ -206,7 +206,9 @@ function measureCategoryOverflow() {
       if (categoryOverflow.value) categoryCanScrollRight.value = true;
     });
 }
-function onCategoryScroll(event: { detail: { scrollLeft: number; scrollWidth: number } }) {
+function onCategoryScroll(event: {
+  detail: { scrollLeft: number; scrollWidth: number };
+}) {
   const { scrollLeft, scrollWidth } = event.detail;
   const max = scrollWidth - categoryViewportW;
   categoryCanScrollRight.value = scrollLeft < max - 8;
@@ -327,8 +329,8 @@ function search() {
             v-for="n in 8"
             :key="n"
             class="homeblocks__spoke"
-            :style="{ transform: `rotate(${n * 45}deg)` }"
-          /><view class="homeblocks__hub" /></view></view
+            :style="{ transform: `rotate(${n * 45}deg)` }" /><view
+            class="homeblocks__hub" /></view></view
       ><view
         v-if="group"
         class="homeblocks__card homeblocks__card--group"
@@ -338,10 +340,8 @@ function search() {
         ><text class="homeblocks__sub">进群领福利 · 优惠早知道</text
         ><view class="homeblocks__cta">一键加入 ›</view
         ><view class="homeblocks__bubble"
-          ><view class="homeblocks__bubble-dots"
-        /></view></view
-      ></view
-    >
+          ><view class="homeblocks__bubble-dots" /></view></view
+    ></view>
     <!-- 分类横滑条（2026-08-22）：单行展示，左右滑动看更多。
          IKCNRB：可滑动感知——右缘渐隐+「›」指示，滑到最右淡出
          IKDBFT（2026-09-04）：首页分类条下线（道哥），同款移至商品页搜索框下方；
@@ -479,8 +479,8 @@ function search() {
       ></image
       ><text class="group-pop__tip">长按识别二维码，加入群聊</text
       ><button class="group-pop__close" @tap="groupOpen = false">
-        我知道了 </button
-      ></view
+        我知道了
+      </button></view
     ></view
   >
   <!-- IKDB7W：天天抽奖原地弹层（WheelPanel 公共组件，pages/wheel 仅作分享落地） -->
@@ -488,14 +488,8 @@ function search() {
     <view class="wheel-sheet" @tap.stop>
       <view class="wheel-sheet__close" @tap="wheelOpen = false">✕</view>
       <view class="wheel-sheet__inner">
-        <view class="wheel-sheet__head">
-          <view class="wheel-sheet__ribbon"
-            ><text>✦ 不出寝食社 · 每日抽奖领福利 ✦</text></view
-          >
-        </view>
-        <view class="wheel-sheet__panel"
-          ><WheelPanel
-        /></view>
+        <view class="wheel-sheet__head"></view>
+        <view class="wheel-sheet__panel"><WheelPanel /></view>
       </view>
     </view>
   </view>
@@ -1173,41 +1167,34 @@ function search() {
   justify-content: center;
   z-index: 2;
 }
-/* IKDDHF：节庆红底背景图（COS：static.buchuqin.com/app/public/wheel-bg-festive.webp，
-   图自带「天天抽奖」金色立体标题，故页头只留副标题胶囊），底部朱红淡入防截断感 */
+/* IKDDHF：节庆红底背景图 v2（COS：static.buchuqin.com/app/public/wheel-bg-festive-v2.webp，
+   图自带「天天抽奖」金色立体标题 + 「不出寝食社·每日抽奖领福利」金胶囊副标题），
+   底部朱红淡入防截断感；高度上限 80vh（IKDDHF 二轮：弹层过高被屏幕底边遮挡） */
 .wheel-sheet__inner {
-  max-height: 86vh;
+  max-height: 80vh;
   overflow-y: auto;
   /* 灯串灯泡沿转盘环外圈分布，弹层边缘会透出 1-2px 横向溢出 → 横向裁掉 */
   overflow-x: hidden;
   border-radius: 32rpx;
   background:
-    linear-gradient(180deg, rgba(230, 58, 23, 0) 0%, rgba(230, 58, 23, 0) 82%, rgba(230, 58, 23, 0.85) 100%),
-    url("https://static.buchuqin.com/app/public/wheel-bg-festive.webp") center top / cover no-repeat,
+    linear-gradient(
+      180deg,
+      rgba(230, 58, 23, 0) 0%,
+      rgba(230, 58, 23, 0) 82%,
+      rgba(230, 58, 23, 0.85) 100%
+    ),
+    url("https://static.buchuqin.com/app/public/wheel-bg-festive-v2.webp") center
+      top / cover no-repeat,
     #e63a17;
   padding-bottom: 28rpx;
 }
-/* 弹层头（IKDDHF）：标题在背景图里，这里只保留金珠胶囊副标题，
-   上方留白与图中标题错开（图 750×1330 等比缩放到弹层 620rpx 宽后
-   标题区约 300rpx 高） */
+/* 弹层头（IKDDHF 三轮）：v2 背景图自带标题+副标题胶囊，页头不再放文字元素，
+   纯留白避让——图 750×1333 在 620rpx 宽弹层内 cover 显示高约 1102rpx，
+   图中胶囊下沿约 24.8% ≈ 273rpx，留白 306rpx 让转盘指针与图中胶囊之间留约 19rpx 呼吸位 */
 .wheel-sheet__head {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 300rpx 0 4rpx;
-}
-.wheel-sheet__ribbon {
-  padding: 8rpx 36rpx;
-  border-radius: 999rpx;
-  border: 2rpx solid #f2cf6e;
-  background: rgba(160, 26, 10, 0.55);
-  color: #ffedbe;
-  font-size: 24rpx;
-  font-weight: 800;
-  letter-spacing: 4rpx;
+  padding-top: 306rpx;
 }
 .wheel-sheet__panel {
-  padding: 10rpx 24rpx 0;
+  padding: 0 24rpx;
 }
 </style>

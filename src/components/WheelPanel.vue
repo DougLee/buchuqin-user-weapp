@@ -102,7 +102,7 @@ function goCoupons() {
           :key="n"
           class="wheel-lights__bulb"
           :class="{ 'wheel-lights__bulb--gold': n % 2 === 0 }"
-          :style="{ transform: `rotate(${n * 22.5}deg) translateY(-234rpx)` }"
+          :style="{ transform: `rotate(${n * 22.5}deg) translateY(-208rpx)` }"
         />
       </view>
       <view
@@ -118,8 +118,9 @@ function goCoupons() {
             'wheel-disc__label--partner': p.type === 'partner',
           }"
           :style="{
-            // 扇区中心在 i*45+22.5（边界是 i*45）；压线会让指针指向不明确（IKDBPX）
-            transform: `translate(-50%,-50%) rotate(${i * 45 + 22.5}deg) translateY(-165rpx) rotate(${-(i * 45 + 22.5)}deg)`,
+            // 扇区中心在 i*45+22.5（边界是 i*45）；压线会让指针指向不明确（IKDBPX）。
+            // 半径随盘径联动（IKDDHF 二轮：500rpx 盘 → 148rpx 文字半径）
+            transform: `translate(-50%,-50%) rotate(${i * 45 + 22.5}deg) translateY(-148rpx) rotate(${-(i * 45 + 22.5)}deg)`,
           }"
         >
           <view v-if="p.type !== 'none'" class="wheel-disc__ticket"
@@ -264,8 +265,8 @@ function goCoupons() {
 /* ---------- 转盘 ---------- */
 .wheel-stage {
   position: relative;
-  width: 560rpx;
-  height: 560rpx;
+  width: 500rpx;
+  height: 500rpx;
   margin: 0 auto;
 }
 /* 灯串：金珠/白珠交替落在金环上 */
@@ -468,7 +469,7 @@ function goCoupons() {
 .wheel-chance {
   display: flex;
   justify-content: center;
-  margin-top: 52rpx;
+  margin-top: 28rpx;
 }
 .wheel-chance__pill {
   display: inline-flex;
@@ -489,10 +490,10 @@ function goCoupons() {
 }
 /* ---------- 规则卡：米白底 + 红花徽章标题 + 红圆数字编号 ---------- */
 .wheel-rules {
-  margin: 20rpx 0 0;
+  margin: 16rpx 0 0;
   background: #fdf6e4;
   border-radius: 24rpx;
-  padding: 20rpx 26rpx 6rpx;
+  padding: 16rpx 26rpx 4rpx;
   border: 2rpx solid #f2cf6e;
   box-shadow: 0 10rpx 30rpx rgba(120, 15, 0, 0.3);
 }
