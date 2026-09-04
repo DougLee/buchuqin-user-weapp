@@ -100,7 +100,7 @@ function goCoupons() {
           :key="n"
           class="wheel-lights__bulb"
           :class="{ 'wheel-lights__bulb--gold': n % 2 === 0 }"
-          :style="{ transform: `rotate(${n * 22.5}deg) translateY(-206rpx)` }"
+          :style="{ transform: `rotate(${n * 22.5}deg) translateY(-234rpx)` }"
         />
       </view>
       <view
@@ -117,7 +117,7 @@ function goCoupons() {
           }"
           :style="{
             // 扇区中心在 i*45+22.5（边界是 i*45）；压线会让指针指向不明确（IKDBPX）
-            transform: `translate(-50%,-50%) rotate(${i * 45 + 22.5}deg) translateY(-146rpx) rotate(${-(i * 45 + 22.5)}deg)`,
+            transform: `translate(-50%,-50%) rotate(${i * 45 + 22.5}deg) translateY(-165rpx) rotate(${-(i * 45 + 22.5)}deg)`,
           }"
         >
           <text class="wheel-disc__name">{{ p.label }}</text>
@@ -125,15 +125,7 @@ function goCoupons() {
           <text v-else-if="p.type === 'partner'" class="wheel-disc__tag"
             >异业券</text
           >
-          <!-- 扇区装饰：平台券=金票券 / 异业券·谢谢参与=星形（纯 CSS） -->
-          <view v-if="p.type === 'coupon'" class="deco-ticket">
-            <text>¥</text>
-          </view>
-          <view
-            v-else
-            class="deco-star"
-            :class="{ 'deco-star--dim': p.type === 'none' }"
-          />
+
         </view>
       </view>
       <!-- 金色菱形宝石指针（两三角+横钉）与绿玉中心按钮 -->
@@ -141,8 +133,6 @@ function goCoupons() {
         <view class="wheel-pointer__gem" />
         <view class="wheel-pointer__pin" />
       </view>
-      <!-- 玻璃台座：转盘下方椭圆 -->
-      <view class="wheel-pedestal" />
       <view
         class="wheel-hub"
         :class="{
@@ -233,7 +223,7 @@ function goCoupons() {
           </view>
         </template>
         <template v-else>
-          <view class="deco-star deco-star--pop" />
+          <view class="wheel-pop__star" />
           <text class="wheel-pop__desc">差一点点就中了{"\n"}明天 0 点再来，好运不打烊</text>
           <view class="wheel-pop__btns">
             <view class="wheel-btn wheel-btn--solid" @tap="closeResult">明天再来</view>
@@ -255,8 +245,8 @@ function goCoupons() {
 /* ---------- 转盘 ---------- */
 .wheel-stage {
   position: relative;
-  width: 460rpx;
-  height: 460rpx;
+  width: 520rpx;
+  height: 520rpx;
   margin: 0 auto;
 }
 /* 灯串：白金灯泡交替落在金环上 */
@@ -296,7 +286,21 @@ function goCoupons() {
     0 0 0 5rpx #f1de9a,
     0 18rpx 50rpx rgba(3, 40, 22, 0.55),
     inset 0 0 0 5rpx rgba(201, 162, 39, 0.25);
+  position: absolute;
   transition: transform 4.2s cubic-bezier(0.16, 0.84, 0.28, 1);
+}
+/* 扇区分隔线：8 道金细丝（IKDC7Y 高阶简洁——去掉票券/星形装饰后靠金线撑结构感） */
+.wheel-disc::after {
+  content: "";
+  position: absolute;
+  inset: 16rpx;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    rgba(201, 162, 39, 0.45) 0deg 0.8deg,
+    transparent 0.8deg 45deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 30%, #000 31%);
+  mask: radial-gradient(circle, transparent 30%, #000 31%);
 }
 .wheel-disc__label {
   position: absolute;
@@ -308,15 +312,17 @@ function goCoupons() {
   white-space: nowrap;
 }
 .wheel-disc__name {
-  font-size: 21rpx;
-  font-weight: 800;
-  color: #2f7a45;
+  font-size: 26rpx;
+  font-weight: 900;
+  color: #1f6b3c;
+  letter-spacing: 1rpx;
 }
 .wheel-disc__tag {
-  font-size: 16rpx;
-  font-weight: 700;
-  color: #5fae74;
-  margin-top: 2rpx;
+  font-size: 15rpx;
+  font-weight: 600;
+  letter-spacing: 3rpx;
+  color: #6fae85;
+  margin-top: 4rpx;
 }
 .wheel-disc__label--partner .wheel-disc__name {
   color: #b9862f;
@@ -328,36 +334,6 @@ function goCoupons() {
   color: #9aa894;
 }
 /* 扇区装饰：平台券=金票券 / 异业券=金亮星 / 谢谢参与=淡绿星 */
-.deco-ticket {
-  margin-top: 4rpx;
-  width: 58rpx;
-  height: 30rpx;
-  border-radius: 7rpx;
-  background: linear-gradient(135deg, #f1de9a, #e0c268);
-  border: 2rpx solid #c9a227;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-.deco-ticket text {
-  font-size: 18rpx;
-  font-weight: 900;
-  color: #7a5f13;
-}
-.deco-star {
-  margin-top: 6rpx;
-  width: 34rpx;
-  height: 34rpx;
-  background: #f1de9a;
-  clip-path: polygon(
-    50% 0%, 63% 34%, 98% 35%, 71% 57%, 81% 91%,
-    50% 70%, 19% 91%, 29% 57%, 2% 35%, 37% 34%
-  );
-}
-.deco-star--dim {
-  background: #cfdec9;
-}
 /* 金色菱形宝石指针：上/下三角 + 中心横钉 */
 .wheel-pointer {
   position: absolute;
@@ -387,27 +363,14 @@ function goCoupons() {
   filter: drop-shadow(0 4rpx 6rpx rgba(60, 45, 5, 0.4));
 }
 /* 玻璃台座：转盘下方椭圆金边底座 */
-.wheel-pedestal {
-  position: absolute;
-  left: 50%;
-  bottom: -34rpx;
-  transform: translateX(-50%);
-  width: 400rpx;
-  height: 72rpx;
-  border-radius: 50%;
-  background: linear-gradient(180deg, rgba(255, 250, 224, 0.5), rgba(201, 162, 39, 0.28));
-  border: 3rpx solid rgba(241, 222, 154, 0.7);
-  box-shadow: 0 10rpx 30rpx rgba(3, 40, 22, 0.4);
-  z-index: 0;
-}
 /* 中心按钮：翡翠绿玉盘 + 金环描边 */
 .wheel-hub {
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 176rpx;
-  height: 176rpx;
+  width: 184rpx;
+  height: 184rpx;
   border-radius: 50%;
   display: flex;
   flex-direction: column;
@@ -441,8 +404,9 @@ function goCoupons() {
 .wheel-hub__sub {
   font-size: 16rpx;
   font-weight: 700;
+  letter-spacing: 3rpx;
   color: rgba(253, 246, 218, 0.92);
-  margin-top: 4rpx;
+  margin-top: 6rpx;
 }
 /* ---------- 次数条：半透明玻璃胶囊 ---------- */
 .wheel-chance {
@@ -594,11 +558,15 @@ function goCoupons() {
   font-weight: 900;
   color: #157a3e;
 }
-.deco-star--pop {
+.wheel-pop__star {
   margin-top: 28rpx;
   width: 88rpx;
   height: 88rpx;
   background: #f1de9a;
+  clip-path: polygon(
+    50% 0%, 63% 34%, 98% 35%, 71% 57%, 81% 91%,
+    50% 70%, 19% 91%, 29% 57%, 2% 35%, 37% 34%
+  );
 }
 .wheel-pop__img {
   width: 320rpx;
