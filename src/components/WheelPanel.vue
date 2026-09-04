@@ -102,7 +102,7 @@ function goCoupons() {
           :key="n"
           class="wheel-lights__bulb"
           :class="{ 'wheel-lights__bulb--gold': n % 2 === 0 }"
-          :style="{ transform: `rotate(${n * 22.5}deg) translateY(-208rpx)` }"
+          :style="{ transform: `rotate(${n * 22.5}deg) translateY(-238rpx)` }"
         />
       </view>
       <view
@@ -120,7 +120,7 @@ function goCoupons() {
           :style="{
             // 扇区中心在 i*45+22.5（边界是 i*45）；压线会让指针指向不明确（IKDBPX）。
             // 半径随盘径联动（IKDDHF 二轮：500rpx 盘 → 148rpx 文字半径）
-            transform: `translate(-50%,-50%) rotate(${i * 45 + 22.5}deg) translateY(-148rpx) rotate(${-(i * 45 + 22.5)}deg)`,
+            transform: `translate(-50%,-50%) rotate(${i * 45 + 22.5}deg) translateY(-170rpx) rotate(${-(i * 45 + 22.5)}deg)`,
           }"
         >
           <view v-if="p.type !== 'none'" class="wheel-disc__ticket"
@@ -259,10 +259,12 @@ function goCoupons() {
   padding: 80rpx 0;
 }
 /* ---------- 转盘 ---------- */
+/* IKDDHF 五轮：盘径 500→572rpx（弹层 620 - 面板 padding 24×2 全宽利用），
+   灯泡/文字半径、中心按钮、指针按 1.14 联动放大 */
 .wheel-stage {
   position: relative;
-  width: 500rpx;
-  height: 500rpx;
+  width: 572rpx;
+  height: 572rpx;
   margin: 0 auto;
 }
 /* 灯串：金珠/白珠交替落在金环上 */
@@ -274,9 +276,9 @@ function goCoupons() {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 16rpx;
-  height: 16rpx;
-  margin: -8rpx 0 0 -8rpx;
+  width: 18rpx;
+  height: 18rpx;
+  margin: -9rpx 0 0 -9rpx;
   border-radius: 50%;
   background: #fff8e0;
   box-shadow: 0 0 16rpx 6rpx rgba(255, 236, 170, 0.9);
@@ -288,7 +290,7 @@ function goCoupons() {
 /* 扇区：奶白底 + 金环描边（配红包金背景图） */
 .wheel-disc {
   position: absolute;
-  inset: 24rpx;
+  inset: 28rpx;
   border-radius: 50%;
   /* conic 从正上方顺时针，与奖位序号一致 */
   background: conic-gradient(
@@ -297,7 +299,7 @@ function goCoupons() {
     #fffdf6 180deg 225deg, #fdf3de 225deg 270deg,
     #fffdf6 270deg 315deg, #fdf3de 315deg 360deg
   );
-  border: 18rpx solid #e8b84a;
+  border: 20rpx solid #e8b84a;
   box-shadow:
     0 0 0 6rpx #f7df9b,
     0 0 0 10rpx rgba(160, 26, 10, 0.85),
@@ -310,7 +312,7 @@ function goCoupons() {
 .wheel-disc::after {
   content: "";
   position: absolute;
-  inset: 14rpx;
+  inset: 16rpx;
   border-radius: 50%;
   background: repeating-conic-gradient(
     rgba(180, 130, 40, 0.5) 0deg 0.8deg,
@@ -331,9 +333,9 @@ function goCoupons() {
 /* 扇区小红券图标（IKDDHF 参考图）：票面锯齿用径向点阵压出来 */
 .wheel-disc__ticket {
   position: relative;
-  width: 56rpx;
-  height: 36rpx;
-  margin-bottom: 6rpx;
+  width: 64rpx;
+  height: 40rpx;
+  margin-bottom: 8rpx;
   border-radius: 8rpx;
   background: linear-gradient(135deg, #f0524a, #d9261c);
   border: 2rpx solid #f5c860;
@@ -361,17 +363,17 @@ function goCoupons() {
 }
 .wheel-disc__ticket-yuan {
   color: #f7df9b;
-  font-size: 20rpx;
+  font-size: 22rpx;
   font-weight: 900;
 }
 .wheel-disc__name {
-  font-size: 26rpx;
+  font-size: 30rpx;
   font-weight: 900;
   color: #a83b14;
   letter-spacing: 1rpx;
 }
 .wheel-disc__tag {
-  font-size: 16rpx;
+  font-size: 18rpx;
   font-weight: 700;
   letter-spacing: 3rpx;
   color: #c98a4a;
@@ -390,7 +392,7 @@ function goCoupons() {
 .wheel-pointer {
   position: absolute;
   left: 50%;
-  top: -14rpx;
+  top: -16rpx;
   transform: translateX(-50%);
   z-index: 3;
   display: flex;
@@ -398,8 +400,8 @@ function goCoupons() {
   align-items: center;
 }
 .wheel-pointer__gem {
-  width: 46rpx;
-  height: 46rpx;
+  width: 52rpx;
+  height: 52rpx;
   background: linear-gradient(135deg, #f66a55 0%, #d9261c 55%, #a81408 100%);
   transform: rotate(45deg);
   border: 4rpx solid #f2cf6e;
@@ -409,10 +411,10 @@ function goCoupons() {
 .wheel-pointer__pin {
   width: 0;
   height: 0;
-  border-left: 16rpx solid transparent;
-  border-right: 16rpx solid transparent;
-  border-top: 34rpx solid #d9261c;
-  margin-top: -6rpx;
+  border-left: 18rpx solid transparent;
+  border-right: 18rpx solid transparent;
+  border-top: 38rpx solid #d9261c;
+  margin-top: -7rpx;
   filter: drop-shadow(0 4rpx 6rpx rgba(60, 10, 0, 0.45));
 }
 /* 中心按钮：红色大圆 + 金环描边（IKDDHF 参考图「开始抽奖/已抽」） */
@@ -421,8 +423,8 @@ function goCoupons() {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 196rpx;
-  height: 196rpx;
+  width: 224rpx;
+  height: 224rpx;
   border-radius: 50%;
   display: flex;
   flex-direction: column;
@@ -448,14 +450,14 @@ function goCoupons() {
   background: radial-gradient(circle at 34% 26%, #b98f74, #8f6247 60%, #6f4832);
 }
 .wheel-hub__main {
-  font-size: 34rpx;
+  font-size: 38rpx;
   font-weight: 900;
   letter-spacing: 2rpx;
   text-shadow: 0 3rpx 8rpx rgba(120, 10, 0, 0.7);
   text-align: center;
 }
 .wheel-hub__sub {
-  font-size: 16rpx;
+  font-size: 18rpx;
   font-weight: 700;
   letter-spacing: 2rpx;
   color: rgba(255, 243, 207, 0.95);
