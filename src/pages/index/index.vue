@@ -489,7 +489,6 @@ function search() {
       <view class="wheel-sheet__close" @tap="wheelOpen = false">✕</view>
       <view class="wheel-sheet__inner">
         <view class="wheel-sheet__head">
-          <text class="wheel-sheet__title">天天抽奖</text>
           <view class="wheel-sheet__ribbon"
             ><text>✦ 不出寝食社 · 每日抽奖领福利 ✦</text></view
           >
@@ -1174,8 +1173,8 @@ function search() {
   justify-content: center;
   z-index: 2;
 }
-/* IKDDHF：节庆红底背景图铺满（灯笼/烟花/金币/祥云/元宝礼盒自带底部压边），
-   超长内容滚动时底边淡入朱红避免截断感 */
+/* IKDDHF：节庆红底背景图（COS：static.buchuqin.com/app/public/wheel-bg-festive.webp，
+   图自带「天天抽奖」金色立体标题，故页头只留副标题胶囊），底部朱红淡入防截断感 */
 .wheel-sheet__inner {
   max-height: 86vh;
   overflow-y: auto;
@@ -1184,31 +1183,21 @@ function search() {
   border-radius: 32rpx;
   background:
     linear-gradient(180deg, rgba(230, 58, 23, 0) 0%, rgba(230, 58, 23, 0) 82%, rgba(230, 58, 23, 0.85) 100%),
-    url(../../static/wheel-bg.jpg) center top / cover no-repeat,
+    url("https://static.buchuqin.com/app/public/wheel-bg-festive.webp") center top / cover no-repeat,
     #e63a17;
   padding-bottom: 28rpx;
 }
-/* 弹层头（IKDDHF 参考图）：白色立体大字（多层描边阴影）+ 金珠胶囊副标题 */
+/* 弹层头（IKDDHF）：标题在背景图里，这里只保留金珠胶囊副标题，
+   上方留白与图中标题错开（图 750×1330 等比缩放到弹层 620rpx 宽后
+   标题区约 300rpx 高） */
 .wheel-sheet__head {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 44rpx 0 8rpx;
-}
-.wheel-sheet__title {
-  font-size: 76rpx;
-  font-weight: 900;
-  letter-spacing: 10rpx;
-  color: #fff;
-  /* 白字金描边立体感：金色偏移影 + 深红投影（wx 不支持 text-stroke 时用阴影叠出） */
-  text-shadow:
-    0 3rpx 0 #f2cf6e,
-    0 6rpx 0 #d9a62e,
-    0 10rpx 16rpx rgba(140, 20, 0, 0.55);
+  padding: 300rpx 0 4rpx;
 }
 .wheel-sheet__ribbon {
-  margin-top: 20rpx;
   padding: 8rpx 36rpx;
   border-radius: 999rpx;
   border: 2rpx solid #f2cf6e;
