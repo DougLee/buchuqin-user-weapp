@@ -75,6 +75,15 @@ async function loadHomeBlocks() {
 const showHomeBlocks = computed(() => wheelActive.value || !!group.value);
 /** IKDB7W：点击入口原地弹层抽奖（不跳转）；pages/wheel 薄壳仅作分享落地 */
 const wheelOpen = ref(false);
+/** 弹窗头绿胶囊文案（IKDBPX 还原参考图）：来自 WheelPanel loaded 事件 */
+const wheelPill = ref("");
+function onWheelLoaded(state: { active: boolean; drawnToday: boolean }) {
+  wheelPill.value = !state.active
+    ? "活动暂未开启"
+    : state.drawnToday
+      ? "今日已抽完"
+      : "今日剩余 1 次";
+}
 function goWheel() {
   if (!wheelActive.value) return;
   wheelOpen.value = true;
@@ -494,8 +503,14 @@ function search() {
           <view class="wheel-sheet__ribbon"
             ><text>不出寝食社 · 每日抽奖领福利</text></view
           >
+          <view v-if="wheelPill" class="wheel-sheet__pill"
+            ><text>✦</text><text>{{ wheelPill }}</text
+            ><text>✦</text></view
+          >
         </view>
-        <view class="wheel-sheet__panel"><WheelPanel /></view>
+        <view class="wheel-sheet__panel"
+          ><WheelPanel @loaded="onWheelLoaded"
+        /></view>
       </view>
     </view>
   </view>
@@ -1172,26 +1187,26 @@ function search() {
   justify-content: center;
   z-index: 2;
 }
-/* 渐变只铺上半段（转盘区），规则卡落在奶油浅底；超高内容内部滚动 */
+/* 满版暖橙→奶油黄（IKDBPX：不到白，规则卡白卡浮在奶油底上）；超高内部滚动 */
 .wheel-sheet__inner {
-  max-height: 82vh;
+  max-height: 86vh;
   overflow-y: auto;
   border-radius: 32rpx;
-  background: linear-gradient(180deg, #ff8a00 0%, #ffa53d 20%, #ffc067 32%, #fff6e8 32.5%);
-  padding-bottom: 34rpx;
+  background: linear-gradient(180deg, #ff921b 0%, #ffa53d 22%, #ffca80 48%, #ffe3b8 78%, #ffdfae 100%);
+  padding-bottom: 28rpx;
 }
-/* 弹层头（IKDBJN 参考图）：YAY 气泡 + 描边大标题 + 黄丝带 */
+/* 弹层头（IKDBJN 参考图 / IKDBPX 紧凑化）：YAY 气泡 + 描边大标题 + 黄丝带 + 绿胶囊 */
 .wheel-sheet__head {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 44rpx 0 6rpx;
+  padding: 30rpx 0 4rpx;
 }
 .wheel-sheet__yay {
   position: absolute;
   left: 56rpx;
-  top: 22rpx;
+  top: 16rpx;
   background: #3f9c5c;
   color: #fff;
   font-size: 20rpx;
@@ -1202,26 +1217,39 @@ function search() {
   box-shadow: 0 4rpx 10rpx rgba(30, 90, 50, 0.3);
 }
 .wheel-sheet__title {
-  font-size: 52rpx;
+  font-size: 46rpx;
   font-weight: 900;
   letter-spacing: 4rpx;
   color: #fff8e8;
   text-shadow:
-    -2rpx -2rpx 0 #7a3e00, 2rpx -2rpx 0 #7a3e00,
-    -2rpx 2rpx 0 #7a3e00, 2rpx 2rpx 0 #7a3e00,
+    -3rpx -3rpx 0 #7a3e00, 3rpx -3rpx 0 #7a3e00,
+    -3rpx 3rpx 0 #7a3e00, 3rpx 3rpx 0 #7a3e00,
     0 12rpx 28rpx rgba(122, 62, 0, 0.5);
 }
 .wheel-sheet__ribbon {
-  margin-top: 14rpx;
+  margin-top: 10rpx;
   background: #ffd24d;
   color: #7a3e00;
   font-size: 20rpx;
   font-weight: 800;
-  padding: 8rpx 30rpx;
+  padding: 6rpx 26rpx;
   border-radius: 10rpx;
   box-shadow: 0 6rpx 0 rgba(122, 62, 0, 0.18);
 }
+.wheel-sheet__pill {
+  margin-top: 12rpx;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  background: #3f9c5c;
+  color: #fff;
+  border-radius: 999rpx;
+  padding: 6rpx 24rpx;
+  font-size: 20rpx;
+  font-weight: 800;
+  box-shadow: 0 6rpx 14rpx rgba(30, 90, 50, 0.25);
+}
 .wheel-sheet__panel {
-  padding: 16rpx 30rpx 0;
+  padding: 10rpx 24rpx 0;
 }
 </style>

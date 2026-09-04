@@ -42,7 +42,8 @@ function onLoaded(state: { active: boolean; drawnToday: boolean }) {
 <style scoped lang="scss">
 .wheel-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #ff8a00 0%, #ffa53d 28%, #ffc067 40%, #fff6e8 40.2%);
+  /* 满版暖橙→奶油黄（IKDBPX：不到白，与弹窗一致） */
+  background: linear-gradient(180deg, #ff921b 0%, #ffa53d 24%, #ffca80 50%, #ffe3b8 82%, #ffdfae 100%);
   padding-bottom: 60rpx;
 }
 .wheel-page__statusbar {
