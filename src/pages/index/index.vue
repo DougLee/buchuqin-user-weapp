@@ -75,15 +75,6 @@ async function loadHomeBlocks() {
 const showHomeBlocks = computed(() => wheelActive.value || !!group.value);
 /** IKDB7W：点击入口原地弹层抽奖（不跳转）；pages/wheel 薄壳仅作分享落地 */
 const wheelOpen = ref(false);
-/** 弹窗头绿胶囊文案（IKDBPX 还原参考图）：来自 WheelPanel loaded 事件 */
-const wheelPill = ref("");
-function onWheelLoaded(state: { active: boolean; drawnToday: boolean }) {
-  wheelPill.value = !state.active
-    ? "活动暂未开启"
-    : state.drawnToday
-      ? "今日已抽完"
-      : "今日剩余 1 次";
-}
 function goWheel() {
   if (!wheelActive.value) return;
   wheelOpen.value = true;
@@ -498,18 +489,15 @@ function search() {
       <view class="wheel-sheet__close" @tap="wheelOpen = false">✕</view>
       <view class="wheel-sheet__inner">
         <view class="wheel-sheet__head">
-          <view class="wheel-sheet__yay"><text>YAY!</text></view>
+          <view class="wheel-sheet__swoosh wheel-sheet__swoosh--l" />
+          <view class="wheel-sheet__swoosh wheel-sheet__swoosh--r" />
           <text class="wheel-sheet__title">天天抽奖</text>
           <view class="wheel-sheet__ribbon"
-            ><text>不出寝食社 · 每日抽奖领福利</text></view
-          >
-          <view v-if="wheelPill" class="wheel-sheet__pill"
-            ><text>✦</text><text>{{ wheelPill }}</text
-            ><text>✦</text></view
+            ><text>✦ 不出寝食社 · 每日抽奖领福利 ✦</text></view
           >
         </view>
         <view class="wheel-sheet__panel"
-          ><WheelPanel @loaded="onWheelLoaded"
+          ><WheelPanel
         /></view>
       </view>
     </view>
@@ -1187,15 +1175,15 @@ function search() {
   justify-content: center;
   z-index: 2;
 }
-/* 满版暖橙→奶油黄（IKDBPX：不到白，规则卡白卡浮在奶油底上）；超高内部滚动 */
+/* 满版翡翠绿→金绿（IKDBY2：高奢翡翠金风）；超高内部滚动 */
 .wheel-sheet__inner {
   max-height: 86vh;
   overflow-y: auto;
   border-radius: 32rpx;
-  background: linear-gradient(180deg, #ff921b 0%, #ffa53d 22%, #ffca80 48%, #ffe3b8 78%, #ffdfae 100%);
+  background: linear-gradient(180deg, #0c4a2e 0%, #145c38 30%, #1f7a4b 55%, #2e8a5c 78%, #35a06b 100%);
   padding-bottom: 28rpx;
 }
-/* 弹层头（IKDBJN 参考图 / IKDBPX 紧凑化）：YAY 气泡 + 描边大标题 + 黄丝带 + 绿胶囊 */
+/* 弹层头（IKDBY2 参考图）：金箔色衬线大标题 + ✦ 星点副标题 + 金弧线光带 */
 .wheel-sheet__head {
   position: relative;
   display: flex;
@@ -1203,51 +1191,42 @@ function search() {
   align-items: center;
   padding: 30rpx 0 4rpx;
 }
-.wheel-sheet__yay {
-  position: absolute;
-  left: 56rpx;
-  top: 16rpx;
-  background: #3f9c5c;
-  color: #fff;
-  font-size: 20rpx;
-  font-weight: 900;
-  padding: 6rpx 18rpx;
-  border-radius: 18rpx 18rpx 18rpx 4rpx;
-  transform: rotate(-10deg);
-  box-shadow: 0 4rpx 10rpx rgba(30, 90, 50, 0.3);
-}
 .wheel-sheet__title {
-  font-size: 46rpx;
+  font-family: serif;
+  font-size: 50rpx;
   font-weight: 900;
-  letter-spacing: 4rpx;
-  color: #fff8e8;
-  text-shadow:
-    -3rpx -3rpx 0 #7a3e00, 3rpx -3rpx 0 #7a3e00,
-    -3rpx 3rpx 0 #7a3e00, 3rpx 3rpx 0 #7a3e00,
-    0 12rpx 28rpx rgba(122, 62, 0, 0.5);
+  letter-spacing: 8rpx;
+  background: linear-gradient(180deg, #f7ecc8 20%, #e6cf8f 60%, #d4b75a 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  text-shadow: 0 6rpx 20rpx rgba(3, 40, 22, 0.5);
 }
 .wheel-sheet__ribbon {
-  margin-top: 10rpx;
-  background: #ffd24d;
-  color: #7a3e00;
-  font-size: 20rpx;
-  font-weight: 800;
-  padding: 6rpx 26rpx;
-  border-radius: 10rpx;
-  box-shadow: 0 6rpx 0 rgba(122, 62, 0, 0.18);
-}
-.wheel-sheet__pill {
   margin-top: 12rpx;
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  background: #3f9c5c;
-  color: #fff;
-  border-radius: 999rpx;
-  padding: 6rpx 24rpx;
+  color: #d8ecc9;
   font-size: 20rpx;
-  font-weight: 800;
-  box-shadow: 0 6rpx 14rpx rgba(30, 90, 50, 0.25);
+  font-weight: 700;
+  letter-spacing: 4rpx;
+}
+/* 金弧线光带：标题两侧细金线（overflow 裁出弧形） */
+.wheel-sheet__swoosh {
+  position: absolute;
+  width: 140rpx;
+  height: 140rpx;
+  border: 3rpx solid rgba(230, 207, 143, 0.55);
+  border-radius: 50%;
+  filter: blur(1rpx);
+}
+.wheel-sheet__swoosh--l {
+  left: -40rpx;
+  top: 30rpx;
+  clip-path: polygon(0 0, 100% 0, 100% 60%, 0 30%);
+}
+.wheel-sheet__swoosh--r {
+  right: -40rpx;
+  top: 20rpx;
+  clip-path: polygon(0 20%, 100% 0, 100% 30%, 0 60%);
 }
 .wheel-sheet__panel {
   padding: 10rpx 24rpx 0;

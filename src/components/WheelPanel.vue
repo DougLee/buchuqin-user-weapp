@@ -1,10 +1,11 @@
 <script setup lang="ts">
 /**
- * 抽奖转盘面板（IKD6FB / IKDB7W / IKDBJN）：转盘+次数+规则+结果弹窗的公共组件。
+ * 抽奖转盘面板（IKD6FB / IKDB7W / IKDBY2）：转盘+次数+规则+结果弹窗的公共组件。
  * 首页弹层与 pages/wheel 独立页（分享落地）共用，抽奖逻辑只此一份。
  * 8 奖位权重随机（概率只在服务端），每日 1 次按北京时间自然日；
  * 平台券自动入账、异业券弹图文、券发完服务端自动降级谢谢参与。
- * 视觉：节庆橙风（IKDBJN 参考图）——橙环灯串转盘/红色大按钮/奶油扇区。
+ * 视觉：翡翠金高奢风（IKDBY2 参考图）——深翡翠绿底/金环灯串/白金扇区/
+ * 金色菱形宝石指针/绿玉按钮/玻璃台座。
  */
 import { computed, ref } from "vue";
 import { api } from "../api";
@@ -38,7 +39,7 @@ const canDraw = computed(
   () => active.value && !drawnToday.value && !spinning.value && !drawing.value,
 );
 const emit = defineEmits<{
-  /** 数据拉取完成：宿主（独立页壳）用它更新页头胶囊文案 */
+  /** 数据拉取完成：宿主（弹层头/独立页头）用它更新剩余次数胶囊文案 */
   (e: "loaded", state: { active: boolean; drawnToday: boolean }): void;
 }>();
 
@@ -98,7 +99,7 @@ function goCoupons() {
           v-for="n in 16"
           :key="n"
           class="wheel-lights__bulb"
-          :class="{ 'wheel-lights__bulb--dim': n % 2 === 0 }"
+          :class="{ 'wheel-lights__bulb--gold': n % 2 === 0 }"
           :style="{ transform: `rotate(${n * 22.5}deg) translateY(-206rpx)` }"
         />
       </view>
@@ -116,7 +117,7 @@ function goCoupons() {
           }"
           :style="{
             // 扇区中心在 i*45+22.5（边界是 i*45）；压线会让指针指向不明确（IKDBPX）
-            transform: `translate(-50%,-50%) rotate(${i * 45 + 22.5}deg) translateY(-148rpx) rotate(${-(i * 45 + 22.5)}deg)`,
+            transform: `translate(-50%,-50%) rotate(${i * 45 + 22.5}deg) translateY(-146rpx) rotate(${-(i * 45 + 22.5)}deg)`,
           }"
         >
           <text class="wheel-disc__name">{{ p.label }}</text>
@@ -124,7 +125,7 @@ function goCoupons() {
           <text v-else-if="p.type === 'partner'" class="wheel-disc__tag"
             >异业券</text
           >
-          <!-- 扇区装饰（IKDBJN 参考图）：平台券=票券 / 异业券·谢谢参与=星形，纯 CSS -->
+          <!-- 扇区装饰：平台券=金票券 / 异业券·谢谢参与=星形（纯 CSS） -->
           <view v-if="p.type === 'coupon'" class="deco-ticket">
             <text>¥</text>
           </view>
@@ -135,13 +136,13 @@ function goCoupons() {
           />
         </view>
       </view>
-      <!-- 指针（红色定位针：圆头+黄星+下三角）与中心大按钮 -->
+      <!-- 金色菱形宝石指针（两三角+横钉）与绿玉中心按钮 -->
       <view class="wheel-pointer">
-        <view class="wheel-pointer__pin"><text>✦</text></view>
-        <view class="wheel-pointer__tail" />
+        <view class="wheel-pointer__gem" />
+        <view class="wheel-pointer__pin" />
       </view>
-      <!-- 奶油锯齿花边：独立元素垫在按钮下（::before z-index:-1 会盖住按钮底色） -->
-      <view class="wheel-hub__gear" />
+      <!-- 玻璃台座：转盘下方椭圆 -->
+      <view class="wheel-pedestal" />
       <view
         class="wheel-hub"
         :class="{
@@ -153,12 +154,12 @@ function goCoupons() {
         <text class="wheel-hub__main">{{
           !active ? "未开启" : drawnToday ? "已抽" : "抽奖"
         }}</text>
-        <view class="wheel-hub__pill">{{
+        <text class="wheel-hub__sub">{{
           !active ? "敬请期待" : drawnToday ? "明日 0 点重置" : "今日第 1 次"
-        }}</view>
+        }}</text>
       </view>
     </view>
-    <!-- 底部次数条：白胶囊（参考图形态），数字橙色放大 -->
+    <!-- 次数条：半透明玻璃胶囊 -->
     <view class="wheel-chance">
       <view v-if="!active" class="wheel-chance__pill">活动暂未开启，敬请期待</view>
       <view v-else-if="drawnToday" class="wheel-chance__pill"
@@ -169,8 +170,12 @@ function goCoupons() {
         <text> 次</text>
       </view>
     </view>
+    <!-- 规则卡：半透明玻璃 + 皇冠图标 + 绿数字圆点 -->
     <view class="wheel-rules">
-      <view class="wheel-rules__title"><text>活动规则</text></view>
+      <view class="wheel-rules__title">
+        <view class="wheel-rules__crown"><text>♛</text></view>
+        <text>活动规则</text>
+      </view>
       <view class="wheel-rules__line">
         <text class="wheel-rules__num">1</text>
         <text class="wheel-rules__text">每位用户每日可抽奖 1 次，次日 0 点重新计算；</text>
@@ -240,10 +245,10 @@ function goCoupons() {
 </template>
 
 <style scoped lang="scss">
-/* ===== 节庆橙风（IKDBJN）：橙 #FF8A00 / 奶油 #FFF6E8 / 棕 #8B4A0F / 红 CTA ===== */
+/* ===== 翡翠金高奢风（IKDBY2）：翡翠 #0C4A2E / 金 #C9A227 / 奶白扇区 ===== */
 .wp-loading {
   text-align: center;
-  color: rgba(255, 255, 255, 0.9);
+  color: #f1de9a;
   font-size: 24rpx;
   padding: 80rpx 0;
 }
@@ -254,7 +259,7 @@ function goCoupons() {
   height: 460rpx;
   margin: 0 auto;
 }
-/* 灯串：白灯落在橙色外环上 */
+/* 灯串：白金灯泡交替落在金环上 */
 .wheel-lights {
   position: absolute;
   inset: 0;
@@ -263,33 +268,34 @@ function goCoupons() {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 16rpx;
-  height: 16rpx;
-  margin: -8rpx 0 0 -8rpx;
+  width: 14rpx;
+  height: 14rpx;
+  margin: -7rpx 0 0 -7rpx;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 14rpx 5rpx rgba(255, 255, 255, 0.9);
+  background: #fffdf2;
+  box-shadow: 0 0 14rpx 5rpx rgba(255, 250, 220, 0.9);
 }
-.wheel-lights__bulb--dim {
-  background: #ffe3b8;
-  box-shadow: none;
+.wheel-lights__bulb--gold {
+  background: #f5dfa0;
+  box-shadow: 0 0 10rpx 3rpx rgba(230, 200, 120, 0.7);
 }
-/* 扇区：白/奶油橙交替（对比拉开才看得出分割）+ 橙色厚环 */
+/* 扇区：白/奶白交替 + 鎏金环 */
 .wheel-disc {
   position: absolute;
   inset: 20rpx;
   border-radius: 50%;
   /* conic 从正上方顺时针，与奖位序号一致 */
   background: conic-gradient(
-    #fffdf7 0 45deg, #ffe7c4 45deg 90deg,
-    #fffdf7 90deg 135deg, #ffe7c4 135deg 180deg,
-    #fffdf7 180deg 225deg, #ffe7c4 225deg 270deg,
-    #fffdf7 270deg 315deg, #ffe7c4 315deg 360deg
+    #fbfdf8 0 45deg, #edf4e9 45deg 90deg,
+    #fbfdf8 90deg 135deg, #edf4e9 135deg 180deg,
+    #fbfdf8 180deg 225deg, #edf4e9 225deg 270deg,
+    #fbfdf8 270deg 315deg, #edf4e9 315deg 360deg
   );
-  border: 16rpx solid #ff8a1e;
+  border: 16rpx solid #c9a227;
   box-shadow:
-    0 16rpx 44rpx rgba(150, 62, 0, 0.35),
-    inset 0 0 0 5rpx #fff6e4;
+    0 0 0 5rpx #f1de9a,
+    0 18rpx 50rpx rgba(3, 40, 22, 0.55),
+    inset 0 0 0 5rpx rgba(201, 162, 39, 0.25);
   transition: transform 4.2s cubic-bezier(0.16, 0.84, 0.28, 1);
 }
 .wheel-disc__label {
@@ -304,28 +310,31 @@ function goCoupons() {
 .wheel-disc__name {
   font-size: 21rpx;
   font-weight: 800;
-  color: #8b4a0f;
+  color: #2f7a45;
 }
 .wheel-disc__tag {
   font-size: 16rpx;
   font-weight: 700;
-  color: #3f9c5c;
+  color: #5fae74;
   margin-top: 2rpx;
 }
+.wheel-disc__label--partner .wheel-disc__name {
+  color: #b9862f;
+}
 .wheel-disc__label--partner .wheel-disc__tag {
-  color: #e0570f;
+  color: #cfa050;
 }
 .wheel-disc__label--none .wheel-disc__name {
-  color: #b99b78;
+  color: #9aa894;
 }
-/* 扇区装饰：平台券票券 / 星形（尺寸随转盘 460 收缩） */
+/* 扇区装饰：平台券=金票券 / 异业券=金亮星 / 谢谢参与=淡绿星 */
 .deco-ticket {
   margin-top: 4rpx;
   width: 58rpx;
   height: 30rpx;
   border-radius: 7rpx;
-  background: #ffd24d;
-  border: 2rpx solid #eda93c;
+  background: linear-gradient(135deg, #f1de9a, #e0c268);
+  border: 2rpx solid #c9a227;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -334,59 +343,64 @@ function goCoupons() {
 .deco-ticket text {
   font-size: 18rpx;
   font-weight: 900;
-  color: #a3641a;
+  color: #7a5f13;
 }
-/* 星形装饰：异业券亮星 / 谢谢参与淡星 */
 .deco-star {
   margin-top: 6rpx;
   width: 34rpx;
   height: 34rpx;
-  background: #ffd98e;
+  background: #f1de9a;
   clip-path: polygon(
     50% 0%, 63% 34%, 98% 35%, 71% 57%, 81% 91%,
     50% 70%, 19% 91%, 29% 57%, 2% 35%, 37% 34%
   );
 }
 .deco-star--dim {
-  background: #e9dcc9;
+  background: #cfdec9;
 }
-/* 红色定位针指针：圆头（白边+黄星）+ 下三角 */
+/* 金色菱形宝石指针：上/下三角 + 中心横钉 */
 .wheel-pointer {
   position: absolute;
   left: 50%;
-  top: -8rpx;
+  top: -10rpx;
   transform: translateX(-50%);
   z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
+.wheel-pointer__gem {
+  width: 44rpx;
+  height: 44rpx;
+  background: linear-gradient(135deg, #f7e9b8 0%, #e6cf8f 50%, #b98f2a 100%);
+  transform: rotate(45deg);
+  border: 3rpx solid #f7e9b8;
+  box-shadow: 0 4rpx 12rpx rgba(150, 120, 30, 0.55);
+}
 .wheel-pointer__pin {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 50%;
-  background: radial-gradient(circle at 32% 26%, #ff7a45, #ff3d1e 70%);
-  border: 5rpx solid #fff;
-  box-shadow: 0 6rpx 14rpx rgba(180, 40, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.wheel-pointer__pin text {
-  color: #ffd24d;
-  font-size: 24rpx;
-  font-weight: 900;
-}
-.wheel-pointer__tail {
   width: 0;
   height: 0;
-  border-left: 18rpx solid transparent;
-  border-right: 18rpx solid transparent;
-  border-top: 34rpx solid #ff3d1e;
-  margin-top: -6rpx;
-  filter: drop-shadow(0 4rpx 6rpx rgba(0, 0, 0, 0.18));
+  border-left: 14rpx solid transparent;
+  border-right: 14rpx solid transparent;
+  border-top: 30rpx solid #c9a227;
+  margin-top: -8rpx;
+  filter: drop-shadow(0 4rpx 6rpx rgba(60, 45, 5, 0.4));
 }
-/* 中心按钮：红色 Claymorphism 大按钮 + 奶油锯齿花边底座 + 橙胶囊副签 */
+/* 玻璃台座：转盘下方椭圆金边底座 */
+.wheel-pedestal {
+  position: absolute;
+  left: 50%;
+  bottom: -34rpx;
+  transform: translateX(-50%);
+  width: 400rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 250, 224, 0.5), rgba(201, 162, 39, 0.28));
+  border: 3rpx solid rgba(241, 222, 154, 0.7);
+  box-shadow: 0 10rpx 30rpx rgba(3, 40, 22, 0.4);
+  z-index: 0;
+}
+/* 中心按钮：翡翠绿玉盘 + 金环描边 */
 .wheel-hub {
   position: absolute;
   left: 50%;
@@ -399,113 +413,98 @@ function goCoupons() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  background: radial-gradient(circle at 32% 26%, #ff8a4d, #ff4d2e 60%, #f03514);
-  border: 8rpx solid #fff;
+  color: #fdf6da;
+  background: radial-gradient(circle at 32% 26%, #3ba05f, #157a3e 55%, #0c5228);
+  border: 7rpx solid #e6cf8f;
   box-shadow:
-    0 16rpx 36rpx rgba(240, 53, 20, 0.45),
-    inset 0 -10rpx 16rpx rgba(150, 25, 0, 0.35),
-    inset 0 6rpx 10rpx rgba(255, 255, 255, 0.45);
+    0 0 0 4rpx #c9a227,
+    0 16rpx 36rpx rgba(3, 40, 22, 0.6),
+    inset 0 -10rpx 16rpx rgba(5, 40, 20, 0.5),
+    inset 0 6rpx 10rpx rgba(255, 255, 255, 0.3);
   z-index: 2;
-}
-/* 锯齿花边：独立齿轮元素垫在按钮下（12 粗齿；负 z-index 伪元素会盖住按钮底色） */
-.wheel-hub__gear {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 204rpx;
-  height: 204rpx;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: repeating-conic-gradient(
-    #ffe9c8 0deg 15deg,
-    transparent 15deg 30deg
-  );
-  z-index: 1;
 }
 .wheel-hub--pressing {
   box-shadow:
-    0 6rpx 16rpx rgba(240, 53, 20, 0.45),
-    inset 0 4rpx 16rpx rgba(150, 25, 0, 0.45);
+    0 0 0 4rpx #c9a227,
+    0 6rpx 16rpx rgba(3, 40, 22, 0.6),
+    inset 0 4rpx 16rpx rgba(5, 40, 20, 0.6);
 }
 .wheel-hub--disabled {
-  background: radial-gradient(circle at 32% 26%, #f2d9bd, #ddb48e 60%, #c9a684);
-  box-shadow:
-    0 8rpx 20rpx rgba(180, 130, 80, 0.3),
-    inset 0 -8rpx 12rpx rgba(150, 105, 60, 0.25);
+  background: radial-gradient(circle at 32% 26%, #6f8f7d, #4d6b5a 60%, #3a5346);
 }
 .wheel-hub__main {
   font-size: 44rpx;
   font-weight: 900;
   letter-spacing: 6rpx;
-  text-shadow: 0 3rpx 8rpx rgba(150, 25, 0, 0.5);
+  text-shadow: 0 3rpx 8rpx rgba(5, 40, 20, 0.7);
 }
-.wheel-hub__pill {
-  margin-top: 6rpx;
-  background: #ff9d2e;
-  color: #fff;
+.wheel-hub__sub {
   font-size: 16rpx;
-  font-weight: 800;
-  padding: 2rpx 16rpx;
-  border-radius: 999rpx;
+  font-weight: 700;
+  color: rgba(253, 246, 218, 0.92);
+  margin-top: 4rpx;
 }
-/* ---------- 次数条：白胶囊（IKDBPX 压缩间距） ---------- */
+/* ---------- 次数条：半透明玻璃胶囊 ---------- */
 .wheel-chance {
   display: flex;
   justify-content: center;
-  margin-top: 20rpx;
+  margin-top: 52rpx;
 }
 .wheel-chance__pill {
   display: inline-flex;
   align-items: baseline;
-  background: #fff;
-  color: #8b4a0f;
+  background: rgba(255, 255, 255, 0.18);
+  border: 2rpx solid rgba(241, 222, 154, 0.5);
+  color: #fdf6da;
   font-size: 24rpx;
   font-weight: 800;
   padding: 10rpx 30rpx;
   border-radius: 999rpx;
-  box-shadow: 0 8rpx 24rpx rgba(150, 62, 0, 0.14);
 }
 .wheel-chance__pill .hot {
-  color: #ff5a1f;
+  color: #f1de9a;
   font-size: 32rpx;
   font-weight: 900;
   margin: 0 4rpx;
 }
-/* ---------- 规则卡：数字圆点 + 虚线分隔 ---------- */
+/* ---------- 规则卡：半透明玻璃 + 皇冠 + 绿数字圆点 ---------- */
 .wheel-rules {
   margin: 20rpx 0 0;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.92);
   border-radius: 24rpx;
   padding: 20rpx 26rpx 6rpx;
-  border: 1rpx solid #ffe9cf;
+  border: 1rpx solid rgba(241, 222, 154, 0.55);
 }
 .wheel-rules__title {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
   font-size: 26rpx;
   font-weight: 900;
-  color: #8b4a0f;
+  color: #155232;
   margin-bottom: 4rpx;
-  display: inline-block;
-  position: relative;
-  padding-bottom: 8rpx;
 }
-/* 标题黄色短杠（参考图手绘下划） */
-.wheel-rules__title::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  height: 8rpx;
-  border-radius: 4rpx;
-  background: #ffd24d;
+.wheel-rules__crown {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1a8a4c, #0c5228);
+  border: 3rpx solid #e6cf8f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wheel-rules__crown text {
+  color: #f1de9a;
+  font-size: 22rpx;
+  margin-top: -2rpx;
 }
 .wheel-rules__line {
   display: flex;
   align-items: flex-start;
   gap: 12rpx;
   padding: 10rpx 0;
-  border-bottom: 2rpx dashed #f5e7d2;
+  border-bottom: 2rpx dashed #e2ecdc;
 }
 .wheel-rules__line:last-child {
   border-bottom: none;
@@ -515,8 +514,8 @@ function goCoupons() {
   width: 30rpx;
   height: 30rpx;
   border-radius: 50%;
-  background: #ff8a2e;
-  color: #fff;
+  background: linear-gradient(135deg, #2f9a55, #157a3e);
+  color: #fdf6da;
   font-size: 18rpx;
   font-weight: 900;
   display: flex;
@@ -527,14 +526,14 @@ function goCoupons() {
 .wheel-rules__text {
   flex: 1;
   font-size: 20rpx;
-  color: #7a5c3d;
+  color: #4a6554;
   line-height: 1.6;
 }
 /* ---------- 结果弹窗 ---------- */
 .wheel-mask {
   position: fixed;
   inset: 0;
-  background: rgba(80, 35, 0, 0.55);
+  background: rgba(3, 40, 22, 0.6);
   /* 高于首页弹层容器（sheet z-80），保证结果弹窗盖在弹层之上 */
   z-index: 100;
   display: flex;
@@ -544,7 +543,8 @@ function goCoupons() {
 .wheel-pop {
   position: relative;
   width: 544rpx;
-  background: #fff;
+  background: linear-gradient(180deg, #fdfbf0, #f6f1de);
+  border: 2rpx solid rgba(201, 162, 39, 0.4);
   border-radius: 40rpx;
   padding: 48rpx 36rpx 32rpx;
   display: flex;
@@ -567,16 +567,16 @@ function goCoupons() {
   width: 316rpx;
   height: 64rpx;
   line-height: 64rpx;
-  background: linear-gradient(120deg, #ff8a3d, #ff5a1f);
-  color: #fff;
+  background: linear-gradient(120deg, #d4b75a, #b98f2a);
+  color: #fdf6da;
   font-size: 26rpx;
   font-weight: 900;
   border-radius: 999rpx;
-  box-shadow: 0 12rpx 32rpx rgba(255, 90, 31, 0.45);
+  box-shadow: 0 12rpx 32rpx rgba(150, 120, 30, 0.45);
 }
 .wheel-pop--green .wheel-pop__ribbon {
-  background: linear-gradient(120deg, #25b95a, #07883b);
-  box-shadow: 0 12rpx 32rpx rgba(7, 136, 59, 0.45);
+  background: linear-gradient(120deg, #2f9a55, #157a3e);
+  box-shadow: 0 12rpx 32rpx rgba(12, 82, 40, 0.45);
 }
 .wheel-coupon {
   margin: 24rpx 0 4rpx;
@@ -585,43 +585,43 @@ function goCoupons() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #fff3dc, #fffaf0);
-  border: 2rpx dashed #ff9d2e;
+  background: linear-gradient(135deg, #e9f4e6, #f6fbf3);
+  border: 2rpx dashed #2f9a55;
   border-radius: 24rpx;
 }
 .wheel-coupon__label {
   font-size: 34rpx;
   font-weight: 900;
-  color: #c2570f;
+  color: #157a3e;
 }
 .deco-star--pop {
   margin-top: 28rpx;
   width: 88rpx;
   height: 88rpx;
-  background: #ffd98e;
+  background: #f1de9a;
 }
 .wheel-pop__img {
   width: 320rpx;
   margin-top: 20rpx;
   border-radius: 24rpx;
-  background: #fff1e6;
+  background: #f2efe0;
 }
 .wheel-pop__biz {
   font-size: 26rpx;
   font-weight: 800;
-  color: #5c3a1a;
+  color: #155232;
   margin-top: 18rpx;
 }
 .wheel-pop__desc {
   font-size: 22rpx;
-  color: #8b6b4a;
+  color: #5d6f5f;
   line-height: 1.7;
   margin-top: 16rpx;
   white-space: pre-line;
 }
 .wheel-pop__hint {
   font-size: 18rpx;
-  color: #c2a482;
+  color: #9aa894;
   margin-top: 12rpx;
 }
 .wheel-pop__btns {
@@ -641,13 +641,13 @@ function goCoupons() {
   justify-content: center;
 }
 .wheel-btn--ghost {
-  background: #fdf3e4;
-  color: #8b4a0f;
-  border: 1rpx solid #f5e3c8;
+  background: #eef3e7;
+  color: #155232;
+  border: 1rpx solid #dfe8d2;
 }
 .wheel-btn--solid {
-  background: linear-gradient(120deg, #ff8a2e, #ff5a1f);
-  color: #fff;
-  box-shadow: 0 8rpx 20rpx rgba(255, 90, 31, 0.35);
+  background: linear-gradient(120deg, #2f9a55, #157a3e);
+  color: #fdf6da;
+  box-shadow: 0 8rpx 20rpx rgba(21, 122, 62, 0.35);
 }
 </style>
