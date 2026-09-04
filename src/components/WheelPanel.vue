@@ -33,6 +33,8 @@ const result = ref<{
   bizTitle: string;
   bizImage: string;
   bizNote: string;
+  /** IKDCVO：partner 配券抽中发券入账时为 UserCoupon id */
+  userCouponId?: string | null;
 } | null>(null);
 
 const canDraw = computed(
@@ -209,16 +211,29 @@ function goCoupons() {
           </view>
         </template>
         <template v-else-if="result.type === 'partner'">
+          <!-- IKDCVO：配了异业券抽中发券入账（bizImage 空展示券态）；
+               存量无券配置仍走图文，长按可识别商家二维码 -->
+          <view v-if="result.userCouponId" class="wheel-coupon wheel-coupon--partner">
+            <text class="wheel-coupon__label">{{ result.bizTitle || result.label }}</text>
+          </view>
           <image
+            v-else
             class="wheel-pop__img"
             :src="result.bizImage"
             mode="widthFix"
             show-menu-by-longpress
           />
-          <text class="wheel-pop__biz">{{ result.bizTitle }}</text>
+          <text v-if="!result.userCouponId" class="wheel-pop__biz">{{ result.bizTitle }}</text>
           <text v-if="result.bizNote" class="wheel-pop__desc">{{ result.bizNote }}</text>
-          <text class="wheel-pop__hint">长按图片可识别商家二维码</text>
+          <text v-if="result.userCouponId" class="wheel-pop__desc">已存入「我的 - 优惠券」，到店出示即可</text>
+          <text v-else class="wheel-pop__hint">长按图片可识别商家二维码</text>
           <view class="wheel-pop__btns">
+            <view
+              v-if="result.userCouponId"
+              class="wheel-btn wheel-btn--ghost"
+              @tap="goCoupons"
+              >查看优惠券</view
+            >
             <view class="wheel-btn wheel-btn--solid" @tap="closeResult">开心收下</view>
           </view>
         </template>
@@ -557,6 +572,14 @@ function goCoupons() {
   font-size: 34rpx;
   font-weight: 900;
   color: #157a3e;
+}
+/* IKDCVO：异业券票面金调（与金额券绿票区分，贴翡翠金主题） */
+.wheel-coupon--partner {
+  background: linear-gradient(135deg, #faf3df, #fdfaf1);
+  border-color: #c9a227;
+}
+.wheel-coupon--partner .wheel-coupon__label {
+  color: #8a6d1a;
 }
 .wheel-pop__star {
   margin-top: 28rpx;

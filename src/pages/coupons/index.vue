@@ -19,9 +19,24 @@ const statusLabels: Record<UserCouponStatus, string> = {
   released: "已退回",
 };
 /** 券不可用行内标注（ADR-0005/IKA00Q）：过期置灰 + 状态改「已过期」，
- *  不再显示「未使用/去使用」误导；门槛原因在结算页券列表就地标差价 */
+ *  不再显示「未使用/去使用」误导；门槛原因在结算页券列表就地标差价。
+ *  IKDCVO：长期券 expiresAt=null 永不过期 */
 function expired(c: UserCoupon) {
-  return new Date(c.coupon.expiresAt).getTime() <= Date.now();
+  return (
+    !!c.coupon.expiresAt &&
+    new Date(c.coupon.expiresAt).getTime() <= Date.now()
+  );
+}
+/** IKDCVO：有效期文案——null = 长期有效 */
+function expiryText(c: Coupon) {
+  return c.expiresAt ? `有效期至 ${c.expiresAt.slice(0, 10)}` : "长期有效";
+}
+/** IKDCVO：异业券到店展示，暂不核销不参与下单 */
+function isPartner(c: Coupon) {
+  return c.kind === "partner";
+}
+function showPartnerTip() {
+  uni.showToast({ title: "到店出示即可享受优惠", icon: "none" });
 }
 /** IKA57M：卡面右侧只留按钮——可用=「去使用」，不可用=置灰按钮显状态 */
 function usable(c: UserCoupon) {
@@ -85,17 +100,21 @@ async function claim(coupon: Coupon) {
       ><view class="section-title"
         ><text class="section-title__main">可以领的券</text></view
       ><view class="coupon card" v-for="c in claimable" :key="c.id"
-        ><!-- 金额列（IKA08W）：外层满高居中，内层基线对齐 --><view
+        ><!-- 金额列（IKA08W）：外层满高居中，内层基线对齐；异业券两态（IKDCVO） --><view
           class="coupon__money"
-          ><view class="coupon__money-inner"
+          ><view v-if="isPartner(c)" class="coupon__money-kind"
+            ><text>异业</text
+            ><text>券</text></view
+          ><view v-else class="coupon__money-inner"
             ><text class="symbol">¥</text
             ><text>{{ fenToYuan(c.amount) }}</text></view
           ></view
         ><view class="coupon__body"
           ><text class="coupon__name">{{ c.name }}</text
-          ><text class="muted">满 {{ fenToYuan(c.threshold) }} 元可用</text
-          ><text class="coupon__date"
-          >有效期至 {{ c.expiresAt.slice(0, 10) }}</text
+          ><text v-if="isPartner(c)" class="muted">{{ c.remark }}</text
+          ><text v-else class="muted"
+          >满 {{ fenToYuan(c.threshold) }} 元可用</text
+          ><text class="coupon__date">{{ expiryText(c) }}</text
           ></view
         ><button
           :disabled="claiming === c.id"
@@ -112,9 +131,12 @@ async function claim(coupon: Coupon) {
         v-for="c in mine"
         :key="c.id"
         :class="{ 'coupon--dead': !usable(c) }"
-        ><!-- 金额列（IKA08W 重开）：格子满高由 grid stretch 保证，本层只管居中 --><view
+        ><!-- 金额列（IKA08W 重开）：格子满高由 grid stretch 保证；异业券两态 --><view
           class="coupon__money"
-          ><view class="coupon__money-inner"
+          ><view v-if="isPartner(c.coupon)" class="coupon__money-kind"
+            ><text>异业</text
+            ><text>券</text></view
+          ><view v-else class="coupon__money-inner"
             ><text class="symbol">¥</text
             ><text>{{ fenToYuan(c.coupon.amount) }}</text></view
           ></view
@@ -122,16 +144,25 @@ async function claim(coupon: Coupon) {
           ><!-- IKA57M：状态文字移出卡面（与按钮重叠），只留在按钮上 --><text
             class="coupon__name"
             >{{ c.coupon.name }}</text
-          ><text class="muted"
+          ><text v-if="isPartner(c.coupon)" class="muted">{{
+            c.coupon.remark
+          }}</text
+          ><text v-else class="muted"
           >满 {{ fenToYuan(c.coupon.threshold) }} 元可用</text
-          ><text class="coupon__date"
-          >有效期至 {{ c.coupon.expiresAt.slice(0, 10) }}</text
+          ><text class="coupon__date">{{ expiryText(c.coupon) }}</text
           ></view
-        ><!-- IKA57M：右侧只显示按钮；不可用置灰 + 按钮文字显状态 --><button
-          v-if="usable(c)"
+        ><!-- IKA57M：右侧只显示按钮；不可用置灰 + 按钮文字显状态；
+             异业券（IKDCVO）不参与下单，可用态按钮「到店出示」 --><button
+          v-if="usable(c) && !isPartner(c.coupon)"
           @tap="uni.switchTab({ url: '/pages/category/index' })"
         >
           去使用
+        </button>
+        <button
+          v-else-if="usable(c) && isPartner(c.coupon)"
+          @tap="showPartnerTip"
+        >
+          到店出示
         </button>
         <button v-else class="coupon__btn-dead" disabled>
           {{ deadLabel(c) }}
@@ -180,6 +211,16 @@ async function claim(coupon: Coupon) {
   /* IK9SO0：¥ 与金额基线对齐，比例协调（原 24/64 失衡） */
   align-items: baseline;
   gap: 4rpx;
+}
+/* IKDCVO：异业券金额位两态——无面额，改「异业/券」两行标识 */
+.coupon__money-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.25;
+  font-size: 34rpx;
+  font-weight: 900;
+  letter-spacing: 4rpx;
 }
 .symbol {
   font-size: 30rpx;

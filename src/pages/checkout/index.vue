@@ -92,7 +92,9 @@ async function load() {
     usableCoupons.value = b.value.mine.filter(
       (item) =>
         (item.status === "claimed" || item.status === "released") &&
-        new Date(item.coupon.expiresAt).getTime() > now,
+        // IKDCVO：长期券 expiresAt=null 不过期；下单列表后端已只出金额券
+        (!item.coupon.expiresAt ||
+          new Date(item.coupon.expiresAt).getTime() > now),
     );
     // IKB3K1：默认不选券，用户主动选择（不再自动勾选抵扣最多的券）
   }

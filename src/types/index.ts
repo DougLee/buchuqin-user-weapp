@@ -136,12 +136,19 @@ export interface LoginResult {
 export interface Coupon {
   id: string;
   name: string;
-  /** 面额，单位：分 */
+  /** 券品种（IKDCVO）：platform 金额券下单抵扣 | partner 异业券到店展示暂不核销 */
+  kind: "platform" | "partner";
+  /** 发放方式：manual 领券中心 | lottery 转盘 | signup 注册发 */
+  trigger: "manual" | "lottery" | "signup";
+  /** 优惠说明（异业券到店权益等） */
+  remark: string;
+  /** 面额，单位：分；partner 券恒为 0 */
   amount: number;
-  /** 使用门槛，单位：分 */
+  /** 使用门槛，单位：分；partner 券恒为 0 */
   threshold: number;
   status: string;
-  expiresAt: string;
+  /** 过期时间；null = 长期有效（IKDCVO） */
+  expiresAt: string | null;
   total?: number;
   remain?: number;
 }
