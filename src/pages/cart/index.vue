@@ -40,6 +40,13 @@ const belowThreshold = computed(
 const thresholdGap = computed(() =>
   fenToYuan((cart.cart.deliveryThreshold ?? 1000) - cart.cart.productAmount),
 );
+/** 凑单进度（IKDEUK 二轮视觉升级）：已购/门槛比例驱动进度条，封顶 100 */
+const thresholdProgress = computed(() =>
+  Math.min(
+    100,
+    (cart.cart.productAmount / (cart.cart.deliveryThreshold ?? 1000)) * 100,
+  ),
+);
 function checkout() {
   if (!cart.cart.items.length) return;
   // 低于起送门槛就地拦截（IK9YPJ）：与悬浮窗/结算页 belowThreshold 同口径
@@ -113,11 +120,25 @@ const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
         ></view
       ></view
     ><view class="cart-foot safe-bottom"
-      ><!-- 起送门槛提醒胶丸（IKDEUK）：未达标时悬于结算行上方，达标/无门槛不渲染 --><view
+      ><!-- 起送凑单条（IKDEUK 二轮）：未达标时悬于结算行上方——差额金额 +
+           去凑单入口 + 进度条（已购/门槛），达标/无门槛不渲染 --><view
         v-if="belowThreshold"
         class="cart-foot__threshold"
         aria-role="alert"
-        >还差 ¥{{ thresholdGap }} 元起送</view
+        ><view class="threshold__info"
+          ><text class="threshold__text">还差</text
+          ><text class="threshold__amount">¥{{ thresholdGap }}</text
+          ><text class="threshold__text">即可起送</text
+          ><!-- 去凑单（次级转化入口）：复用 goBrowse 跳分类页 --><view
+            class="threshold__go"
+            @tap="goBrowse"
+            >去凑单 ›</view
+          ></view
+        ><view class="threshold__bar"
+          ><view
+            class="threshold__fill"
+            :style="{ width: thresholdProgress + '%' }"
+          ></view></view></view
       ><view class="cart-foot__row"
         ><view
           ><text class="muted">合计</text
@@ -143,9 +164,9 @@ const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
 .cart-page {
-  /* 底部补偿（IKAHBQ）：让出固定结算条(≈124rpx，IKDEUK 加门槛胶丸后 ≈176rpx)
-   * + 自绘 TabBar(≈118rpx) */
-  padding-bottom: calc(330rpx + env(safe-area-inset-bottom));
+  /* 底部补偿（IKAHBQ）：让出固定结算条 + 自绘 TabBar(≈118rpx)；
+   * IKDEUK 二轮凑单条（文案行+进度条 ≈110rpx）后结算区整体 ≈250rpx */
+  padding-bottom: calc(380rpx + env(safe-area-inset-bottom));
 }
 .cart-head {
   display: flex;
@@ -313,16 +334,81 @@ const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
   justify-content: space-between;
   gap: 18rpx;
 }
-/* 起送门槛提醒胶丸（IKDEUK）：暖橙警示（#e25c05 系）配浅橙底，不上大红 */
+/* 起送凑单条（IKDEUK 二轮视觉升级）：浅暖奶油底 + 橙系进度条，配色取自
+ * 福利群卡同款色板（#fff1e2 底 / #ff7a21 渐变 / #b96f33 辅文），与首页
+ * 双版块一个视觉语言；圆角 20rpx 对齐项目模块圆角 */
 .cart-foot__threshold {
-  padding: 10rpx 24rpx;
+  padding: 14rpx 24rpx 18rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(150deg, #fff8f0, #fff1e2);
+  border: 2rpx solid rgba(255, 122, 33, 0.2);
+}
+.threshold__info {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+}
+.threshold__text {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #b96f33;
+}
+/* 差额金额：视觉主角，放大加粗 */
+.threshold__amount {
+  font-size: 32rpx;
+  font-weight: 900;
+  color: #e25c05;
+}
+/* 去凑单：白底橙字小胶囊（在浅橙底上浮起一层），次级转化入口 */
+.threshold__go {
+  position: relative;
+  margin-left: auto;
+  min-height: 56rpx;
+  padding: 0 24rpx;
+  display: flex;
+  align-items: center;
   border-radius: 999rpx;
-  text-align: center;
+  background: #fff;
+  border: 2rpx solid rgba(226, 92, 5, 0.35);
   font-size: 24rpx;
   font-weight: 800;
   color: #e25c05;
-  background: #fdeee0;
-  border: 2rpx solid rgba(226, 92, 5, 0.25);
+  box-shadow: 0 4rpx 10rpx rgba(217, 95, 16, 0.1);
+}
+/* 命中区外扩（counter 同款）：触控目标不小于规范 */
+.threshold__go::after {
+  content: "";
+  position: absolute;
+  left: -12rpx;
+  top: -12rpx;
+  right: -12rpx;
+  bottom: -12rpx;
+}
+.threshold__go:active {
+  transform: scale(0.95);
+  opacity: 0.9;
+}
+/* 进度条：已购/门槛比例，加减商品时宽度平滑推进（高级感来源） */
+.threshold__bar {
+  margin-top: 14rpx;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: rgba(226, 92, 5, 0.12);
+  overflow: hidden;
+}
+.threshold__fill {
+  height: 100%;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #ffb37a, #ff7a21);
+  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .threshold__fill {
+    transition: none;
+  }
+  .threshold__go:active {
+    transform: none;
+  }
 }
 .cart-foot__total {
   font-size: 40rpx;
