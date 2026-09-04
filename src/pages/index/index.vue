@@ -654,6 +654,12 @@ function search() {
 }
 .hero {
   aspect-ratio: 2.55/1;
+  /* IKDEUR 五修（真凶落网）：实测 banner 渲染宽 = 视口 − 仅左 padding
+     （右 padding 不参与 swiper 宽度计算，右侧贴边 25px）——工具端老内核
+     对 swiper 组件 width:100% 的计算怪癖。视口锚定显式宽绕开百分比链，
+     左右各 28rpx 数学必然对称 */
+  width: calc(100vw - 56rpx);
+  max-width: calc(100vw - 56rpx);
   border-radius: 28rpx;
   overflow: hidden;
   margin-top: 24rpx;
@@ -710,9 +716,12 @@ function search() {
 .hero__slide--dark {
   background: linear-gradient(120deg, #1e2520 0%, #2f4436 60%, #159447 100%);
 }
-/* 空 Banner 占位（IK9RX2）：与轮播同高圆角，承载单帧品牌文案 */
+/* 空 Banner 占位（IK9RX2）：与轮播同高圆角，承载单帧品牌文案；
+   IKDEUR 五修：宽度同 .hero 视口锚定 */
 .hero--empty {
   aspect-ratio: 2.55/1;
+  width: calc(100vw - 56rpx);
+  max-width: calc(100vw - 56rpx);
   border-radius: 28rpx;
   overflow: hidden;
   margin-top: 24rpx;
