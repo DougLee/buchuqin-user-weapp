@@ -69,6 +69,33 @@ export const api = {
     request<{ image: string; scope: "building" | "campus" } | null>(
       "/wechat-group",
     ),
+  /** 抽奖大转盘（IKD6FB）：active=false 首页入口不渲染；drawnToday 供转盘页置灰 */
+  wheel: () =>
+    request<{
+      active: boolean;
+      prizes: {
+        type: "coupon" | "partner" | "none";
+        label: string;
+        bizTitle: string;
+        bizImage: string;
+        bizNote: string;
+      }[];
+      drawnToday: boolean;
+    }>("/wheel"),
+  /** 抽奖（IKD6FB）：每日 1 次；平台券自动入账，异业券返回图文 */
+  drawWheel: () =>
+    request<{
+      index: number;
+      type: "coupon" | "partner" | "none";
+      userCouponId: string | null;
+      prize: {
+        type: "coupon" | "partner" | "none";
+        label: string;
+        bizTitle: string;
+        bizImage: string;
+        bizNote: string;
+      };
+    }>("/wheel/draw", { method: "POST", body: "{}" }),
   /** 商品分类列表（IK97FA：分类页直连，替代 /home 聚合里的分类字段） */
   categories: () => request<Category[]>("/categories"),
   products: async (categoryId = "all", keyword = "") =>

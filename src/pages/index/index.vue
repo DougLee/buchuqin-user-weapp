@@ -46,9 +46,36 @@ onShow(async () => {
   promotions.value = home.promotions ?? [];
   await cart.load();
   loading.value = false;
+  // IKD6FA：双版块数据静默拉取（转盘未配置/群码未配置各自隐藏入口）
+  void loadHomeBlocks();
   // IKCNRB：数据渲染后量宽判溢出（决定右缘指示是否显示）
   setTimeout(measureCategoryOverflow, 200);
 });
+/* ---------- 首页双版块（IKD6FA）：左「天天抽奖」入口 + 右「楼栋福利群」 ---------- */
+/** 转盘配置：active=false（未配置/已下线）时不渲染左卡 */
+const wheelActive = ref(false);
+/** 群码（IKAJSZ 同源接口）：null = 未配置楼栋群与校级大群，右卡不渲染 */
+const group = ref<Awaited<ReturnType<typeof api.wechatGroup>>>(null);
+const groupOpen = ref(false);
+async function loadHomeBlocks() {
+  // 静默降级：任一失败只隐藏对应入口，不影响首页主流程
+  try {
+    wheelActive.value = (await api.wheel()).active;
+  } catch {
+    wheelActive.value = false;
+  }
+  try {
+    group.value = await api.wechatGroup();
+  } catch {
+    group.value = null;
+  }
+}
+/** 双版块区域是否渲染：左右卡都无配置时整块不占位 */
+const showHomeBlocks = computed(() => wheelActive.value || !!group.value);
+function goWheel() {
+  if (!wheelActive.value) return;
+  uni.navigateTo({ url: "/pages/wheel/index" });
+}
 /* ---------- 促销模块卡（IKAHFG/ADR-0006）：秒杀/临期各一块，倒计时走秒级跳动 ---------- */
 /** 倒计时心跳：模块卡存在才渲染时间，秒级刷新；页面卸载即清 */
 const now = ref(Date.now());
@@ -282,17 +309,34 @@ function search() {
         ><text class="hero__sub">想吃的照样有</text></view
       ></view
     >
-    <view class="delivery"
-      ><view class="delivery__item delivery__item--green"
-        ><view
-          ><text class="delivery__title">不出寝点单</text
-          ><text class="delivery__sub">零食饮料 寝室直达</text></view
-        ></view
-      ><view class="delivery__item delivery__item--orange"
-        ><view
-          ><text class="delivery__title">最快30分钟送达</text
-          ><text class="delivery__sub">楼长接力送到门口</text></view
-        ></view
+    <!-- 首页双版块（IKD6FA）：左天天抽奖（进转盘页）+ 右楼栋福利群（弹二维码）。
+         左卡转盘未配置/已下线时隐藏，右卡群码未配置时隐藏，都无则整块不渲染 -->
+    <view v-if="showHomeBlocks" class="homeblocks"
+      ><view
+        v-if="wheelActive"
+        class="homeblocks__card homeblocks__card--wheel"
+        @tap="goWheel"
+        ><text class="homeblocks__title">天天抽奖</text
+        ><text class="homeblocks__sub">每日 1 次 · 优惠券等你拿</text
+        ><view class="homeblocks__cta">去试试手气 ›</view
+        ><view class="homeblocks__wheel"
+          ><view
+            v-for="n in 8"
+            :key="n"
+            class="homeblocks__spoke"
+            :style="{ transform: `rotate(${n * 45}deg)` }"
+          /><view class="homeblocks__hub" /></view></view
+      ><view
+        v-if="group"
+        class="homeblocks__card homeblocks__card--group"
+        @tap="groupOpen = true"
+        ><view class="homeblocks__dot" /><text class="homeblocks__title"
+          >楼栋福利群</text
+        ><text class="homeblocks__sub">进群领福利 · 优惠早知道</text
+        ><view class="homeblocks__cta">一键加入 ›</view
+        ><view class="homeblocks__bubble"
+          ><view class="homeblocks__bubble-dots"
+        /></view></view
       ></view
     >
     <!-- 分类横滑条（2026-08-22）：单行展示，左右滑动看更多。
@@ -416,6 +460,24 @@ function search() {
     /></view>
   </view>
 
+  <!-- 进群弹窗（IKD6FA 复用 IKAJSZ）：show-menu-by-longpress 长按识别 -->
+  <view v-if="groupOpen && group" class="group-mask" @tap="groupOpen = false"
+    ><view class="group-pop" @tap.stop
+      ><text class="group-pop__title">{{
+        group.scope === "building" ? "本楼栋群" : "校园大群"
+      }}</text
+      ><image
+        class="group-pop__qr"
+        :src="group.image"
+        mode="widthFix"
+        show-menu-by-longpress
+      ></image
+      ><text class="group-pop__tip">长按识别二维码，加入群聊</text
+      ><button class="group-pop__close" @tap="groupOpen = false">
+        我知道了 </button
+      ></view
+    ></view
+  >
   <TabBar :current="0" />
   <CartOverlay />
 </template>
@@ -584,42 +646,6 @@ function search() {
   margin-top: 12rpx;
   font-size: 24rpx;
   color: rgba(255, 255, 255, 0.85);
-}
-.delivery {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16rpx;
-  margin-top: 20rpx;
-}
-.delivery__item {
-  min-height: 116rpx;
-  border-radius: 24rpx;
-  padding: 22rpx 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border: 2rpx solid rgba(21, 148, 71, 0.06);
-}
-.delivery__item--green {
-  background: linear-gradient(135deg, #edfae9, #f8fff5);
-  color: $primary-dark;
-}
-.delivery__item--orange {
-  background: linear-gradient(135deg, #fff4e8, #fffaf3);
-  color: $orange;
-}
-.delivery__title,
-.delivery__sub {
-  display: block;
-}
-.delivery__title {
-  font-size: 30rpx;
-  font-weight: 900;
-}
-.delivery__sub {
-  font-size: 21rpx;
-  color: $muted;
-  margin-top: 8rpx;
 }
 /* 分类横滑条（2026-08-22）：单行 scroll-x，项不压缩；右缘白色渐隐提示可滑 */
 /* IKAHBA 方案A：整条放大一档（图标 88→112 / 文字 20→24 加粗 / 项宽 112→136 /
@@ -911,5 +937,181 @@ function search() {
   50% {
     opacity: 0.55;
   }
+}
+/* ---------- 首页双版块（IKD6FA）：左天天抽奖 + 右楼栋福利群 ---------- */
+.homeblocks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+.homeblocks__card {
+  position: relative;
+  min-height: 164rpx;
+  border-radius: 28rpx;
+  padding: 24rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  overflow: hidden;
+  border: 2rpx solid rgba(21, 148, 71, 0.06);
+}
+.homeblocks__card--wheel {
+  background: linear-gradient(140deg, #e2f7e4, #f4fdf2);
+  border-color: rgba(37, 185, 90, 0.28);
+  box-shadow: 0 8rpx 24rpx rgba(7, 136, 59, 0.08);
+}
+.homeblocks__card--wheel .homeblocks__title,
+.homeblocks__card--wheel .homeblocks__cta {
+  color: $primary-dark;
+}
+.homeblocks__card--wheel .homeblocks__sub {
+  color: #2f8a52;
+}
+.homeblocks__card--group {
+  background: linear-gradient(140deg, #fff1e2, #fdf8ef);
+  border-color: rgba(255, 122, 33, 0.24);
+  box-shadow: 0 8rpx 24rpx rgba(217, 95, 16, 0.08);
+}
+.homeblocks__card--group .homeblocks__title,
+.homeblocks__card--group .homeblocks__cta {
+  color: #c2570f;
+}
+.homeblocks__card--group .homeblocks__sub {
+  color: #b96f33;
+}
+.homeblocks__title {
+  font-size: 30rpx;
+  font-weight: 900;
+  letter-spacing: 1rpx;
+}
+.homeblocks__sub {
+  font-size: 20rpx;
+  margin-top: 6rpx;
+}
+.homeblocks__cta {
+  font-size: 18rpx;
+  font-weight: 800;
+  margin-top: 12rpx;
+}
+/* 右上红点：群卡暗示新福利 */
+.homeblocks__dot {
+  position: absolute;
+  top: 18rpx;
+  right: 22rpx;
+  width: 16rpx;
+  height: 16rpx;
+  background: #ff4d2e;
+  border-radius: 50%;
+  border: 3rpx solid #fdf8ef;
+}
+/* 迷你转盘：CSS 八辐条 + 中心毂，纯装饰不拦截手势 */
+.homeblocks__wheel {
+  position: absolute;
+  right: -14rpx;
+  bottom: -18rpx;
+  width: 116rpx;
+  height: 116rpx;
+  border-radius: 50%;
+  background: #fff;
+  border: 6rpx solid #ffe9b8;
+  box-shadow: 0 6rpx 16rpx rgba(7, 136, 59, 0.18);
+  pointer-events: none;
+}
+.homeblocks__spoke {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4rpx;
+  height: 50%;
+  margin-left: -2rpx;
+  transform-origin: 50% 0;
+  background: #25b95a;
+  opacity: 0.35;
+}
+.homeblocks__hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34rpx;
+  height: 34rpx;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 32% 28%, #ffa259, #ff6a1e 60%, #e8520c);
+  border: 4rpx solid #fff;
+}
+/* 迷你群气泡 */
+.homeblocks__bubble {
+  position: absolute;
+  right: 18rpx;
+  bottom: 16rpx;
+  width: 88rpx;
+  height: 64rpx;
+  background: #ff9a5c;
+  border-radius: 20rpx 20rpx 20rpx 4rpx;
+  opacity: 0.9;
+  pointer-events: none;
+}
+.homeblocks__bubble-dots {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 30rpx;
+  height: 10rpx;
+  background: radial-gradient(circle, #fff 42%, transparent 46%);
+  background-size: 15rpx 10rpx;
+  background-repeat: repeat-x;
+}
+/* 按压反馈：轻缩放不位移 */
+.homeblocks__card:active {
+  transform: scale(0.97);
+  opacity: 0.92;
+}
+/* ---------- 进群弹窗（IKD6FA 复用 IKAJSZ 同款交互） ---------- */
+.group-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 30, 18, 0.55);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.group-pop {
+  width: 560rpx;
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 40rpx 36rpx 30rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.group-pop__title {
+  font-size: 32rpx;
+  font-weight: 900;
+  color: $primary-dark;
+}
+.group-pop__qr {
+  width: 440rpx;
+  margin: 28rpx 0 8rpx;
+  border-radius: 12rpx;
+}
+.group-pop__tip {
+  font-size: 24rpx;
+  color: $muted;
+  margin-bottom: 26rpx;
+}
+.group-pop__close {
+  width: 100%;
+  min-height: 84rpx;
+  background: $primary-soft;
+  border-radius: 20rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: $primary-dark;
+}
+.group-pop__close::after {
+  border: none;
 }
 </style>
