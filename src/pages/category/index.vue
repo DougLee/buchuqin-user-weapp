@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
 import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
+import { categoryImage } from "../../utils/categoryImage";
 import type { Category, Product } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
@@ -92,6 +93,11 @@ async function pick(id: string) {
   active.value = id;
   await load();
 }
+/** IKDBFT：快捷分类横滑条（原首页分类条同款）——仅真实 DB 分类，
+ *  「全部」「限时秒杀」伪分类留给左侧栏；点击 pick() 页内联动 */
+const quickCats = computed(() =>
+  categories.value.filter((c) => c.id !== "all" && c.id !== "seckill"),
+);
 const open = (id: string) =>
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
 /** 搜索态标题（IKAHBJ）：关键词 + 当前分类联动，让筛选范围始终可见 */
@@ -112,6 +118,24 @@ const currentName = () => {
         confirm-type="search"
         @confirm="search"
       /><button @tap="search">搜索</button></view
+    ><!-- IKDBFT：快捷分类横滑条（首页分类条同款下移），点击页内联动选中 --><scroll-view
+      v-if="quickCats.length"
+      scroll-x
+      class="quick card"
+      enhanced
+      :show-scrollbar="false"
+      ><view class="quick__row"
+        ><view
+          v-for="c in quickCats"
+          :key="c.id"
+          class="quick__item"
+          :class="{ 'quick__item--active': active === c.id }"
+          @tap="pick(c.id)"
+          ><view class="quick__icon"
+            ><image :src="categoryImage(c)" mode="aspectFit" /></view
+          ><text class="quick__name">{{ c.name }}</text></view
+        ></view
+      ></scroll-view
     ><view class="body"
       ><scroll-view scroll-y class="side"
         ><view
@@ -217,6 +241,60 @@ const currentName = () => {
   border-radius: 34rpx;
   font-size: 24rpx;
   padding: 0 30rpx;
+}
+/* IKDBFT：快捷分类横滑条（首页同款视觉：圆图+名称，偶数项奶油底） */
+.quick {
+  margin-top: 16rpx;
+  padding: 24rpx 0;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.quick__row {
+  display: inline-flex;
+  white-space: nowrap;
+}
+.quick__item {
+  flex-shrink: 0;
+  width: 136rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: $ink;
+  font-weight: 700;
+}
+.quick__icon {
+  width: 112rpx;
+  height: 112rpx;
+  margin: 0 auto 12rpx;
+  border-radius: 50%;
+  background: $primary-soft;
+  border: 4rpx solid transparent;
+  overflow: hidden;
+  transition: transform 0.12s ease;
+  box-sizing: border-box;
+}
+.quick__item:nth-child(2n) .quick__icon {
+  background: $cream;
+}
+.quick__item:active .quick__icon {
+  transform: scale(0.92);
+}
+/* 选中态：描边圈住当前分类（与左栏高亮同步） */
+.quick__item--active .quick__icon {
+  border-color: $primary;
+  background: #fff;
+}
+.quick__icon image {
+  width: 100%;
+  height: 100%;
+}
+.quick__name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quick__item--active .quick__name {
+  color: $primary-dark;
 }
 .body {
   flex: 1;

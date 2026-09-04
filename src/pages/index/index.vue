@@ -343,8 +343,10 @@ function search() {
       ></view
     >
     <!-- 分类横滑条（2026-08-22）：单行展示，左右滑动看更多。
-         IKCNRB：可滑动感知——右缘渐隐+「›」指示，滑到最右淡出 -->
-    <view class="categories card"
+         IKCNRB：可滑动感知——右缘渐隐+「›」指示，滑到最右淡出
+         IKDBFT（2026-09-04）：首页分类条下线（道哥），同款移至商品页搜索框下方；
+         整块保留，恢复 = 删除 v-if="false" -->
+    <view v-if="false" class="categories card"
       ><scroll-view
         scroll-x
         class="categories__scroll"
