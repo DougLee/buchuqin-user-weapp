@@ -969,7 +969,7 @@ function search() {
    图自带右侧装饰，right center/cover 保住装饰区，文字压左侧留白区，同色兜底 */
 .homeblocks__card--wheel {
   background:
-    url("https://static.buchuqin.com/app/public/home-card-wheel-v3.webp") right
+    url("https://static.buchuqin.com/app/public/home-card-wheel-v4.webp") right
       center / cover no-repeat,
     #e2f7e4;
   border-color: rgba(37, 185, 90, 0.28);
@@ -984,7 +984,7 @@ function search() {
 }
 .homeblocks__card--group {
   background:
-    url("https://static.buchuqin.com/app/public/home-card-group-v3.webp") right
+    url("https://static.buchuqin.com/app/public/home-card-group-v4.webp") right
       center / cover no-repeat,
     #fff1e2;
   border-color: rgba(255, 122, 33, 0.24);
