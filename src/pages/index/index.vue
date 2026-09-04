@@ -326,8 +326,10 @@ function search() {
             v-if="banner.image"
             class="hero__bg"
             :src="banner.image"
-            mode="aspectFill"
-          /><!-- IKC1AD：用户端 Banner 只显示图片，标题/副标题/角标退为内部字段；
+            mode="scaleToFill"
+          /><!-- IKDEUR 三修（道哥方案）：scaleToFill 严格铺满——图边缘完整展示、
+               零裁切零留白，展示对称性完全由设计图决定；防变形由 admin 上传口
+               自动裁切到 2.55:1 兜底 --><!-- IKC1AD：用户端 Banner 只显示图片，标题/副标题/角标退为内部字段；
                文字仅在无图兜底帧（渐变底）保留，纯色块无字不可读 --><view
             class="hero__mask"
             v-if="!banner.image && banner.badge"
