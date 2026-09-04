@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
@@ -26,19 +26,25 @@ function stockTag(line: CartLine): string {
   if (line.quantity > stock) return `库存不足，仅剩 ${stock} 件`;
   return "";
 }
+/**
+ * 起送门槛判断（IKDEUK）：与结算页 belowThreshold 同源同口径——
+ * GET /cart 返回 deliveryThreshold（分），金额 > 0 且 < 门槛才算未达标；
+ * 门槛为 0（无门槛）或已达标均为 false，提醒条与置灰都不渲染。
+ */
+const belowThreshold = computed(
+  () =>
+    cart.cart.productAmount > 0 &&
+    cart.cart.productAmount < (cart.cart.deliveryThreshold ?? 1000),
+);
+/** 差额展示（IKDEUK）：分转元固定两位小数，对齐结算页 thresholdGap 写法 */
+const thresholdGap = computed(() =>
+  fenToYuan((cart.cart.deliveryThreshold ?? 1000) - cart.cart.productAmount),
+);
 function checkout() {
   if (!cart.cart.items.length) return;
   // 低于起送门槛就地拦截（IK9YPJ）：与悬浮窗/结算页 belowThreshold 同口径
-  if (
-    cart.cart.productAmount > 0 &&
-    cart.cart.productAmount < (cart.cart.deliveryThreshold ?? 1000)
-  ) {
-    uni.showToast({
-      title: `还差 ¥${fenToYuan(
-        (cart.cart.deliveryThreshold ?? 1000) - cart.cart.productAmount,
-      )} 起送`,
-      icon: "none",
-    });
+  if (belowThreshold.value) {
+    uni.showToast({ title: `还差 ¥${thresholdGap.value} 起送`, icon: "none" });
     return;
   }
   uni.navigateTo({ url: "/pages/checkout/index" });
@@ -107,18 +113,29 @@ const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
         ></view
       ></view
     ><view class="cart-foot safe-bottom"
-      ><view
-        ><text class="muted">合计</text
-        ><text class="cart-foot__total"
-          >¥{{ fenToYuan(cart.cart.productAmount) }}</text
-        ></view
-      ><button
-        class="primary-btn cart-foot__checkout"
-        :disabled="!cart.cart.items.length"
-        @tap="checkout"
-      >
-        去结算
-      </button></view
+      ><!-- 起送门槛提醒胶丸（IKDEUK）：未达标时悬于结算行上方，达标/无门槛不渲染 --><view
+        v-if="belowThreshold"
+        class="cart-foot__threshold"
+        aria-role="alert"
+        >还差 ¥{{ thresholdGap }} 元起送</view
+      ><view class="cart-foot__row"
+        ><view
+          ><text class="muted">合计</text
+          ><text class="cart-foot__total"
+            >¥{{ fenToYuan(cart.cart.productAmount) }}</text
+          ></view
+        ><!-- 未达标置灰（IKDEUK）：不落 native disabled——微信 disabled 按钮会吞
+          tap 导致拦截 toast 出不来，改 class 置灰 + aria-disabled 语义，
+          拦截与提示统一走 checkout() --><button
+          class="primary-btn cart-foot__checkout"
+          :class="{ 'cart-foot__checkout--locked': belowThreshold }"
+          :aria-disabled="belowThreshold ? 'true' : 'false'"
+          :disabled="!cart.cart.items.length"
+          @tap="checkout"
+        >
+          去结算
+        </button></view
+      ></view
     >
   </view>
   <TabBar :current="2" />
@@ -126,8 +143,9 @@ const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
 .cart-page {
-  /* 底部补偿（IKAHBQ）：让出固定结算条(≈124rpx) + 自绘 TabBar(≈118rpx) */
-  padding-bottom: calc(270rpx + env(safe-area-inset-bottom));
+  /* 底部补偿（IKAHBQ）：让出固定结算条(≈124rpx，IKDEUK 加门槛胶丸后 ≈176rpx)
+   * + 自绘 TabBar(≈118rpx) */
+  padding-bottom: calc(330rpx + env(safe-area-inset-bottom));
 }
 .cart-head {
   display: flex;
@@ -274,7 +292,8 @@ const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
   text-align: center;
   font-weight: 900;
 }
-/* 固定结算条（IKAHBQ）：悬于自绘 TabBar 上方，低于其 z-index(990) 不抢层 */
+/* 固定结算条（IKAHBQ）：悬于自绘 TabBar 上方，低于其 z-index(990) 不抢层。
+ * IKDEUK 改纵向两层：门槛提醒胶丸在上、合计+按钮行在下 */
 .cart-foot {
   position: fixed;
   left: 0;
@@ -282,12 +301,28 @@ const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
   bottom: calc(118rpx + env(safe-area-inset-bottom));
   z-index: 20;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18rpx;
+  flex-direction: column;
+  gap: 12rpx;
   padding: 18rpx 28rpx;
   background: $surface;
   box-shadow: 0 -8rpx 24rpx rgba(21, 75, 38, 0.08);
+}
+.cart-foot__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+/* 起送门槛提醒胶丸（IKDEUK）：暖橙警示（#e25c05 系）配浅橙底，不上大红 */
+.cart-foot__threshold {
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  text-align: center;
+  font-size: 24rpx;
+  font-weight: 800;
+  color: #e25c05;
+  background: #fdeee0;
+  border: 2rpx solid rgba(226, 92, 5, 0.25);
 }
 .cart-foot__total {
   font-size: 40rpx;
@@ -300,6 +335,10 @@ const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
   margin: 0;
 }
 .cart-foot__checkout[disabled] {
+  opacity: 0.55;
+}
+/* 未达标置灰（IKDEUK）：native disabled 会吞 tap，用 class 表达置灰语义 */
+.cart-foot__checkout--locked {
   opacity: 0.55;
 }
 .primary-btn[disabled] {

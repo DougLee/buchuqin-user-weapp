@@ -669,12 +669,14 @@ function search() {
   justify-content: center;
   overflow: hidden;
 }
-/* 真图 Banner：背景图铺满 + 底部深色渐变遮罩，文字置顶保证可读 */
+/* 真图 Banner：背景图铺满 + 底部深色渐变遮罩，文字置顶保证可读。
+ * IKDEUK：原先 inset:0 与 width/height:100% 三者齐给属过约束定位
+ * （LTR 下 right 被忽略）——image 同层渲染时 100% 基准偶发取视口宽，
+ * 图右缘随即溢出 banner、右侧贴屏（左侧 28rpx 正常，右零间距）。
+ * 只留 inset:0 四边定界，尺寸由定界推导，任何基准异常都不再溢出 */
 .hero__bg {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
 }
 .hero__mask {
   position: absolute;
