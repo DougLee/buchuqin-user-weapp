@@ -315,7 +315,8 @@ function search() {
       ></view
     >
     <!-- 首页双版块（IKD6FA）：左天天抽奖（进转盘页）+ 右楼栋福利群（弹二维码）。
-         左卡转盘未配置/已下线时隐藏，右卡群码未配置时隐藏，都无则整块不渲染 -->
+         左卡转盘未配置/已下线时隐藏，右卡群码未配置时隐藏，都无则整块不渲染；
+         卡片背景图走 COS（static.buchuqin.com，图自带右侧装饰，不再叠加 CSS 装饰） -->
     <view v-if="showHomeBlocks" class="homeblocks"
       ><view
         v-if="wheelActive"
@@ -323,14 +324,7 @@ function search() {
         @tap="goWheel"
         ><text class="homeblocks__title">天天抽奖</text
         ><text class="homeblocks__sub">每日 1 次 · 优惠券等你拿</text
-        ><view class="homeblocks__cta">去试试手气 ›</view
-        ><view class="homeblocks__wheel"
-          ><view
-            v-for="n in 8"
-            :key="n"
-            class="homeblocks__spoke"
-            :style="{ transform: `rotate(${n * 45}deg)` }" /><view
-            class="homeblocks__hub" /></view></view
+        ><view class="homeblocks__cta">去试试手气 ›</view></view
       ><view
         v-if="group"
         class="homeblocks__card homeblocks__card--group"
@@ -338,9 +332,7 @@ function search() {
         ><view class="homeblocks__dot" /><text class="homeblocks__title"
           >楼栋福利群</text
         ><text class="homeblocks__sub">进群领福利 · 优惠早知道</text
-        ><view class="homeblocks__cta">一键加入 ›</view
-        ><view class="homeblocks__bubble"
-          ><view class="homeblocks__bubble-dots" /></view></view
+        ><view class="homeblocks__cta">一键加入 ›</view></view
     ></view>
     <!-- 分类横滑条（2026-08-22）：单行展示，左右滑动看更多。
          IKCNRB：可滑动感知——右缘渐隐+「›」指示，滑到最右淡出
@@ -971,8 +963,13 @@ function search() {
   overflow: hidden;
   border: 2rpx solid rgba(21, 148, 71, 0.06);
 }
+/* 卡片背景图（COS static.buchuqin.com）：图自带右侧装饰，right center/cover 保住装饰区，
+   文字压左侧留白区，底色取图上同色兜底 */
 .homeblocks__card--wheel {
-  background: linear-gradient(140deg, #e2f7e4, #f4fdf2);
+  background:
+    url("https://static.buchuqin.com/app/public/home-card-wheel.webp") right
+      center / cover no-repeat,
+    #e2f7e4;
   border-color: rgba(37, 185, 90, 0.28);
   box-shadow: 0 8rpx 24rpx rgba(7, 136, 59, 0.08);
 }
@@ -984,7 +981,10 @@ function search() {
   color: #2f8a52;
 }
 .homeblocks__card--group {
-  background: linear-gradient(140deg, #fff1e2, #fdf8ef);
+  background:
+    url("https://static.buchuqin.com/app/public/home-card-group.webp") right
+      center / cover no-repeat,
+    #fff1e2;
   border-color: rgba(255, 122, 33, 0.24);
   box-shadow: 0 8rpx 24rpx rgba(217, 95, 16, 0.08);
 }
@@ -1019,64 +1019,6 @@ function search() {
   background: #ff4d2e;
   border-radius: 50%;
   border: 3rpx solid #fdf8ef;
-}
-/* 迷你转盘：CSS 八辐条 + 中心毂，纯装饰不拦截手势 */
-.homeblocks__wheel {
-  position: absolute;
-  right: -14rpx;
-  bottom: -18rpx;
-  width: 116rpx;
-  height: 116rpx;
-  border-radius: 50%;
-  background: #fff;
-  border: 6rpx solid #ffe9b8;
-  box-shadow: 0 6rpx 16rpx rgba(7, 136, 59, 0.18);
-  pointer-events: none;
-}
-.homeblocks__spoke {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 4rpx;
-  height: 50%;
-  margin-left: -2rpx;
-  transform-origin: 50% 0;
-  background: #25b95a;
-  opacity: 0.35;
-}
-.homeblocks__hub {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 34rpx;
-  height: 34rpx;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle at 32% 28%, #ffa259, #ff6a1e 60%, #e8520c);
-  border: 4rpx solid #fff;
-}
-/* 迷你群气泡 */
-.homeblocks__bubble {
-  position: absolute;
-  right: 18rpx;
-  bottom: 16rpx;
-  width: 88rpx;
-  height: 64rpx;
-  background: #ff9a5c;
-  border-radius: 20rpx 20rpx 20rpx 4rpx;
-  opacity: 0.9;
-  pointer-events: none;
-}
-.homeblocks__bubble-dots {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 30rpx;
-  height: 10rpx;
-  background: radial-gradient(circle, #fff 42%, transparent 46%);
-  background-size: 15rpx 10rpx;
-  background-repeat: repeat-x;
 }
 /* 按压反馈：轻缩放不位移 */
 .homeblocks__card:active {
