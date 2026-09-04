@@ -71,8 +71,12 @@ async function loadHomeBlocks() {
     group.value = null;
   }
 }
-/** 双版块区域是否渲染：左右卡都无配置时整块不占位 */
-const showHomeBlocks = computed(() => wheelActive.value || !!group.value);
+/** IKDERY：右卡（福利群）恒渲染（未配置走筹备中态），左卡仍随转盘配置显隐 */
+/** IKDERY：筹备中弹窗「先去逛逛」——关弹窗直达分类页 */
+function goBrowseFromGroup() {
+  groupOpen.value = false;
+  uni.switchTab({ url: "/pages/category/index" });
+}
 /** IKDB7W：点击入口原地弹层抽奖（不跳转）；pages/wheel 薄壳仅作分享落地 */
 const wheelOpen = ref(false);
 function goWheel() {
@@ -317,7 +321,7 @@ function search() {
     <!-- 首页双版块（IKD6FA）：左天天抽奖（进转盘页）+ 右楼栋福利群（弹二维码）。
          左卡转盘未配置/已下线时隐藏，右卡群码未配置时隐藏，都无则整块不渲染；
          卡片背景图走 COS（static.buchuqin.com，图自带右侧装饰，不再叠加 CSS 装饰） -->
-    <view v-if="showHomeBlocks" class="homeblocks"
+    <view class="homeblocks"
       ><view
         v-if="wheelActive"
         class="homeblocks__card homeblocks__card--wheel"
@@ -325,14 +329,19 @@ function search() {
         ><text class="homeblocks__title">天天抽奖</text
         ><text class="homeblocks__sub">每日 1 次 · 优惠券等你拿</text
         ><view class="homeblocks__cta">去试试手气 ›</view></view
-      ><view
-        v-if="group"
+      ><!-- IKDERY：右卡未配群码也显示——红点/文案切筹备中态，点击弹窗占位 -->
+      <view
         class="homeblocks__card homeblocks__card--group"
         @tap="groupOpen = true"
-        ><view class="homeblocks__dot" /><text class="homeblocks__title"
+        ><view v-if="group" class="homeblocks__dot" /><text
+          class="homeblocks__title"
           >楼栋福利群</text
-        ><text class="homeblocks__sub">进群领福利 · 优惠早知道</text
-        ><view class="homeblocks__cta">一键加入 ›</view></view
+        ><text class="homeblocks__sub">{{
+          group ? "进群领福利 · 优惠早知道" : "福利群筹备中 · 敬请期待"
+        }}</text
+        ><view class="homeblocks__cta">{{
+          group ? "一键加入 ›" : "先逛逛福利 ›"
+        }}</view></view
     ></view>
     <!-- 分类横滑条（2026-08-22）：单行展示，左右滑动看更多。
          IKCNRB：可滑动感知——右缘渐隐+「›」指示，滑到最右淡出
@@ -457,22 +466,49 @@ function search() {
     /></view>
   </view>
 
-  <!-- 进群弹窗（IKD6FA 复用 IKAJSZ）：show-menu-by-longpress 长按识别 -->
-  <view v-if="groupOpen && group" class="group-mask" @tap="groupOpen = false"
+  <!-- 进群弹窗（IKD6FA 复用 IKAJSZ）：show-menu-by-longpress 长按识别；
+       IKDERY 未配置态：气泡占位 + 筹备中文案 + 去逛逛引导 -->
+  <view v-if="groupOpen" class="group-mask" @tap="groupOpen = false"
     ><view class="group-pop" @tap.stop
-      ><text class="group-pop__title">{{
-        group.scope === "building" ? "本楼栋群" : "校园大群"
-      }}</text
-      ><image
-        class="group-pop__qr"
-        :src="group.image"
-        mode="widthFix"
-        show-menu-by-longpress
-      ></image
-      ><text class="group-pop__tip">长按识别二维码，加入群聊</text
-      ><button class="group-pop__close" @tap="groupOpen = false">
-        我知道了
-      </button></view
+      ><!-- 已配置态：二维码 + 长按识别 -->
+      <template v-if="group"
+        ><text class="group-pop__title">{{
+          group.scope === "building" ? "本楼栋群" : "校园大群"
+        }}</text
+        ><image
+          class="group-pop__qr"
+          :src="group.image"
+          mode="widthFix"
+          show-menu-by-longpress
+        ></image
+        ><text class="group-pop__tip">长按识别二维码，加入群聊</text
+        ><button class="group-pop__close" @tap="groupOpen = false">
+          我知道了
+        </button></template
+      ><!-- 未配置态（IKDERY）：CSS 对话气泡占位 -->
+      <template v-else
+        ><text class="group-pop__title">楼栋福利群</text
+        ><view class="group-pop__placeholder"
+          ><view class="group-pop__bubble"
+            ><view class="group-pop__bubble-dots"
+              ><view /><view /><view /></view
+            ></view
+          ></view
+        ><text class="group-pop__empty-title">福利群筹备中</text
+        ><text class="group-pop__tip"
+          >楼栋专属福利与优惠早知道，群码上线后第一时间开放</text
+        ><view class="group-pop__btns"
+          ><button class="group-pop__close" @tap="groupOpen = false">
+            我知道了
+          </button>
+          <button
+            class="group-pop__primary"
+            @tap="goBrowseFromGroup"
+          >
+            先去逛逛
+          </button></view
+        ></template
+      ></view
     ></view
   >
   <!-- IKDB7W：天天抽奖原地弹层（WheelPanel 公共组件，pages/wheel 仅作分享落地） -->
@@ -1069,6 +1105,61 @@ function search() {
   font-size: 28rpx;
   font-weight: 700;
   color: $primary-dark;
+}
+/* IKDERY：未配置态——CSS 对话气泡占位 + 双按钮（次级知道了/主级先去逛逛） */
+.group-pop__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.group-pop__bubble {
+  width: 160rpx;
+  height: 120rpx;
+  margin: 30rpx 0 26rpx;
+  background: linear-gradient(135deg, #ff9a5c, #ff7a21);
+  border-radius: 36rpx 36rpx 36rpx 8rpx;
+  box-shadow: 0 10rpx 24rpx rgba(217, 95, 16, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.group-pop__bubble-dots {
+  display: flex;
+  gap: 14rpx;
+}
+.group-pop__bubble-dots view {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0.92;
+}
+.group-pop__empty-title {
+  font-size: 34rpx;
+  font-weight: 900;
+  color: #c2570f;
+  margin-bottom: 10rpx;
+}
+.group-pop__btns {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 34rpx;
+}
+.group-pop__btns .group-pop__close {
+  flex: 1;
+  min-width: 0;
+}
+.group-pop__primary {
+  flex: 1;
+  min-height: 84rpx;
+  background: linear-gradient(120deg, #ff7a21, #e25c05);
+  border-radius: 20rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #fff;
+}
+.group-pop__primary::after {
+  border: none;
 }
 .group-pop__close::after {
   border: none;
