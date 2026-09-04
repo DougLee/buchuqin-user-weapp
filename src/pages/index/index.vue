@@ -3,6 +3,7 @@ import { computed, getCurrentInstance, onUnmounted, ref } from "vue";
 import { onShareAppMessage, onShareTimeline, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import ProductCard from "../../components/ProductCard.vue";
+import WheelPanel from "../../components/WheelPanel.vue";
 import { useCartStore } from "../../stores/cart";
 import { useSessionStore } from "../../stores/session";
 import { categoryImage } from "../../utils/categoryImage";
@@ -72,9 +73,11 @@ async function loadHomeBlocks() {
 }
 /** 双版块区域是否渲染：左右卡都无配置时整块不占位 */
 const showHomeBlocks = computed(() => wheelActive.value || !!group.value);
+/** IKDB7W：点击入口原地弹层抽奖（不跳转）；pages/wheel 薄壳仅作分享落地 */
+const wheelOpen = ref(false);
 function goWheel() {
   if (!wheelActive.value) return;
-  uni.navigateTo({ url: "/pages/wheel/index" });
+  wheelOpen.value = true;
 }
 /* ---------- 促销模块卡（IKAHFG/ADR-0006）：秒杀/临期各一块，倒计时走秒级跳动 ---------- */
 /** 倒计时心跳：模块卡存在才渲染时间，秒级刷新；页面卸载即清 */
@@ -478,6 +481,19 @@ function search() {
       ></view
     ></view
   >
+  <!-- IKDB7W：天天抽奖原地弹层（WheelPanel 公共组件，pages/wheel 仅作分享落地） -->
+  <view v-if="wheelOpen" class="wheel-sheet-mask" @tap="wheelOpen = false">
+    <view class="wheel-sheet" @tap.stop>
+      <view class="wheel-sheet__close" @tap="wheelOpen = false">✕</view>
+      <view class="wheel-sheet__inner">
+        <view class="wheel-sheet__head">
+          <text class="wheel-sheet__title">天天抽奖</text>
+          <text class="wheel-sheet__sub">每日 1 次 · 优惠券等你拿</text>
+        </view>
+        <view class="wheel-sheet__panel"><WheelPanel /></view>
+      </view>
+    </view>
+  </view>
   <TabBar :current="0" />
   <CartOverlay />
 </template>
@@ -1113,5 +1129,71 @@ function search() {
 }
 .group-pop__close::after {
   border: none;
+}
+/* ---------- IKDB7W：天天抽奖弹层（压过 group-mask z-30，结果弹窗在组件内 z-100） ---------- */
+.wheel-sheet-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 30, 18, 0.6);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wheel-sheet {
+  position: relative;
+  width: 620rpx;
+  animation: wheel-sheet-in 0.26s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+@keyframes wheel-sheet-in {
+  from {
+    transform: scale(0.88);
+    opacity: 0;
+  }
+}
+.wheel-sheet__close {
+  position: absolute;
+  top: 20rpx;
+  right: 20rpx;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1rpx solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+/* 渐变只铺上半段（转盘区），规则卡落在浅底；超高内容内部滚动 */
+.wheel-sheet__inner {
+  max-height: 82vh;
+  overflow-y: auto;
+  border-radius: 32rpx;
+  background: linear-gradient(180deg, #075e2f 0%, #0a7c3b 20%, #0e9c48 32%, #f6f8f6 32.5%);
+  padding-bottom: 34rpx;
+}
+.wheel-sheet__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #fff;
+  padding: 40rpx 0 8rpx;
+}
+.wheel-sheet__title {
+  font-size: 40rpx;
+  font-weight: 900;
+  letter-spacing: 4rpx;
+  text-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.25);
+}
+.wheel-sheet__sub {
+  font-size: 22rpx;
+  opacity: 0.9;
+  margin-top: 8rpx;
+}
+.wheel-sheet__panel {
+  padding: 16rpx 30rpx 0;
 }
 </style>
