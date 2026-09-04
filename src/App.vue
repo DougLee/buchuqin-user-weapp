@@ -15,6 +15,10 @@ page {
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 30rpx;
   line-height: 1.55;
+  /* IKDEUR 四修：禁横向滚动——banner 容器被横向溢出整体右推
+     （右侧贴屏、左侧 28rpx）的根治锁；任何元素溢出不再把内容顶歪 */
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 view,
 text,
