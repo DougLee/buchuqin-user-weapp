@@ -1179,6 +1179,8 @@ function search() {
 .wheel-sheet__inner {
   max-height: 86vh;
   overflow-y: auto;
+  /* 灯串灯泡沿 460rpx 转盘环外圈分布，弹层边缘会透出 1-2px 横向溢出 → 横向裁掉 */
+  overflow-x: hidden;
   border-radius: 32rpx;
   background: linear-gradient(180deg, #0c4a2e 0%, #145c38 30%, #1f7a4b 55%, #2e8a5c 78%, #35a06b 100%);
   padding-bottom: 28rpx;
