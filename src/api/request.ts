@@ -10,6 +10,8 @@ export function toAbsoluteUrl(url: string): string {
 /** @dcloudio/types 未收录 PATCH（微信基础库 wx.request 已支持），这里放宽 method */
 type RequestOptions = Omit<UniApp.RequestOptions, "url" | "method"> & {
   method?: UniApp.RequestOptions["method"] | "PATCH";
+  /** 静默请求（IKD6FH）：失败不弹全局 toast，由调用方自行降级（如寝室列表 404 回退手填） */
+  silent?: boolean;
 };
 function isApiResult<T>(value: unknown): value is ApiResult<T> {
   return (
@@ -124,16 +126,18 @@ export async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
+  // silent 是本层约定，不透传给 uni.request（IKD6FH）
+  const { silent, ...rest } = options;
   const token = await ensureToken(path);
   const send = (authToken: string, retried: boolean) =>
     new Promise<T>((resolve, reject) => {
       uni.request({
-        ...(options as UniApp.RequestOptions),
+        ...(rest as UniApp.RequestOptions),
         url: `${BASE_URL}${path}`,
         header: {
           "content-type": "application/json",
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-          ...(options.header || {}),
+          ...(rest.header || {}),
         },
         success: async (res) => {
           // token 过期/失效：清缓存强制重登一次后重试
@@ -190,12 +194,13 @@ export async function request<T>(
               res.statusCode,
             );
           }
-          if (res.statusCode !== 401)
+          if (res.statusCode !== 401 && !silent)
             uni.showToast({ title: apiError.message, icon: "none" });
           reject(apiError);
         },
         fail() {
-          uni.showToast({ title: "网络异常，请检查网络后重试", icon: "none" });
+          if (!silent)
+            uni.showToast({ title: "网络异常，请检查网络后重试", icon: "none" });
           reject(new ApiError("网络异常，请检查网络后重试", "network"));
         },
       });

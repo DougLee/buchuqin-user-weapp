@@ -89,6 +89,13 @@ export interface Building {
   gender: string;
   available: boolean;
 }
+/** 楼栋寝室条目（IKD6FH 地址四级选择）：GET /campuses/current/buildings/:buildingId/rooms */
+export interface Room {
+  id: string;
+  floor: number;
+  /** 寝室号，如 "318" */
+  roomNo: string;
+}
 /** 订单聚合阶段（后端 statusPhase，前端 tab 直接映射；IK93GQ 12 态状态机） */
 export type OrderStatusPhase = "payment" | "fulfillment" | "done" | "exception";
 export interface Order {

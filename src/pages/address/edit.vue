@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import type { Building } from "../../types";
@@ -29,6 +29,53 @@ const floorPlaceholder = computed(() =>
     ? `${currentBuilding.value.minFloor}-${currentBuilding.value.maxFloor} 层`
     : "所在楼层",
 );
+/** 该层寝室号列表（IKD6FH）：非空 → 寝室号转 picker 选择；空/拉取失败回退手填 */
+const rooms = ref<string[]>([]);
+const roomIndex = computed(() => rooms.value.indexOf(form.room));
+/** 楼栋id+楼层 → 寝室号列表缓存（IKD6FH）：来回切层不重复请求 */
+const roomsCache = new Map<string, string[]>();
+/** 已选寝室号所属的「楼栋id:楼层」锚点（IKD6FH）：与当前组合不符才清空寝室号，
+ *  避免编辑旧地址回填时被 watcher 误清 */
+let roomAnchor = "";
+function roomKey(buildingId: string | undefined, floor: number | undefined) {
+  return `${buildingId || ""}:${floor ?? ""}`;
+}
+/** IKD6FH：拉当前楼栋+楼层的寝室列表。legacy 伪楼栋（历史地址，后台无此楼）直接跳过；
+ *  接口已 silent（404/网络失败不弹 toast），空列表或失败都保持手填 */
+async function loadRooms() {
+  const building = currentBuilding.value;
+  const floor = form.floor;
+  rooms.value = [];
+  if (!building || building.id.startsWith("legacy-") || !floor) return;
+  const key = roomKey(building.id, floor);
+  const cached = roomsCache.get(key);
+  if (cached) {
+    rooms.value = cached;
+    return;
+  }
+  try {
+    const list = await api.buildingRooms(building.id, floor);
+    const roomNos = list.map((r) => r.roomNo);
+    roomsCache.set(key, roomNos);
+    // 响应期间楼栋/楼层可能又变了：过期响应直接丢弃
+    if (currentBuilding.value?.id === building.id && form.floor === floor)
+      rooms.value = roomNos;
+  } catch {
+    /* 静默降级：该层未导入寝室数据/楼栋下架/网络失败，维持手填 input */
+  }
+}
+// 楼栋或楼层变化（IKD6FH）：已选寝室号不属于新组合时清空，并重拉该层寝室列表
+watch(
+  () => roomKey(currentBuilding.value?.id, form.floor),
+  (key) => {
+    if (roomAnchor !== key) form.room = "";
+    loadRooms();
+  },
+);
+function onRoomPick(event: { detail: { value: number | string } }) {
+  const room = rooms.value[Number(event.detail.value)];
+  if (room) form.room = room;
+}
 function onBuildingPick(event: { detail: { value: number | string } }) {
   const name = buildingNames.value[Number(event.detail.value)];
   if (name) {
@@ -69,6 +116,8 @@ onLoad(async (q) => {
       },
       ...buildings.value,
     ];
+  // IKD6FH：回填的寝室号锚定到「楼栋+楼层」，watcher 首次触发时才不会误清
+  roomAnchor = roomKey(currentBuilding.value?.id, form.floor);
 });
 async function save() {
   const floor = form.floor;
@@ -143,7 +192,22 @@ async function save() {
           :placeholder="floorPlaceholder" /></label
       ><label
         ><text>寝室号</text
-        ><input v-model="form.room" type="number" placeholder="例如：318" /></label
+        ><picker
+          v-if="rooms.length"
+          mode="selector"
+          :range="rooms"
+          :value="roomIndex"
+          @change="onRoomPick"
+          ><view class="picker" :class="{ 'picker--empty': !form.room }"
+            >{{ form.room || "请选择寝室号" }}<text class="picker__arrow"
+              >⌄</text
+            ></view
+          ></picker
+        ><input
+          v-else
+          v-model="form.room"
+          type="number"
+          placeholder="例如：318" /></label
       ><label
         ><text>联系人</text
         ><input v-model="form.contactName" placeholder="你的称呼" /></label
