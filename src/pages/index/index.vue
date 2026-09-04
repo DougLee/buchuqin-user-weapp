@@ -489,8 +489,6 @@ function search() {
       <view class="wheel-sheet__close" @tap="wheelOpen = false">✕</view>
       <view class="wheel-sheet__inner">
         <view class="wheel-sheet__head">
-          <view class="wheel-sheet__swoosh wheel-sheet__swoosh--l" />
-          <view class="wheel-sheet__swoosh wheel-sheet__swoosh--r" />
           <text class="wheel-sheet__title">天天抽奖</text>
           <view class="wheel-sheet__ribbon"
             ><text>✦ 不出寝食社 · 每日抽奖领福利 ✦</text></view
@@ -1166,69 +1164,59 @@ function search() {
   width: 64rpx;
   height: 64rpx;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1rpx solid rgba(255, 255, 255, 0.35);
-  color: #fff;
+  background: rgba(150, 20, 8, 0.55);
+  border: 3rpx solid #f2cf6e;
+  color: #ffedbe;
   font-size: 26rpx;
+  font-weight: 900;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2;
 }
-/* 满版翡翠绿→金绿（IKDBY2：高奢翡翠金风）；超高内部滚动 */
+/* IKDDHF：节庆红底背景图铺满（灯笼/烟花/金币/祥云/元宝礼盒自带底部压边），
+   超长内容滚动时底边淡入朱红避免截断感 */
 .wheel-sheet__inner {
   max-height: 86vh;
   overflow-y: auto;
-  /* 灯串灯泡沿 460rpx 转盘环外圈分布，弹层边缘会透出 1-2px 横向溢出 → 横向裁掉 */
+  /* 灯串灯泡沿转盘环外圈分布，弹层边缘会透出 1-2px 横向溢出 → 横向裁掉 */
   overflow-x: hidden;
   border-radius: 32rpx;
-  background: linear-gradient(180deg, #0c4a2e 0%, #145c38 30%, #1f7a4b 55%, #2e8a5c 78%, #35a06b 100%);
+  background:
+    linear-gradient(180deg, rgba(230, 58, 23, 0) 0%, rgba(230, 58, 23, 0) 82%, rgba(230, 58, 23, 0.85) 100%),
+    url(../../static/wheel-bg.jpg) center top / cover no-repeat,
+    #e63a17;
   padding-bottom: 28rpx;
 }
-/* 弹层头（IKDBY2 参考图）：金箔色衬线大标题 + ✦ 星点副标题 + 金弧线光带 */
+/* 弹层头（IKDDHF 参考图）：白色立体大字（多层描边阴影）+ 金珠胶囊副标题 */
 .wheel-sheet__head {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 30rpx 0 4rpx;
+  padding: 44rpx 0 8rpx;
 }
 .wheel-sheet__title {
-  font-family: serif;
-  font-size: 50rpx;
+  font-size: 76rpx;
   font-weight: 900;
-  letter-spacing: 8rpx;
-  background: linear-gradient(180deg, #f7ecc8 20%, #e6cf8f 60%, #d4b75a 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  text-shadow: 0 6rpx 20rpx rgba(3, 40, 22, 0.5);
+  letter-spacing: 10rpx;
+  color: #fff;
+  /* 白字金描边立体感：金色偏移影 + 深红投影（wx 不支持 text-stroke 时用阴影叠出） */
+  text-shadow:
+    0 3rpx 0 #f2cf6e,
+    0 6rpx 0 #d9a62e,
+    0 10rpx 16rpx rgba(140, 20, 0, 0.55);
 }
 .wheel-sheet__ribbon {
-  margin-top: 12rpx;
-  color: #d8ecc9;
-  font-size: 20rpx;
-  font-weight: 700;
+  margin-top: 20rpx;
+  padding: 8rpx 36rpx;
+  border-radius: 999rpx;
+  border: 2rpx solid #f2cf6e;
+  background: rgba(160, 26, 10, 0.55);
+  color: #ffedbe;
+  font-size: 24rpx;
+  font-weight: 800;
   letter-spacing: 4rpx;
-}
-/* 金弧线光带：标题两侧细金线（overflow 裁出弧形） */
-.wheel-sheet__swoosh {
-  position: absolute;
-  width: 140rpx;
-  height: 140rpx;
-  border: 3rpx solid rgba(230, 207, 143, 0.55);
-  border-radius: 50%;
-  filter: blur(1rpx);
-}
-.wheel-sheet__swoosh--l {
-  left: -40rpx;
-  top: 30rpx;
-  clip-path: polygon(0 0, 100% 0, 100% 60%, 0 30%);
-}
-.wheel-sheet__swoosh--r {
-  right: -40rpx;
-  top: 20rpx;
-  clip-path: polygon(0 20%, 100% 0, 100% 30%, 0 60%);
 }
 .wheel-sheet__panel {
   padding: 10rpx 24rpx 0;

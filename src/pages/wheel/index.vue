@@ -22,8 +22,6 @@ function onLoaded(state: { active: boolean; drawnToday: boolean }) {
   <view class="wheel-page">
     <view class="wheel-page__statusbar"><text>9:41</text></view>
     <view class="wheel-page__head">
-      <view class="wheel-page__swoosh wheel-page__swoosh--l" />
-      <view class="wheel-page__swoosh wheel-page__swoosh--r" />
       <text class="wheel-page__title">天天抽奖</text>
       <view class="wheel-page__ribbon"
         ><text>✦ 不出寝食社 · 每日抽奖领福利 ✦</text></view
@@ -38,55 +36,41 @@ function onLoaded(state: { active: boolean; drawnToday: boolean }) {
 <style scoped lang="scss">
 .wheel-page {
   min-height: 100vh;
-  /* 满版翡翠绿→金绿（IKDBY2，与弹窗一致） */
-  background: linear-gradient(180deg, #0c4a2e 0%, #145c38 30%, #1f7a4b 55%, #2e8a5c 82%, #35a06b 100%);
+  /* IKDDHF：与弹窗同款节庆红底背景图（灯笼/烟花/祥云压边） */
+  background: url(../../static/wheel-bg.jpg) center top / cover no-repeat, #e63a17;
   padding-bottom: 60rpx;
 }
 .wheel-page__statusbar {
   height: 88rpx;
 }
-/* 页头（IKDBY2 参考图）：金箔色衬线大标题 + ✦ 星点副标题 + 金弧线 */
+/* 页头（IKDDHF 参考图）：白色立体大字 + 金珠胶囊副标题 */
 .wheel-page__head {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding-top: 20rpx;
 }
 .wheel-page__title {
-  font-family: serif;
-  font-size: 64rpx;
+  font-size: 76rpx;
   font-weight: 900;
-  letter-spacing: 8rpx;
-  background: linear-gradient(180deg, #f7ecc8 20%, #e6cf8f 60%, #d4b75a 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  text-shadow: 0 6rpx 20rpx rgba(3, 40, 22, 0.5);
+  letter-spacing: 10rpx;
+  color: #fff;
+  text-shadow:
+    0 3rpx 0 #f2cf6e,
+    0 6rpx 0 #d9a62e,
+    0 10rpx 16rpx rgba(140, 20, 0, 0.55);
 }
 .wheel-page__ribbon {
-  margin-top: 14rpx;
-  color: #d8ecc9;
-  font-size: 22rpx;
-  font-weight: 700;
+  margin-top: 20rpx;
+  padding: 8rpx 36rpx;
+  border-radius: 999rpx;
+  border: 2rpx solid #f2cf6e;
+  background: rgba(160, 26, 10, 0.55);
+  color: #ffedbe;
+  font-size: 24rpx;
+  font-weight: 800;
   letter-spacing: 4rpx;
-}
-.wheel-page__swoosh {
-  position: absolute;
-  width: 200rpx;
-  height: 200rpx;
-  border: 3rpx solid rgba(230, 207, 143, 0.5);
-  border-radius: 50%;
-  filter: blur(1rpx);
-}
-.wheel-page__swoosh--l {
-  left: -60rpx;
-  top: 40rpx;
-  clip-path: polygon(0 0, 100% 0, 100% 60%, 0 30%);
-}
-.wheel-page__swoosh--r {
-  right: -60rpx;
-  top: 30rpx;
-  clip-path: polygon(0 20%, 100% 0, 100% 30%, 0 60%);
 }
 .wheel-page__panel {
   margin-top: 40rpx;

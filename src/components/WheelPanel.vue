@@ -122,12 +122,15 @@ function goCoupons() {
             transform: `translate(-50%,-50%) rotate(${i * 45 + 22.5}deg) translateY(-165rpx) rotate(${-(i * 45 + 22.5)}deg)`,
           }"
         >
+          <view v-if="p.type !== 'none'" class="wheel-disc__ticket"
+            ><text class="wheel-disc__ticket-yuan">¥</text></view
+          >
           <text class="wheel-disc__name">{{ p.label }}</text>
           <text v-if="p.type === 'coupon'" class="wheel-disc__tag">平台券</text>
           <text v-else-if="p.type === 'partner'" class="wheel-disc__tag"
             >异业券</text
           >
-
+          <text v-else class="wheel-disc__tag">再接再厉</text>
         </view>
       </view>
       <!-- 金色菱形宝石指针（两三角+横钉）与绿玉中心按钮 -->
@@ -144,10 +147,10 @@ function goCoupons() {
         @tap="spin"
       >
         <text class="wheel-hub__main">{{
-          !active ? "未开启" : drawnToday ? "已抽" : "抽奖"
+          !active ? "未开启" : drawnToday ? "已抽" : "开始抽奖"
         }}</text>
         <text class="wheel-hub__sub">{{
-          !active ? "敬请期待" : drawnToday ? "明日 0 点重置" : "今日第 1 次"
+          !active ? "敬请期待" : drawnToday ? "今日 0 点重置" : "今日第 1 次"
         }}</text>
       </view>
     </view>
@@ -162,11 +165,12 @@ function goCoupons() {
         <text> 次</text>
       </view>
     </view>
-    <!-- 规则卡：半透明玻璃 + 皇冠图标 + 绿数字圆点 -->
+    <!-- 规则卡：米白底 + 红花徽章标题 + 红圆数字编号（IKDDHF 参考图） -->
     <view class="wheel-rules">
       <view class="wheel-rules__title">
-        <view class="wheel-rules__crown"><text>♛</text></view>
+        <text class="wheel-rules__flower">✿</text>
         <text>活动规则</text>
+        <text class="wheel-rules__flower">✿</text>
       </view>
       <view class="wheel-rules__line">
         <text class="wheel-rules__num">1</text>
@@ -250,21 +254,21 @@ function goCoupons() {
 </template>
 
 <style scoped lang="scss">
-/* ===== 翡翠金高奢风（IKDBY2）：翡翠 #0C4A2E / 金 #C9A227 / 奶白扇区 ===== */
+/* ===== 红金节庆风（IKDDHF）：朱红 #e6332a / 金 #e8b84a / 奶白扇区 ===== */
 .wp-loading {
   text-align: center;
-  color: #f1de9a;
+  color: #ffedbe;
   font-size: 24rpx;
   padding: 80rpx 0;
 }
 /* ---------- 转盘 ---------- */
 .wheel-stage {
   position: relative;
-  width: 520rpx;
-  height: 520rpx;
+  width: 560rpx;
+  height: 560rpx;
   margin: 0 auto;
 }
-/* 灯串：白金灯泡交替落在金环上 */
+/* 灯串：金珠/白珠交替落在金环上 */
 .wheel-lights {
   position: absolute;
   inset: 0;
@@ -273,45 +277,46 @@ function goCoupons() {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 14rpx;
-  height: 14rpx;
-  margin: -7rpx 0 0 -7rpx;
+  width: 16rpx;
+  height: 16rpx;
+  margin: -8rpx 0 0 -8rpx;
   border-radius: 50%;
-  background: #fffdf2;
-  box-shadow: 0 0 14rpx 5rpx rgba(255, 250, 220, 0.9);
+  background: #fff8e0;
+  box-shadow: 0 0 16rpx 6rpx rgba(255, 236, 170, 0.9);
 }
 .wheel-lights__bulb--gold {
-  background: #f5dfa0;
-  box-shadow: 0 0 10rpx 3rpx rgba(230, 200, 120, 0.7);
+  background: #f5c860;
+  box-shadow: 0 0 12rpx 4rpx rgba(245, 200, 96, 0.75);
 }
-/* 扇区：白/奶白交替 + 鎏金环 */
+/* 扇区：奶白底 + 金环描边（配红包金背景图） */
 .wheel-disc {
   position: absolute;
-  inset: 20rpx;
+  inset: 24rpx;
   border-radius: 50%;
   /* conic 从正上方顺时针，与奖位序号一致 */
   background: conic-gradient(
-    #fbfdf8 0 45deg, #edf4e9 45deg 90deg,
-    #fbfdf8 90deg 135deg, #edf4e9 135deg 180deg,
-    #fbfdf8 180deg 225deg, #edf4e9 225deg 270deg,
-    #fbfdf8 270deg 315deg, #edf4e9 315deg 360deg
+    #fffdf6 0 45deg, #fdf3de 45deg 90deg,
+    #fffdf6 90deg 135deg, #fdf3de 135deg 180deg,
+    #fffdf6 180deg 225deg, #fdf3de 225deg 270deg,
+    #fffdf6 270deg 315deg, #fdf3de 315deg 360deg
   );
-  border: 16rpx solid #c9a227;
+  border: 18rpx solid #e8b84a;
   box-shadow:
-    0 0 0 5rpx #f1de9a,
-    0 18rpx 50rpx rgba(3, 40, 22, 0.55),
-    inset 0 0 0 5rpx rgba(201, 162, 39, 0.25);
+    0 0 0 6rpx #f7df9b,
+    0 0 0 10rpx rgba(160, 26, 10, 0.85),
+    0 20rpx 50rpx rgba(120, 15, 0, 0.55),
+    inset 0 0 0 4rpx rgba(232, 184, 74, 0.35);
   position: absolute;
   transition: transform 4.2s cubic-bezier(0.16, 0.84, 0.28, 1);
 }
-/* 扇区分隔线：8 道金细丝（IKDC7Y 高阶简洁——去掉票券/星形装饰后靠金线撑结构感） */
+/* 扇区分隔线：8 道金细丝 */
 .wheel-disc::after {
   content: "";
   position: absolute;
-  inset: 16rpx;
+  inset: 14rpx;
   border-radius: 50%;
   background: repeating-conic-gradient(
-    rgba(201, 162, 39, 0.45) 0deg 0.8deg,
+    rgba(180, 130, 40, 0.5) 0deg 0.8deg,
     transparent 0.8deg 45deg
   );
   -webkit-mask: radial-gradient(circle, transparent 30%, #000 31%);
@@ -326,34 +331,69 @@ function goCoupons() {
   align-items: center;
   white-space: nowrap;
 }
+/* 扇区小红券图标（IKDDHF 参考图）：票面锯齿用径向点阵压出来 */
+.wheel-disc__ticket {
+  position: relative;
+  width: 56rpx;
+  height: 36rpx;
+  margin-bottom: 6rpx;
+  border-radius: 8rpx;
+  background: linear-gradient(135deg, #f0524a, #d9261c);
+  border: 2rpx solid #f5c860;
+  box-shadow: 0 3rpx 8rpx rgba(160, 26, 10, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wheel-disc__ticket::before,
+.wheel-disc__ticket::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 10rpx;
+  height: 10rpx;
+  margin-top: -5rpx;
+  border-radius: 50%;
+  background: #fdf3de;
+}
+.wheel-disc__ticket::before {
+  left: -5rpx;
+}
+.wheel-disc__ticket::after {
+  right: -5rpx;
+}
+.wheel-disc__ticket-yuan {
+  color: #f7df9b;
+  font-size: 20rpx;
+  font-weight: 900;
+}
 .wheel-disc__name {
   font-size: 26rpx;
   font-weight: 900;
-  color: #1f6b3c;
+  color: #a83b14;
   letter-spacing: 1rpx;
 }
 .wheel-disc__tag {
-  font-size: 15rpx;
-  font-weight: 600;
+  font-size: 16rpx;
+  font-weight: 700;
   letter-spacing: 3rpx;
-  color: #6fae85;
-  margin-top: 4rpx;
+  color: #c98a4a;
+  margin-top: 3rpx;
 }
 .wheel-disc__label--partner .wheel-disc__name {
-  color: #b9862f;
-}
-.wheel-disc__label--partner .wheel-disc__tag {
-  color: #cfa050;
+  color: #b3621f;
 }
 .wheel-disc__label--none .wheel-disc__name {
-  color: #9aa894;
+  color: #b39a7d;
 }
-/* 扇区装饰：平台券=金票券 / 异业券=金亮星 / 谢谢参与=淡绿星 */
-/* 金色菱形宝石指针：上/下三角 + 中心横钉 */
+.wheel-disc__label--none .wheel-disc__tag {
+  color: #cbb79c;
+}
+/* 指针：顶部红底金边菱形指向盘心（IKDDHF 参考图） */
 .wheel-pointer {
   position: absolute;
   left: 50%;
-  top: -10rpx;
+  top: -14rpx;
   transform: translateX(-50%);
   z-index: 3;
   display: flex;
@@ -361,69 +401,70 @@ function goCoupons() {
   align-items: center;
 }
 .wheel-pointer__gem {
-  width: 44rpx;
-  height: 44rpx;
-  background: linear-gradient(135deg, #f7e9b8 0%, #e6cf8f 50%, #b98f2a 100%);
+  width: 46rpx;
+  height: 46rpx;
+  background: linear-gradient(135deg, #f66a55 0%, #d9261c 55%, #a81408 100%);
   transform: rotate(45deg);
-  border: 3rpx solid #f7e9b8;
-  box-shadow: 0 4rpx 12rpx rgba(150, 120, 30, 0.55);
+  border: 4rpx solid #f2cf6e;
+  border-radius: 8rpx;
+  box-shadow: 0 4rpx 12rpx rgba(120, 15, 0, 0.5);
 }
 .wheel-pointer__pin {
   width: 0;
   height: 0;
-  border-left: 14rpx solid transparent;
-  border-right: 14rpx solid transparent;
-  border-top: 30rpx solid #c9a227;
-  margin-top: -8rpx;
-  filter: drop-shadow(0 4rpx 6rpx rgba(60, 45, 5, 0.4));
+  border-left: 16rpx solid transparent;
+  border-right: 16rpx solid transparent;
+  border-top: 34rpx solid #d9261c;
+  margin-top: -6rpx;
+  filter: drop-shadow(0 4rpx 6rpx rgba(60, 10, 0, 0.45));
 }
-/* 玻璃台座：转盘下方椭圆金边底座 */
-/* 中心按钮：翡翠绿玉盘 + 金环描边 */
+/* 中心按钮：红色大圆 + 金环描边（IKDDHF 参考图「开始抽奖/已抽」） */
 .wheel-hub {
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 184rpx;
-  height: 184rpx;
+  width: 196rpx;
+  height: 196rpx;
   border-radius: 50%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #fdf6da;
-  background: radial-gradient(circle at 32% 26%, #3ba05f, #157a3e 55%, #0c5228);
-  border: 7rpx solid #e6cf8f;
+  color: #fff3cf;
+  background: radial-gradient(circle at 34% 26%, #f66a55, #d9261c 55%, #a81408);
+  border: 8rpx solid #f2cf6e;
   box-shadow:
-    0 0 0 4rpx #c9a227,
-    0 16rpx 36rpx rgba(3, 40, 22, 0.6),
-    inset 0 -10rpx 16rpx rgba(5, 40, 20, 0.5),
-    inset 0 6rpx 10rpx rgba(255, 255, 255, 0.3);
+    0 0 0 4rpx rgba(160, 26, 10, 0.9),
+    0 16rpx 36rpx rgba(120, 15, 0, 0.55),
+    inset 0 -10rpx 18rpx rgba(120, 10, 0, 0.5),
+    inset 0 8rpx 12rpx rgba(255, 220, 180, 0.35);
   z-index: 2;
 }
 .wheel-hub--pressing {
   box-shadow:
-    0 0 0 4rpx #c9a227,
-    0 6rpx 16rpx rgba(3, 40, 22, 0.6),
-    inset 0 4rpx 16rpx rgba(5, 40, 20, 0.6);
+    0 0 0 4rpx rgba(160, 26, 10, 0.9),
+    0 6rpx 16rpx rgba(120, 15, 0, 0.55),
+    inset 0 4rpx 18rpx rgba(120, 10, 0, 0.6);
 }
 .wheel-hub--disabled {
-  background: radial-gradient(circle at 32% 26%, #6f8f7d, #4d6b5a 60%, #3a5346);
+  background: radial-gradient(circle at 34% 26%, #b98f74, #8f6247 60%, #6f4832);
 }
 .wheel-hub__main {
-  font-size: 44rpx;
+  font-size: 34rpx;
   font-weight: 900;
-  letter-spacing: 6rpx;
-  text-shadow: 0 3rpx 8rpx rgba(5, 40, 20, 0.7);
+  letter-spacing: 2rpx;
+  text-shadow: 0 3rpx 8rpx rgba(120, 10, 0, 0.7);
+  text-align: center;
 }
 .wheel-hub__sub {
   font-size: 16rpx;
   font-weight: 700;
-  letter-spacing: 3rpx;
-  color: rgba(253, 246, 218, 0.92);
-  margin-top: 6rpx;
+  letter-spacing: 2rpx;
+  color: rgba(255, 243, 207, 0.95);
+  margin-top: 8rpx;
 }
-/* ---------- 次数条：半透明玻璃胶囊 ---------- */
+/* ---------- 次数条：金边深红胶囊 ---------- */
 .wheel-chance {
   display: flex;
   justify-content: center;
@@ -432,58 +473,50 @@ function goCoupons() {
 .wheel-chance__pill {
   display: inline-flex;
   align-items: baseline;
-  background: rgba(255, 255, 255, 0.18);
-  border: 2rpx solid rgba(241, 222, 154, 0.5);
-  color: #fdf6da;
+  background: rgba(150, 20, 8, 0.55);
+  border: 2rpx solid rgba(242, 207, 110, 0.7);
+  color: #ffedbe;
   font-size: 24rpx;
   font-weight: 800;
   padding: 10rpx 30rpx;
   border-radius: 999rpx;
 }
 .wheel-chance__pill .hot {
-  color: #f1de9a;
+  color: #ffd97a;
   font-size: 32rpx;
   font-weight: 900;
   margin: 0 4rpx;
 }
-/* ---------- 规则卡：半透明玻璃 + 皇冠 + 绿数字圆点 ---------- */
+/* ---------- 规则卡：米白底 + 红花徽章标题 + 红圆数字编号 ---------- */
 .wheel-rules {
   margin: 20rpx 0 0;
-  background: rgba(255, 255, 255, 0.92);
+  background: #fdf6e4;
   border-radius: 24rpx;
   padding: 20rpx 26rpx 6rpx;
-  border: 1rpx solid rgba(241, 222, 154, 0.55);
+  border: 2rpx solid #f2cf6e;
+  box-shadow: 0 10rpx 30rpx rgba(120, 15, 0, 0.3);
 }
 .wheel-rules__title {
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  font-size: 26rpx;
-  font-weight: 900;
-  color: #155232;
-  margin-bottom: 4rpx;
-}
-.wheel-rules__crown {
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #1a8a4c, #0c5228);
-  border: 3rpx solid #e6cf8f;
-  display: flex;
-  align-items: center;
   justify-content: center;
+  gap: 16rpx;
+  font-size: 28rpx;
+  font-weight: 900;
+  color: #b3231b;
+  margin-bottom: 6rpx;
+  letter-spacing: 4rpx;
 }
-.wheel-rules__crown text {
-  color: #f1de9a;
-  font-size: 22rpx;
-  margin-top: -2rpx;
+.wheel-rules__flower {
+  color: #d9261c;
+  font-size: 24rpx;
 }
 .wheel-rules__line {
   display: flex;
   align-items: flex-start;
   gap: 12rpx;
   padding: 10rpx 0;
-  border-bottom: 2rpx dashed #e2ecdc;
+  border-bottom: 2rpx dashed #ead9b4;
 }
 .wheel-rules__line:last-child {
   border-bottom: none;
@@ -493,8 +526,8 @@ function goCoupons() {
   width: 30rpx;
   height: 30rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, #2f9a55, #157a3e);
-  color: #fdf6da;
+  background: linear-gradient(135deg, #f0524a, #b3231b);
+  color: #fff3cf;
   font-size: 18rpx;
   font-weight: 900;
   display: flex;
@@ -505,14 +538,14 @@ function goCoupons() {
 .wheel-rules__text {
   flex: 1;
   font-size: 20rpx;
-  color: #4a6554;
+  color: #7c4a2d;
   line-height: 1.6;
 }
 /* ---------- 结果弹窗 ---------- */
 .wheel-mask {
   position: fixed;
   inset: 0;
-  background: rgba(3, 40, 22, 0.6);
+  background: rgba(70, 10, 0, 0.6);
   /* 高于首页弹层容器（sheet z-80），保证结果弹窗盖在弹层之上 */
   z-index: 100;
   display: flex;
@@ -522,8 +555,8 @@ function goCoupons() {
 .wheel-pop {
   position: relative;
   width: 544rpx;
-  background: linear-gradient(180deg, #fdfbf0, #f6f1de);
-  border: 2rpx solid rgba(201, 162, 39, 0.4);
+  background: linear-gradient(180deg, #fdfbf0, #f8efdc);
+  border: 2rpx solid rgba(200, 60, 30, 0.35);
   border-radius: 40rpx;
   padding: 48rpx 36rpx 32rpx;
   display: flex;
@@ -546,16 +579,16 @@ function goCoupons() {
   width: 316rpx;
   height: 64rpx;
   line-height: 64rpx;
-  background: linear-gradient(120deg, #d4b75a, #b98f2a);
-  color: #fdf6da;
+  background: linear-gradient(120deg, #f0524a, #b3231b);
+  color: #fff3cf;
   font-size: 26rpx;
   font-weight: 900;
   border-radius: 999rpx;
-  box-shadow: 0 12rpx 32rpx rgba(150, 120, 30, 0.45);
+  box-shadow: 0 12rpx 32rpx rgba(140, 20, 5, 0.45);
 }
 .wheel-pop--green .wheel-pop__ribbon {
-  background: linear-gradient(120deg, #2f9a55, #157a3e);
-  box-shadow: 0 12rpx 32rpx rgba(12, 82, 40, 0.45);
+  background: linear-gradient(120deg, #d9a62e, #b3231b);
+  box-shadow: 0 12rpx 32rpx rgba(140, 20, 5, 0.4);
 }
 .wheel-coupon {
   margin: 24rpx 0 4rpx;
@@ -564,16 +597,16 @@ function goCoupons() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #e9f4e6, #f6fbf3);
-  border: 2rpx dashed #2f9a55;
+  background: linear-gradient(135deg, #fdeeee, #fdf8f0);
+  border: 2rpx dashed #d9261c;
   border-radius: 24rpx;
 }
 .wheel-coupon__label {
   font-size: 34rpx;
   font-weight: 900;
-  color: #157a3e;
+  color: #b3231b;
 }
-/* IKDCVO：异业券票面金调（与金额券绿票区分，贴翡翠金主题） */
+/* IKDCVO：异业券票面金调（与金额券红票区分） */
 .wheel-coupon--partner {
   background: linear-gradient(135deg, #faf3df, #fdfaf1);
   border-color: #c9a227;
@@ -585,7 +618,7 @@ function goCoupons() {
   margin-top: 28rpx;
   width: 88rpx;
   height: 88rpx;
-  background: #f1de9a;
+  background: #f2cf6e;
   clip-path: polygon(
     50% 0%, 63% 34%, 98% 35%, 71% 57%, 81% 91%,
     50% 70%, 19% 91%, 29% 57%, 2% 35%, 37% 34%
@@ -600,19 +633,19 @@ function goCoupons() {
 .wheel-pop__biz {
   font-size: 26rpx;
   font-weight: 800;
-  color: #155232;
+  color: #b3621f;
   margin-top: 18rpx;
 }
 .wheel-pop__desc {
   font-size: 22rpx;
-  color: #5d6f5f;
+  color: #7c5a3a;
   line-height: 1.7;
   margin-top: 16rpx;
   white-space: pre-line;
 }
 .wheel-pop__hint {
   font-size: 18rpx;
-  color: #9aa894;
+  color: #b39a7d;
   margin-top: 12rpx;
 }
 .wheel-pop__btns {
@@ -632,13 +665,13 @@ function goCoupons() {
   justify-content: center;
 }
 .wheel-btn--ghost {
-  background: #eef3e7;
-  color: #155232;
-  border: 1rpx solid #dfe8d2;
+  background: #fdf6e4;
+  color: #b3231b;
+  border: 1rpx solid #ead9b4;
 }
 .wheel-btn--solid {
-  background: linear-gradient(120deg, #2f9a55, #157a3e);
-  color: #fdf6da;
-  box-shadow: 0 8rpx 20rpx rgba(21, 122, 62, 0.35);
+  background: linear-gradient(120deg, #f0524a, #b3231b);
+  color: #fff3cf;
+  box-shadow: 0 8rpx 20rpx rgba(179, 35, 27, 0.4);
 }
 </style>
