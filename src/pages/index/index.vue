@@ -307,7 +307,7 @@ function search() {
       /><text class="search__button" @tap="search">搜索</text></view
     >
     <swiper
-      v-if="banners.length"
+      v-if="!loading && banners.length"
       class="hero"
       autoplay
       circular
@@ -348,17 +348,28 @@ function search() {
         ></swiper-item
       ></swiper
     >
-    <!-- 空 Banner 降级（IK9RX2）：后台未配置时给一个品牌占位帧，不让轮播区塌掉 -->
-    <view v-else class="hero hero--empty"
+    <!-- 空 Banner 降级（IK9RX2）：后台未配置时给一个品牌占位帧，不让轮播区塌掉；
+         2026-09-05 骨架屏：loading 期间不闪空占位帧，改渲染同构 shimmer -->
+    <view v-else-if="!loading" class="hero hero--empty"
       ><view class="hero__slide hero__slide--green"
         ><text class="hero__title">今天不出寝</text
         ><text class="hero__sub">想吃的照样有</text></view
       ></view
     >
+    <view v-else class="hero hero--skeleton" />
     <!-- 首页双版块（IKD6FA）：左天天抽奖（进转盘页）+ 右楼栋福利群（弹二维码）。
          左卡转盘未配置/已下线时隐藏，右卡群码未配置时隐藏，都无则整块不渲染；
          卡片背景图走 COS（static.buchuqin.com，图自带右侧装饰，不再叠加 CSS 装饰） -->
-    <view class="homeblocks"
+    <!-- 2026-09-05 骨架屏：双卡区 loading 期间同构 shimmer 占位（与最终
+         版块同栅格），数据到达零跳变；真卡见下方 v-if -->
+    <view v-if="loading" class="homeblocks"
+      ><view
+        v-for="n in 2"
+        :key="n"
+        class="homeblocks__card homeblocks__card--skeleton"
+      ></view
+    ></view>
+    <view v-else class="homeblocks"
       ><view
         v-if="wheelActive"
         class="homeblocks__card homeblocks__card--wheel"
@@ -1120,6 +1131,19 @@ function search() {
 .homeblocks__card:active {
   transform: scale(0.97);
   opacity: 0.92;
+}
+/* ---------- 2026-09-05 首页骨架屏：banner/双卡与真模块同构占位，
+   shimmer 与购物车/分类条/网格全端同款（pulse 复用 .skeleton 的 keyframes） */
+.hero--skeleton {
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: pulse 1.2s infinite;
+  box-shadow: none;
+}
+.homeblocks__card--skeleton {
+  border: none;
+  box-shadow: none;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: pulse 1.2s infinite;
 }
 /* ---------- 进群弹窗（IKD6FA 复用 IKAJSZ 同款交互） ---------- */
 .group-mask {
