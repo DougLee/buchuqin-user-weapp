@@ -489,8 +489,11 @@ function search() {
       <view class="wheel-sheet__close" @tap="wheelOpen = false">✕</view>
       <view class="wheel-sheet__inner">
         <view class="wheel-sheet__head">
+          <view class="wheel-sheet__yay"><text>YAY!</text></view>
           <text class="wheel-sheet__title">天天抽奖</text>
-          <text class="wheel-sheet__sub">每日 1 次 · 优惠券等你拿</text>
+          <view class="wheel-sheet__ribbon"
+            ><text>不出寝食社 · 每日抽奖领福利</text></view
+          >
         </view>
         <view class="wheel-sheet__panel"><WheelPanel /></view>
       </view>
@@ -1169,31 +1172,54 @@ function search() {
   justify-content: center;
   z-index: 2;
 }
-/* 渐变只铺上半段（转盘区），规则卡落在浅底；超高内容内部滚动 */
+/* 渐变只铺上半段（转盘区），规则卡落在奶油浅底；超高内容内部滚动 */
 .wheel-sheet__inner {
   max-height: 82vh;
   overflow-y: auto;
   border-radius: 32rpx;
-  background: linear-gradient(180deg, #075e2f 0%, #0a7c3b 20%, #0e9c48 32%, #f6f8f6 32.5%);
+  background: linear-gradient(180deg, #ff8a00 0%, #ffa53d 20%, #ffc067 32%, #fff6e8 32.5%);
   padding-bottom: 34rpx;
 }
+/* 弹层头（IKDBJN 参考图）：YAY 气泡 + 描边大标题 + 黄丝带 */
 .wheel-sheet__head {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 44rpx 0 6rpx;
+}
+.wheel-sheet__yay {
+  position: absolute;
+  left: 56rpx;
+  top: 22rpx;
+  background: #3f9c5c;
   color: #fff;
-  padding: 40rpx 0 8rpx;
+  font-size: 20rpx;
+  font-weight: 900;
+  padding: 6rpx 18rpx;
+  border-radius: 18rpx 18rpx 18rpx 4rpx;
+  transform: rotate(-10deg);
+  box-shadow: 0 4rpx 10rpx rgba(30, 90, 50, 0.3);
 }
 .wheel-sheet__title {
-  font-size: 40rpx;
+  font-size: 52rpx;
   font-weight: 900;
   letter-spacing: 4rpx;
-  text-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.25);
+  color: #fff8e8;
+  text-shadow:
+    -2rpx -2rpx 0 #7a3e00, 2rpx -2rpx 0 #7a3e00,
+    -2rpx 2rpx 0 #7a3e00, 2rpx 2rpx 0 #7a3e00,
+    0 12rpx 28rpx rgba(122, 62, 0, 0.5);
 }
-.wheel-sheet__sub {
-  font-size: 22rpx;
-  opacity: 0.9;
-  margin-top: 8rpx;
+.wheel-sheet__ribbon {
+  margin-top: 14rpx;
+  background: #ffd24d;
+  color: #7a3e00;
+  font-size: 20rpx;
+  font-weight: 800;
+  padding: 8rpx 30rpx;
+  border-radius: 10rpx;
+  box-shadow: 0 6rpx 0 rgba(122, 62, 0, 0.18);
 }
 .wheel-sheet__panel {
   padding: 16rpx 30rpx 0;
