@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onShow } from "@dcloudio/uni-app";
 import { useCartStore } from "../stores/cart";
+import { useSessionStore } from "../stores/session";
 /**
  * 自绘 tabBar（2026-08-19）：原生 tabBar 的图标显示尺寸（约 27px）与文字字号
  * （约 10px）由微信写死不可调，道哥两轮反馈"太小不协调"后改用本组件。
@@ -18,6 +19,8 @@ const TABS = [
 ] as const;
 const props = defineProps<{ current: number }>();
 const cart = useCartStore();
+// IKDETO：「我的」tab 红点——存在未使用的新人券（首页 onShow 拉取更新）
+const session = useSessionStore();
 function go(index: number) {
   if (index === props.current) return; // 已在当前页，避免重复触发 onShow
   uni.switchTab({ url: TABS[index].path });
@@ -46,6 +49,10 @@ onShow(() => uni.hideTabBar({ animation: false, fail: () => {} }));
           class="tabbar__icon"
           :src="`/static/tabbar/tab-${tab.icon}${index === current ? '-active' : ''}.png`"
         />
+        <view
+          v-if="tab.icon === 'profile' && session.hasUsableSignupCoupon"
+          class="tabbar__dot"
+        ></view>
         <text
           v-if="tab.icon === 'cart' && cart.cart.totalQuantity > 0"
           class="tabbar__badge"
@@ -120,6 +127,16 @@ onShow(() => uni.hideTabBar({ animation: false, fail: () => {} }));
   color: #25b95a;
 }
 /* 件数角标（IKAHBQ）：口径同 CartFab，白描边在白底条上立得住 */
+.tabbar__dot {
+  position: absolute;
+  top: -6rpx;
+  right: -10rpx;
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: #ff4d2e;
+  border: 2rpx solid #fff;
+}
 .tabbar__badge {
   position: absolute;
   top: -8rpx;

@@ -29,6 +29,10 @@ export const useSessionStore = defineStore("session", {
     user: null as SessionUser | null,
     /** 首次微信登录后端给的是"微信用户"，需要引导用户改昵称 */
     needsNickname: false,
+    /** IKDETO 迎新礼包：当次登录即注册（isNewUser）——首页据此弹一次礼包弹窗 */
+    justSignedUp: false,
+    /** IKDETO 红点：存在未使用的新人（signup）券，「我的」tab 常亮 */
+    hasUsableSignupCoupon: false,
   }),
   getters: {
     nickname: (state) => readLocalNickname() || state.user?.nickname || "",
@@ -54,6 +58,8 @@ export const useSessionStore = defineStore("session", {
         const result = await api.wechatLogin(await wxLoginCode());
         uni.setStorageSync("token", result.token);
         this.applyUser(result.user);
+        // IKDETO：注册当次置位（首页 onShow 消费后自清，只弹一次）
+        this.justSignedUp = result.isNewUser === true;
       })();
       try {
         await loginInFlight;

@@ -4,6 +4,7 @@ import { onShareAppMessage, onShareTimeline, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import ProductCard from "../../components/ProductCard.vue";
 import WheelPanel from "../../components/WheelPanel.vue";
+import WelcomeGift from "../../components/WelcomeGift.vue";
 import { useCartStore } from "../../stores/cart";
 import { useSessionStore } from "../../stores/session";
 import { categoryImage } from "../../utils/categoryImage";
@@ -15,6 +16,7 @@ import type {
   Category,
   HomePromotion,
   Product,
+  UserCoupon,
 } from "../../types";
 
 const cart = useCartStore(),
@@ -47,8 +49,9 @@ onShow(async () => {
   promotions.value = home.promotions ?? [];
   await cart.load();
   loading.value = false;
-  // IKD6FA：双版块数据静默拉取（转盘未配置/群码未配置各自隐藏入口）
-  void loadHomeBlocks();
+  // IKD6FA：双版块数据静默拉取；IKDETO 迎新礼包内容同批拉取后判定弹窗
+  await loadHomeBlocks();
+  maybeShowWelcomeGift();
   // IKCNRB：数据渲染后量宽判溢出（决定右缘指示是否显示）
   setTimeout(measureCategoryOverflow, 200);
 });
@@ -70,6 +73,38 @@ async function loadHomeBlocks() {
   } catch {
     group.value = null;
   }
+  // IKDETO：signup 券一次拉取两用——迎新弹窗内容 +「我的」tab 红点
+  try {
+    const bundle = await api.coupons();
+    const now = Date.now();
+    signupCoupons.value = bundle.mine.filter(
+      (item) =>
+        item.coupon.trigger === "signup" &&
+        (item.status === "claimed" || item.status === "released") &&
+        (!item.coupon.expiresAt ||
+          new Date(item.coupon.expiresAt).getTime() > now),
+    );
+    useSessionStore().hasUsableSignupCoupon = signupCoupons.value.length > 0;
+  } catch {
+    signupCoupons.value = [];
+  }
+}
+/* ---------- IKDETO 迎新礼包：注册当次弹一次（storage 防重） ---------- */
+const signupCoupons = ref<UserCoupon[]>([]),
+  giftOpen = ref(false),
+  GIFT_SHOWN_KEY = "welcomeGiftShown";
+function maybeShowWelcomeGift() {
+  const session = useSessionStore();
+  if (!session.justSignedUp) return;
+  session.justSignedUp = false; // 一次性：当次消费即清，重登不弹
+  if (uni.getStorageSync(GIFT_SHOWN_KEY)) return;
+  if (!signupCoupons.value.length) return;
+  uni.setStorageSync(GIFT_SHOWN_KEY, true);
+  giftOpen.value = true;
+}
+function onGiftUse() {
+  giftOpen.value = false;
+  uni.switchTab({ url: "/pages/category/index" });
 }
 /** IKDERY：右卡（福利群）恒渲染（未配置走筹备中态），左卡仍随转盘配置显隐 */
 /** IKDERY：筹备中弹窗「先去逛逛」——关弹窗直达分类页 */
@@ -511,6 +546,13 @@ function search() {
       ></view
     ></view
   >
+  <!-- IKDETO 迎新礼包：注册当次弹一次 -->
+  <WelcomeGift
+    v-if="giftOpen"
+    :coupons="signupCoupons"
+    @use="onGiftUse"
+    @close="giftOpen = false"
+  />
   <!-- IKDB7W：天天抽奖原地弹层（WheelPanel 公共组件，pages/wheel 仅作分享落地） -->
   <view v-if="wheelOpen" class="wheel-sheet-mask" @tap="wheelOpen = false">
     <view class="wheel-sheet" @tap.stop>

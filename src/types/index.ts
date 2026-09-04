@@ -138,6 +138,8 @@ export interface SessionUser {
 }
 export interface LoginResult {
   token: string;
+  /** IKDETO：当次为注册（首建档）——C 端据此弹一次迎新礼包 */
+  isNewUser?: boolean;
   user: SessionUser;
 }
 export interface Coupon {
