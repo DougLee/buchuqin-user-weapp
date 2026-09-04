@@ -670,13 +670,16 @@ function search() {
   overflow: hidden;
 }
 /* 真图 Banner：背景图铺满 + 底部深色渐变遮罩，文字置顶保证可读。
- * IKDEUK：原先 inset:0 与 width/height:100% 三者齐给属过约束定位
- * （LTR 下 right 被忽略）——image 同层渲染时 100% 基准偶发取视口宽，
- * 图右缘随即溢出 banner、右侧贴屏（左侧 28rpx 正常，右零间距）。
- * 只留 inset:0 四边定界，尺寸由定界推导，任何基准异常都不再溢出 */
+ * IKDEUK 二修：image 是微信原生组件（有内在尺寸），inset 定界对它不
+ * 生效——上轮删掉显式宽高后图回落默认尺寸直接摆烂。稳妥写法 =
+ * left/top 锚定 + 显式 width/height:100%（image 必须显式宽高），不写
+ * right/bottom 避免过约束；swiper-item 已 overflow:hidden 兜底裁切 */
 .hero__bg {
   position: absolute;
-  inset: 0;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
 }
 .hero__mask {
   position: absolute;
