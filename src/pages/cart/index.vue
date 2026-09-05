@@ -55,18 +55,32 @@ const hasSoldOut = computed(() =>
     (line) => line.product.stock <= 0 || line.quantity > line.product.stock,
   ),
 );
-function checkout() {
-  if (!cart.cart.items.length) return;
-  if (hasSoldOut.value) {
-    uni.showToast({ title: "有商品库存不足，请先调整后再结算", icon: "none" });
-    return;
+/** IKDFZK 二轮（道哥）：库存实时性——页面停留期间库存可能被他人下单
+ *  或后台调整压低（加到 5 份时库存充足 → 别人买走 4 份），手里的旧
+ *  stock 会放行跳转（到结算页才报错）；点击时静默重拉一次购物车再判，
+ *  起送门槛同享最新口径。连点防抖：inFlight 期间忽略。 */
+let checkoutInFlight = false;
+async function checkout() {
+  if (!cart.cart.items.length || checkoutInFlight) return;
+  checkoutInFlight = true;
+  try {
+    await cart.load();
+    if (hasSoldOut.value) {
+      uni.showToast({
+        title: "有商品库存不足，请先调整后再结算",
+        icon: "none",
+      });
+      return;
+    }
+    // 低于起送门槛就地拦截（IK9YPJ）：与悬浮窗/结算页 belowThreshold 同口径
+    if (belowThreshold.value) {
+      uni.showToast({ title: `还差 ¥${thresholdGap.value} 起送`, icon: "none" });
+      return;
+    }
+    uni.navigateTo({ url: "/pages/checkout/index" });
+  } finally {
+    checkoutInFlight = false;
   }
-  // 低于起送门槛就地拦截（IK9YPJ）：与悬浮窗/结算页 belowThreshold 同口径
-  if (belowThreshold.value) {
-    uni.showToast({ title: `还差 ¥${thresholdGap.value} 起送`, icon: "none" });
-    return;
-  }
-  uni.navigateTo({ url: "/pages/checkout/index" });
 }
 const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
 /**
