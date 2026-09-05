@@ -47,8 +47,17 @@ const thresholdProgress = computed(() =>
     (cart.cart.productAmount / (cart.cart.deliveryThreshold ?? 1000)) * 100,
   ),
 );
+/** 售罄拦截（2026-09-05 道哥）：购物车内任一商品库存为 0 即不可结算——
+ *  按钮置灰 + 点击就地提示不跳结算页（与起送拦截同口径，ADR-0005 库存标注同源） */
+const hasSoldOut = computed(() =>
+  cart.cart.items.some((line) => line.product.stock <= 0),
+);
 function checkout() {
   if (!cart.cart.items.length) return;
+  if (hasSoldOut.value) {
+    uni.showToast({ title: "有商品已抢完，请先移除再结算", icon: "none" });
+    return;
+  }
   // 低于起送门槛就地拦截（IK9YPJ）：与悬浮窗/结算页 belowThreshold 同口径
   if (belowThreshold.value) {
     uni.showToast({ title: `还差 ¥${thresholdGap.value} 起送`, icon: "none" });
@@ -147,10 +156,10 @@ const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
           ></view
         ><!-- 未达标置灰（IKDEUK）：不落 native disabled——微信 disabled 按钮会吞
           tap 导致拦截 toast 出不来，改 class 置灰 + aria-disabled 语义，
-          拦截与提示统一走 checkout() --><button
+          拦截与提示统一走 checkout()；售罄置灰同口径（2026-09-05 道哥） --><button
           class="primary-btn cart-foot__checkout"
-          :class="{ 'cart-foot__checkout--locked': belowThreshold }"
-          :aria-disabled="belowThreshold ? 'true' : 'false'"
+          :class="{ 'cart-foot__checkout--locked': belowThreshold || hasSoldOut }"
+          :aria-disabled="belowThreshold || hasSoldOut ? 'true' : 'false'"
           :disabled="!cart.cart.items.length"
           @tap="checkout"
         >
