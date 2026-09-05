@@ -127,8 +127,8 @@ export const api = {
   /** 当前校园的楼栋预设列表（地址表单楼栋选择器） */
   buildings: () =>
     request<Building[]>("/campuses/current/buildings"),
-  /** 楼栋寝室列表（IKD6FH 地址四级选择）：floor 选填（不传=全楼）。
-   *  silent：legacy 伪楼栋必 404、未导入寝室数据的层返回空数组，页面静默回退手填不弹 toast */
+  /** 楼栋寝室列表（寝室地址三级联动数据源）：floor 选填（不传=全楼，页面拉全按层分组）。
+   *  silent：未导入寝室数据的楼返回空数组、失败不弹 toast，页面按「未录入」处理 */
   buildingRooms: (buildingId: string, floor?: number) =>
     request<Room[]>(
       `/campuses/current/buildings/${buildingId}/rooms${floor ? `?floor=${floor}` : ""}`,
