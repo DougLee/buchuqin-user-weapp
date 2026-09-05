@@ -47,15 +47,18 @@ const thresholdProgress = computed(() =>
     (cart.cart.productAmount / (cart.cart.deliveryThreshold ?? 1000)) * 100,
   ),
 );
-/** 售罄拦截（2026-09-05 道哥）：购物车内任一商品库存为 0 即不可结算——
- *  按钮置灰 + 点击就地提示不跳结算页（与起送拦截同口径，ADR-0005 库存标注同源） */
+/** 售罄/超量拦截（2026-09-05 道哥）：完全售罄(stock<=0)或数量超库存
+ *  (quantity>stock)任一存在即不可结算——按钮置灰 + 就地提示不跳结算页
+ *  （与行内 stockTag 标注、ADR-0005 库存口径同源） */
 const hasSoldOut = computed(() =>
-  cart.cart.items.some((line) => line.product.stock <= 0),
+  cart.cart.items.some(
+    (line) => line.product.stock <= 0 || line.quantity > line.product.stock,
+  ),
 );
 function checkout() {
   if (!cart.cart.items.length) return;
   if (hasSoldOut.value) {
-    uni.showToast({ title: "有商品已抢完，请先移除再结算", icon: "none" });
+    uni.showToast({ title: "有商品库存不足，请先调整后再结算", icon: "none" });
     return;
   }
   // 低于起送门槛就地拦截（IK9YPJ）：与悬浮窗/结算页 belowThreshold 同口径
