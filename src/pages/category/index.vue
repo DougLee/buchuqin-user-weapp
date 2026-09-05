@@ -118,8 +118,9 @@ const currentName = () => {
         confirm-type="search"
         @confirm="search"
       /><button @tap="search">搜索</button></view
-    ><!-- IKDBFT：快捷分类横滑条（首页分类条同款下移），点击页内联动选中 --><scroll-view
-      v-if="quickCats.length"
+    ><!-- IKDBFT：快捷分类横滑条（首页分类条同款下移），点击页内联动选中 -->
+    <!-- 2026-09-05 道哥决策暂时下线，此区域预留广告位（方案待定）；恢复 = 删除 v-if="false" --><scroll-view
+      v-if="false"
       scroll-x
       class="quick card"
       enhanced
