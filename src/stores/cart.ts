@@ -97,6 +97,24 @@ export const useCartStore = defineStore("cart", {
         () => false,
       );
     },
+    /**
+     * 整袋清空（IKDFZK）：PUT 空 items（后端全量替换语义一次清掉，含
+     * 售罄/下架钉子户行），挂串行链防与在途 set 竞争；成功标记
+     * clearedAt 让 load() 短路（同 clearLocal，防其他页 onShow 在
+     * 重拉窗口期把商品复活回来）。
+     */
+    clearAll(): Promise<boolean> {
+      const run = this._chain.then(async () => {
+        this.pending = {};
+        this.cart = await api.updateCart([]);
+        this.clearedAt = Date.now();
+      });
+      this._chain = run.catch(() => {});
+      return run.then(
+        () => true,
+        () => false,
+      );
+    },
     quantity(id: string) {
       if (id in this.pending) return this.pending[id];
       return this.cart.items.find((i) => i.product.id === id)?.quantity ?? 0;

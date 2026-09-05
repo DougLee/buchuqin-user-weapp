@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onUnmounted, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
@@ -66,12 +66,37 @@ function checkout() {
   uni.navigateTo({ url: "/pages/checkout/index" });
 }
 const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
+/**
+ * 清空购物车（IKDFZK，道哥拍板 A）：行内两击确认——首击变红「确认
+ * 清空？」3 秒内再击执行、超时自动还原（轻量防误触，不弹窗）。
+ */
+const clearArmed = ref(false);
+let clearTimer: ReturnType<typeof setTimeout> | undefined;
+onUnmounted(() => clearTimeout(clearTimer));
+function onClearCart() {
+  if (!clearArmed.value) {
+    clearArmed.value = true;
+    clearTimeout(clearTimer);
+    clearTimer = setTimeout(() => (clearArmed.value = false), 3000);
+    return;
+  }
+  clearTimeout(clearTimer);
+  clearArmed.value = false;
+  void cart.clearAll();
+}
 </script>
 <template>
   <view class="page cart-page"
     ><view class="cart-head"
       ><text class="cart-head__title">购物车</text
-      ><text class="muted">{{ cart.cart.totalQuantity }} 件</text></view
+      ><text class="muted">{{ cart.cart.totalQuantity }} 件</text
+      ><!-- IKDFZK 清空按钮（道哥）：标题行右缘，行内两击确认，空车隐藏 --><view
+        v-if="cart.cart.items.length"
+        class="cart-head__clear"
+        :class="{ 'cart-head__clear--armed': clearArmed }"
+        @tap="onClearCart"
+        >{{ clearArmed ? "确认清空？" : "清空" }}</view
+      ></view
     ><!-- 加载骨架（2026-08-24）：行卡同构占位，空车引导不再抢跑闪断 --><view
       v-if="!booted && !cart.cart.items.length"
       class="cart-list card"
@@ -186,6 +211,28 @@ const goBrowse = () => uni.switchTab({ url: "/pages/category/index" });
 .cart-head__title {
   font-size: 38rpx;
   font-weight: 900;
+}
+/* IKDFZK 清空按钮：标题行右缘幽灵胶囊；armed 态红底白字（危险确认） */
+.cart-head__clear {
+  margin-left: auto;
+  min-height: 56rpx;
+  padding: 0 22rpx;
+  display: flex;
+  align-items: center;
+  border-radius: 999rpx;
+  border: 2rpx solid rgba(226, 92, 5, 0.3);
+  color: #b96f33;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+.cart-head__clear--armed {
+  background: #e25c05;
+  border-color: #e25c05;
+  color: #fff;
+}
+.cart-head__clear:active {
+  transform: scale(0.95);
+  opacity: 0.9;
 }
 .cart-empty {
   display: flex;
