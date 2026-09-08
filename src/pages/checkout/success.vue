@@ -131,28 +131,7 @@ function openCancel() {
           >{{ order.address.buildingName }} · {{ order.address.room }}</text
         ></view
       ></view
-    ><!-- 楼栋福利群引导（IKE4FR 道哥拍板A）：内嵌卡片不阻断，每单显示；
-         未配置群不占位。二维码长按识别（aspectFit 防裁码），橙系延续首页福利群卡 -->
-    <view v-if="group" class="group-card card" role="button">
-      <view class="group-card__qrwrap">
-        <image
-          class="group-card__qr"
-          :src="group.image"
-          mode="aspectFit"
-          show-menu-by-longpress
-        />
-      </view>
-      <view class="group-card__meta">
-        <view class="group-card__head"
-          ><text class="group-card__title">{{
-            group.scope === "building" ? "本楼栋福利群" : "校园福利大群"
-          }}</text
-          ><text class="group-card__badge">官方</text></view
-        >
-        <text class="group-card__sub">配送动态 · 优惠福利，进群早知道</text>
-        <text class="group-card__hint">长按识别二维码进群</text>
-      </view>
-    </view><!-- 支付后推荐券（道哥 2026-09-08）：featured 券一键领取，
+    ><!-- 支付后推荐券（道哥 2026-09-08）：featured 券一键领取，
          领取后变已领态（券额大字左、按钮右），无推荐不占位 -->
     <view
       v-if="featuredCoupon && !couponClaimed"
@@ -182,7 +161,57 @@ function openCancel() {
       v-else-if="couponClaimed"
       class="pay-coupon pay-coupon--done card"
       >已放入你的优惠券账户，下单立减</view
-    ><!-- 支付成功页广告位（IKA57E→IKB87P 大卡版）：图上文下，最多 2 条，未配置不占位 -->
+    >
+    <view
+      v-if="featuredCoupon && !couponClaimed"
+      class="pay-coupon card"
+      role="button"
+      @tap="claimFeaturedCoupon"
+    >
+      <view class="pay-coupon__amount"
+        ><text class="pay-coupon__symbol">¥</text
+        >{{ fenToYuan(featuredCoupon.amount) }}</view
+      >
+      <view class="pay-coupon__meta">
+        <text class="pay-coupon__name">{{ featuredCoupon.name }}</text>
+        <text class="pay-coupon__cond"
+          >{{
+            featuredCoupon.threshold > 0
+              ? `满 ${fenToYuan(featuredCoupon.threshold)} 元可用`
+              : "无门槛"
+          }} · 下单自动抵扣</text
+        >
+      </view>
+      <view class="pay-coupon__btn" :class="{ 'pay-coupon__btn--busy': claimingCoupon }">
+        {{ claimingCoupon ? "领取中…" : "领取" }}
+      </view>
+    </view>
+    <view
+      v-else-if="couponClaimed"
+      class="pay-coupon pay-coupon--done card"
+      >已放入你的优惠券账户，下单立减</view
+    ><!-- 楼栋福利群引导（IKE4FR 道哥拍板A，次位于领券卡）：内嵌卡片不阻断，每单显示；
+         未配置群不占位。二维码长按识别（aspectFit 防裁码），橙系延续首页福利群卡 -->
+    <view v-if="group" class="group-card card" role="button">
+      <view class="group-card__qrwrap">
+        <image
+          class="group-card__qr"
+          :src="group.image"
+          mode="aspectFit"
+          show-menu-by-longpress
+        />
+      </view>
+      <view class="group-card__meta">
+        <view class="group-card__head"
+          ><text class="group-card__title">{{
+            group.scope === "building" ? "本楼栋福利群" : "校园福利大群"
+          }}</text
+          ><text class="group-card__badge">官方</text></view
+        >
+        <text class="group-card__sub">配送动态 · 优惠福利，进群早知道</text>
+        <text class="group-card__hint">长按识别二维码进群</text>
+      </view>
+    </view><!-- 支付成功页广告位（IKA57E→IKB87P 大卡版）：图上文下，最多 2 条，未配置不占位 -->
     <view v-if="ads.length" class="ads">
       <text class="ads__caption">为你推荐</text>
       <view
