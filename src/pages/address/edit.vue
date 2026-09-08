@@ -38,28 +38,29 @@ const floorIndex = computed(() => floors.value.indexOf(form.floor ?? -1));
 const floorRooms = computed(() =>
   allRooms.value.filter((r) => r.floor === form.floor).map((r) => r.roomNo),
 );
-/** 寝室号模糊筛选（2026-09-08 道哥）：房间多时输入数字即过滤，
- *  点选落值——值恒来自已录入列表，不破坏后端寝室校验 */
-const roomQuery = ref("");
+/**
+ * 寝室号输入自由输入 + 网格快选（2026-09-08 道哥方向）：输入直接落
+ * form.room（保存时校验是否已录入）；下拉网格为快选辅助——选项大块
+ * 触控（三列 84rpx 高），touchstart 选值先于 blur 无竞态。
+ */
 const roomDropdown = ref(false);
 const filteredRooms = computed(() => {
-  const q = roomQuery.value.trim();
+  const q = form.room.trim();
   if (!q) return floorRooms.value;
-  return floorRooms.value.filter((r) => r.includes(q));
+  // 前缀匹配排前（输 6 → 6xx 优先于 16x），包含匹配殿后
+  const starts = floorRooms.value.filter((r) => r.startsWith(q));
+  const contains = floorRooms.value.filter(
+    (r) => !r.startsWith(q) && r.includes(q),
+  );
+  return [...starts, ...contains];
 });
-// form.room 是唯一事实源（含编辑回填/切楼层清空），输入框文案随之同步
-watch(
-  () => form.room,
-  (v) => (roomQuery.value = v || ""),
-);
 function onRoomInput(event: InputEvent) {
   // uni 类型把 InputEvent.detail 收窄为 number（旧接口）——运行时是 { value }
-  roomQuery.value = (event.detail as unknown as { value: string }).value;
+  form.room = (event.detail as unknown as { value: string }).value;
   roomDropdown.value = true;
 }
-function onRoomBlur() {
-  // 延时收起：给下拉项的 tap 留出触发窗口（blur 先于 tap 的平台行为）
-  setTimeout(() => (roomDropdown.value = false), 180);
+function onRoomFocus() {
+  roomDropdown.value = true;
 }
 function pickRoom(room: string) {
   form.room = room;
@@ -171,6 +172,7 @@ onLoad(async (q) => {
 async function save() {
   const floor = form.floor;
   const building = currentBuilding.value;
+  form.room = form.room.trim(); // 输入通道可能带进空格
   if (
     !form.buildingName ||
     !floor ||
@@ -188,11 +190,17 @@ async function save() {
       uni.showToast({ title: `${building.name} 寝室数据未录入`, icon: "none" });
       return;
     }
-    if (
-      roomsLoaded.value &&
-      (!floors.value.includes(floor) || !floorRooms.value.includes(form.room))
-    ) {
-      uni.showToast({ title: "请重新选择楼层与寝室号", icon: "none" });
+    if (roomsLoaded.value && !floors.value.includes(floor)) {
+      uni.showToast({ title: "请重新选择楼层", icon: "none" });
+      return;
+    }
+    // 道哥 2026-09-08：输入自由但必须命中已录入寝室——明确报出未录入的号
+    if (roomsLoaded.value && !floorRooms.value.includes(form.room)) {
+      uni.showToast({
+        title: `「${form.room}」未在该楼层录入，请核对`,
+        icon: "none",
+        duration: 2500,
+      });
       return;
     }
   }
@@ -263,32 +271,33 @@ async function save() {
           <input
             class="room-input"
             :class="{ 'picker--empty': !form.room }"
-            :value="roomQuery"
+            :value="form.room"
             :placeholder="
-              floorRooms.length
-                ? '输入数字筛选，如 6'
-                : '请先选择楼栋与楼层'
+              floorRooms.length ? '输入寝室号，如 612' : '请先选择楼栋与楼层'
             "
             placeholder-class="room-input__ph"
             :disabled="!floorRooms.length"
             @input="onRoomInput"
-            @focus="roomDropdown = true"
-            @blur="onRoomBlur"
+            @focus="onRoomFocus"
           />
+          <!-- 快选网格：选项大块（三列 84rpx），touchstart 选值无 blur 竞态 -->
           <scroll-view
             v-if="roomDropdown && floorRooms.length"
             scroll-y
             class="room-dropdown"
           >
-            <view
-              v-for="room in filteredRooms"
-              :key="room"
-              class="room-option"
-              @tap="pickRoom(room)"
-              >{{ room }}</view
-            >
-            <view v-if="!filteredRooms.length" class="room-option room-option--empty"
-              >无匹配寝室，换个数字试试</view
+            <view class="room-grid">
+              <view
+                v-for="room in filteredRooms"
+                :key="room"
+                class="room-chip"
+                :class="{ 'room-chip--active': room === form.room }"
+                @touchstart.prevent="pickRoom(room)"
+                >{{ room }}</view
+              >
+            </view>
+            <view v-if="!filteredRooms.length" class="room-empty"
+              >「{{ form.room }}」未在该楼层录入，请核对或清空后从列表选择</view
             >
           </scroll-view>
         </view>
@@ -383,25 +392,43 @@ async function save() {
   left: 0;
   right: 0;
   z-index: 50;
-  max-height: 420rpx;
+  max-height: 480rpx;
   margin-top: 8rpx;
   background: #fff;
   border: 2rpx solid rgba(32, 74, 45, 0.12);
   border-radius: 16rpx;
-  box-shadow: 0 12rpx 30rpx rgba(21, 75, 38, 0.12);
+  box-shadow: 0 12rpx 30rpx rgba(21, 75, 38, 0.14);
 }
-.room-option {
-  padding: 20rpx 24rpx;
+/* 三列网格大选项：84rpx 高触控目标，一屏 12 个 */
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12rpx;
+  padding: 16rpx;
+}
+.room-chip {
+  min-height: 84rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14rpx;
+  border: 2rpx solid rgba(32, 74, 45, 0.14);
+  background: #fafcf9;
   font-size: 28rpx;
-  font-weight: 700;
+  font-weight: 800;
   color: $ink;
 }
-.room-option:active {
-  background: $primary-soft;
+.room-chip--active {
+  background: $primary-dark;
+  border-color: transparent;
+  color: #fff;
 }
-.room-option--empty {
+.room-empty {
+  padding: 26rpx 24rpx;
+  text-align: center;
   color: $muted;
-  font-weight: 400;
+  font-size: 24rpx;
+  line-height: 1.5;
 }
 .picker--empty {
   color: $muted;
