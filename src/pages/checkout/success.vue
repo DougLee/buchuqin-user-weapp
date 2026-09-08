@@ -160,30 +160,32 @@ function openCancel() {
       </view>
     </view><!-- 支付后推荐券（道哥 2026-09-08）：featured 券一键领取，
          领取后变已领态（券额大字左、按钮右），无推荐不占位 -->
-    <view
-      v-if="featuredCoupon && !couponClaimed"
-      class="pay-coupon card"
-      role="button"
-      @tap="claimFeaturedCoupon"
-    >
-      <view class="pay-coupon__amount"
-        ><text class="pay-coupon__symbol">¥</text
-        >{{ fenToYuan(featuredCoupon.amount) }}</view
+    <view v-if="featuredCoupon && !couponClaimed" class="pay-coupon card">
+      <!-- 金额条通底（券中心 IKA08W 同款三列：金额/信息/按钮） -->
+      <view class="pay-coupon__money"
+        ><view class="pay-coupon__money-inner"
+          ><text class="pay-coupon__symbol">¥</text
+          >{{ fenToYuan(featuredCoupon.amount) }}</view
+        ></view
       >
-      <view class="pay-coupon__meta">
-        <text class="pay-coupon__name">{{ featuredCoupon.name }}</text>
-        <text class="pay-coupon__cond"
+      <view class="pay-coupon__body"
+        ><text class="pay-coupon__name">{{ featuredCoupon.name }}</text
+        ><text class="pay-coupon__cond"
           >{{
             featuredCoupon.threshold > 0
               ? `满 ${fenToYuan(featuredCoupon.threshold)} 元可用`
               : "无门槛"
-          }} · 下单自动抵扣</text
-        >
-      </view>
-      <view class="pay-coupon__btn" :class="{ 'pay-coupon__btn--busy': claimingCoupon }">
+          }}</text
+        ></view
+      >
+      <button
+        class="pay-coupon__btn"
+        :disabled="claimingCoupon"
+        @tap.stop="claimFeaturedCoupon"
+      >
         {{ claimingCoupon ? "领取中…" : "领取" }}
-      </view>
-    </view>
+      </button></view
+    >
     <view
       v-else-if="couponClaimed"
       class="pay-coupon pay-coupon--done card"
@@ -291,18 +293,70 @@ function openCancel() {
 /* 支付后推荐券卡（道哥 2026-09-08）：券额大字左 + 信息中 + 领取钮右；
    已领态整卡弱化 */
 .pay-coupon {
+  /* 券中心同款三列（金额条通底/信息/按钮），min-height 200 与群/广告等高 */
   margin-top: 24rpx;
-  height: 200rpx;
-  padding: 0 28rpx;
+  min-height: 200rpx;
+  display: grid;
+  grid-template-columns: 150rpx 1fr auto;
+  align-items: stretch;
+  background: #fff;
+  border: 2rpx solid rgba(37, 185, 90, 0.12);
+  overflow: hidden;
+}
+.pay-coupon__money {
+  background: linear-gradient(135deg, $primary, $primary-dark);
+  color: #fff;
   display: flex;
   align-items: center;
-  gap: 24rpx;
-  /* 白底细边（虚线券边显杂，白底更简洁） */
-  background: #fff;
-  border: 2rpx solid rgba(226, 92, 5, 0.28);
+  justify-content: center;
+  font-size: 52rpx;
+  font-weight: 900;
+}
+.pay-coupon__money-inner {
+  display: flex;
+  align-items: baseline;
+  gap: 4rpx;
+}
+.pay-coupon__symbol {
+  font-size: 26rpx;
+}
+.pay-coupon__body {
+  padding: 24rpx 0 24rpx 26rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8rpx;
+  min-width: 0;
+}
+.pay-coupon__name {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: $ink;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pay-coupon__cond {
+  font-size: 22rpx;
+  color: #667069;
+}
+.pay-coupon__btn {
+  align-self: center;
+  margin: 0 26rpx;
+  min-height: 72rpx;
+  line-height: 72rpx;
+  padding: 0 34rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #41ce69, $primary);
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+.pay-coupon__btn[disabled] {
+  opacity: 0.6;
 }
 .pay-coupon--done {
-  border-style: solid;
+  border-color: rgba(37, 185, 90, 0.2);
   justify-content: center;
   color: #b96f33;
   font-weight: 700;
@@ -314,10 +368,6 @@ function openCancel() {
   color: #e25c05;
   line-height: 1;
   flex: none;
-}
-.pay-coupon__symbol {
-  font-size: 26rpx;
-  margin-right: 4rpx;
 }
 .pay-coupon__meta {
   flex: 1;
@@ -350,9 +400,6 @@ function openCancel() {
   font-size: 27rpx;
   font-weight: 900;
   box-shadow: 0 6rpx 16rpx rgba(217, 95, 16, 0.25);
-}
-.pay-coupon__btn--busy {
-  opacity: 0.6;
 }
 /* 群引导卡（IKE4FR）：橙系延续首页福利群卡认知，横向 QR+文案；
    订单卡与广告位之间（自有运营 > 商业广告），间距同 28rpx */
