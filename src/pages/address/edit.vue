@@ -54,10 +54,18 @@ const filteredRooms = computed(() => {
   );
   return [...starts, ...contains];
 });
+/** 键盘高度（keyboardheightchange）：>0 时下拉向上弹，与键盘物理隔离
+ *  （道哥 2026-09-08：键盘和列表不互相遮挡） */
+const keyboardHeight = ref(0);
+const dropUp = computed(() => keyboardHeight.value > 0);
 function onRoomInput(event: InputEvent) {
   // uni 类型把 InputEvent.detail 收窄为 number（旧接口）——运行时是 { value }
   form.room = (event.detail as unknown as { value: string }).value;
-  roomDropdown.value = true;
+  // 清空输入 → 下拉随之收起（道哥：空输入不该挂着列表）
+  roomDropdown.value = form.room.trim() !== "";
+}
+function onKeyboardHeightChange(e: { detail: { height: number } }) {
+  keyboardHeight.value = e.detail?.height ?? 0;
 }
 function onRoomFocus() {
   roomDropdown.value = true;
@@ -279,12 +287,15 @@ async function save() {
             :disabled="!floorRooms.length"
             @input="onRoomInput"
             @focus="onRoomFocus"
+            @blur="roomDropdown = false"
+            @keyboardheightchange="onKeyboardHeightChange"
           />
           <!-- 快选网格：选项大块（三列 84rpx），touchstart 选值无 blur 竞态 -->
           <scroll-view
             v-if="roomDropdown && floorRooms.length"
             scroll-y
             class="room-dropdown"
+            :class="{ 'room-dropdown--up': dropUp }"
           >
             <view class="room-grid">
               <view
@@ -400,9 +411,16 @@ async function save() {
   box-shadow: 0 12rpx 30rpx rgba(21, 75, 38, 0.14);
 }
 /* 三列网格大选项：84rpx 高触控目标，一屏 12 个 */
+/* 键盘弹起时向上弹：键盘在下方、列表在上方，互不遮挡 */
+.room-dropdown--up {
+  top: auto;
+  bottom: calc(100% + 8rpx);
+  margin-top: 0;
+  margin-bottom: 8rpx;
+}
 .room-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12rpx;
   padding: 16rpx;
 }
