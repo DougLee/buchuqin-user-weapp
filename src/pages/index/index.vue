@@ -5,6 +5,7 @@ import { api } from "../../api";
 import ProductCard from "../../components/ProductCard.vue";
 import WheelPanel from "../../components/WheelPanel.vue";
 import WelcomeGift from "../../components/WelcomeGift.vue";
+import PhoneGate from "../../components/PhoneGate.vue";
 import { useCartStore } from "../../stores/cart";
 import { useSessionStore } from "../../stores/session";
 import { categoryImage } from "../../utils/categoryImage";
@@ -214,7 +215,26 @@ function openBanner(banner: Banner) {
 /** Banner 可点性（IKC1AD）：配了长图或旧文字详情才算可点（驱动按压反馈样式） */
 const hasBannerDetail = (banner: Banner) =>
   Boolean(banner.detailImage?.trim() || banner.content?.trim());
-const add = (p: Product) => cart.set(p, cart.quantity(p.id) + 1);
+/** IKE3HT 加购收网（拍板A 不可跳过）：未绑手机号先弹授权，
+ *  绑定成功（@bound）补执行被拦的加购——用户不必再点一次 */
+const phoneGateOpen = ref(false);
+let pendingProduct: Product | undefined;
+const add = (p: Product) => {
+  if (session.needsPhone) {
+    pendingProduct = p;
+    phoneGateOpen.value = true;
+    return;
+  }
+  cart.set(p, cart.quantity(p.id) + 1);
+};
+const onPhoneBound = () => {
+  phoneGateOpen.value = false;
+  if (pendingProduct) {
+    const p = pendingProduct;
+    pendingProduct = undefined;
+    cart.set(p, cart.quantity(p.id) + 1);
+  }
+};
 /** 分享（IKC7V6）：默认分享——微信自动截当前页为分享图，落地首页 */
 onShareAppMessage(() => ({
   title: "不出寝，零食送到寝室",
@@ -561,7 +581,8 @@ function search() {
     ></view
   >
   <!-- IKDETO 迎新礼包：注册当次弹一次 -->
-  <!-- IKE3HT 方案C：首启门已撤（提审被拒），手机号改在结算页收网（checkout 挂 PhoneGate） -->
+  <!-- IKE3HT 加购收网：未绑手机号点「＋」弹授权（拍板A 不可跳过），绑定成功补执行加购 -->
+  <PhoneGate v-if="phoneGateOpen && session.needsPhone" @bound="onPhoneBound" />
   <WelcomeGift
     v-if="giftOpen"
     :coupons="signupCoupons"

@@ -3,18 +3,20 @@ import { ref } from "vue";
 import { useSessionStore } from "../stores/session";
 /**
  * 手机号授权弹层（IKE3HT 方案C，2026-09-08 道哥拍板）：
- * B 首启强授权门提审被拒（强制索权）→ 回退静默登录，改在结算页收网——
- * 未绑定手机号不能下单（下单索权属「提供服务所必需」，规范放行）。
+ * B 首启强授权门提审被拒（强制索权）→ 回退静默登录，收网提前至加购
+ * （首页商品卡/详情页，拍板A 不可跳过），结算页挂载保留兜底。
  * 不可跳过：mask 不响应点击、无关闭钮；拒绝授权停留可重试。
- * 授权成功 user.phone 更新 → 调用方 v-if="session.needsPhone" 翻转消失。
+ * 绑定成功 user.phone 更新 → 宿主 v-if 翻转隐藏，@bound 补执行被拦动作。
  */
 const session = useSessionStore();
 const binding = ref(false);
+/** 绑定成功通知宿主：加购收网场景据此补执行被拦的加购 */
+const emit = defineEmits<{ bound: [] }>();
 async function onGetPhone(e: { detail: { code?: string; errMsg?: string } }) {
   const code = e.detail?.code;
   if (!code) {
     // 用户点了微信弹窗的「拒绝」：弹层保持（不可跳过），说明原因后可重试
-    uni.showToast({ title: "需授权手机号才能下单，请重试", icon: "none" });
+    uni.showToast({ title: "需授权手机号才能加购，请重试", icon: "none" });
     return;
   }
   if (binding.value) return;
@@ -22,6 +24,7 @@ async function onGetPhone(e: { detail: { code?: string; errMsg?: string } }) {
   try {
     await session.bindPhoneByCode(code);
     uni.showToast({ title: "绑定成功", icon: "success" });
+    emit("bound");
   } catch (err) {
     uni.showToast({
       title: err instanceof Error ? err.message : "授权失败，请重试",

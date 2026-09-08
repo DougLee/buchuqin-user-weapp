@@ -3,13 +3,16 @@ import { computed, onUnmounted, ref } from "vue";
 import { onShareAppMessage, onShareTimeline, onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
+import PhoneGate from "../../components/PhoneGate.vue";
 import { useCartStore } from "../../stores/cart";
+import { useSessionStore } from "../../stores/session";
 import { fenToYuan } from "../../utils/money";
 import { countdownText, PROMO_TAG } from "../../utils/promotion";
 import { SERVICE_PHONE } from "../../utils/service";
 import type { Product } from "../../types";
 const product = ref<Product>(),
   cart = useCartStore(),
+  session = useSessionStore(),
   productId = ref(""),
   loading = ref(true),
   error = ref(false);
@@ -73,11 +76,26 @@ const add = async () => {
     uni.showToast({ title: "已抢完，看看别的吧", icon: "none" });
     return;
   }
+  // IKE3HT 加购收网（拍板A 不可跳过）：未绑手机号先授权，绑定成功补执行
+  if (session.needsPhone) {
+    pendingAdd = true;
+    phoneGateOpen.value = true;
+    return;
+  }
   const ok = await cart.set(
     product.value,
     cart.quantity(product.value.id) + 1,
   );
   if (ok) uni.showToast({ title: "已放进购物车", icon: "success" });
+};
+/** 授权弹层开合 + 被拦加购的补执行标记（@bound 消费） */
+const phoneGateOpen = ref(false);
+let pendingAdd = false;
+const onPhoneBound = () => {
+  phoneGateOpen.value = false;
+  if (!pendingAdd) return;
+  pendingAdd = false;
+  void add();
 };
 // 跨工位契约：购物车悬浮窗由工位 B 全局挂载，emit open-cart 唤起，不 import 组件
 const openCart = () => uni.$emit("open-cart");
@@ -197,6 +215,8 @@ const gallery = computed(() => {
       </button></view
     ></view
   >
+  <!-- IKE3HT 加购收网：未绑手机号点「＋」弹授权（拍板A 不可跳过），绑定成功补执行 -->
+  <PhoneGate v-if="phoneGateOpen && session.needsPhone" @bound="onPhoneBound" />
   <CartOverlay />
 </template>
 <style scoped lang="scss">
