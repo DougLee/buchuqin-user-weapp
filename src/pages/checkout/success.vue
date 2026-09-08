@@ -19,6 +19,12 @@ const orderId = ref(""),
    *  一键领取复用券中心 claimCoupon；无推荐/已领取 → 不渲染 */
   featuredCoupon = ref<Awaited<ReturnType<typeof api.coupons>>["claimable"][number]>(),
   couponClaimed = ref(false);
+  // 营销位总量 2（道哥 2026-09-08：广告+券合计最多两个）：
+  // 推荐券存在且未领 → 券占 1 槽、广告 1 条；无券/已领 → 广告 2 条
+  const marketingAdCount = computed(() =>
+    featuredCoupon.value && !couponClaimed.value ? 1 : 2,
+  );
+  const marketingAds = computed(() => ads.value.slice(0, marketingAdCount.value));
 onLoad(async (q) => {
   orderId.value = String(q?.id || "");
   // 广告位拉取失败静默（不影响支付结果展示）
@@ -212,10 +218,10 @@ function openCancel() {
         <text class="group-card__hint">长按识别二维码进群</text>
       </view>
     </view><!-- 支付成功页广告位（IKA57E→IKB87P 大卡版）：图上文下，最多 2 条，未配置不占位 -->
-    <view v-if="ads.length" class="ads">
+    <view v-if="marketingAds.length" class="ads">
       <text class="ads__caption">为你推荐</text>
       <view
-        v-for="banner in ads"
+        v-for="banner in marketingAds"
         :key="banner.id"
         class="ad card"
         role="button"
@@ -231,12 +237,6 @@ function openCancel() {
           /><text v-if="banner.badge" class="ad__badge">{{
             banner.badge
           }}</text></view
-        ><view class="ad__meta"
-          ><text class="ad__title">{{ banner.title }}</text
-          ><text v-if="banner.subtitle" class="ad__sub">{{
-            banner.subtitle
-          }}</text
-          ><text class="ad__go">查看详情 ›</text></view
         ></view
       >
     </view><view class="actions safe-bottom"
@@ -442,7 +442,7 @@ function openCancel() {
 /* 媒体区：有图铺图（aspectFill 防跳版），无图落主题色块（角标仍在） */
 .ad__media {
   position: relative;
-  height: 300rpx;
+  height: 340rpx;
   background: linear-gradient(135deg, $primary, $primary-dark);
 }
 .ad__media--orange {
@@ -466,35 +466,9 @@ function openCancel() {
   padding: 8rpx 20rpx;
   border-radius: 999rpx;
 }
-.ad__meta {
-  padding: 26rpx 28rpx 28rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-.ad__title {
-  font-size: 32rpx;
-  font-weight: 800;
-  color: $ink;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ad__sub {
-  margin-top: 10rpx;
-  font-size: 26rpx;
-  color: $muted;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ad__go {
-  margin-top: 18rpx;
-  font-size: 26rpx;
-  color: $primary;
-  font-weight: 700;
+/* 纯图卡（道哥 2026-09-08：广告只显示图片）——图为主角加高一档 */
+.ad__media {
+  height: 340rpx;
 }
 .order__row {
   display: flex;
