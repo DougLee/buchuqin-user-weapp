@@ -12,13 +12,20 @@ const orderId = ref(""),
   /** 订单卡加载中（2026-08-24）：拉单期间给同构占位，卡片不突兀弹入 */
   loading = ref(true),
   /** 支付成功页广告位（IKA57E→IKB87P 大卡版）：最多 2 条，空数组不渲染 */
-  ads = ref<Banner[]>([]);
+  ads = ref<Banner[]>([]),
+  /** 楼栋福利群引导（IKE4FR）：楼栋→校级兜底后端已做；未配置 null 不渲染 */
+  group = ref<Awaited<ReturnType<typeof api.wechatGroup>>>(null);
 onLoad(async (q) => {
   orderId.value = String(q?.id || "");
   // 广告位拉取失败静默（不影响支付结果展示）
   api
     .paySuccessBanners()
     .then((list) => (ads.value = (list ?? []).slice(0, 2)))
+    .catch(() => {});
+  // 群码拉取失败静默：卡片不渲染即可，不影响支付结果展示
+  api
+    .wechatGroup()
+    .then((g) => (group.value = g))
     .catch(() => {});
   try {
     if (orderId.value) order.value = await api.order(orderId.value);
@@ -91,7 +98,28 @@ function openCancel() {
           >{{ order.address.buildingName }} · {{ order.address.room }}</text
         ></view
       ></view
-    ><!-- 支付成功页广告位（IKA57E→IKB87P 大卡版）：图上文下，最多 2 条，未配置不占位 -->
+    ><!-- 楼栋福利群引导（IKE4FR 道哥拍板A）：内嵌卡片不阻断，每单显示；
+         未配置群不占位。二维码长按识别（aspectFit 防裁码），橙系延续首页福利群卡 -->
+    <view v-if="group" class="group-card card" role="button">
+      <view class="group-card__qrwrap">
+        <image
+          class="group-card__qr"
+          :src="group.image"
+          mode="aspectFit"
+          show-menu-by-longpress
+        />
+      </view>
+      <view class="group-card__meta">
+        <view class="group-card__head"
+          ><text class="group-card__title">{{
+            group.scope === "building" ? "本楼栋福利群" : "校园福利大群"
+          }}</text
+          ><text class="group-card__badge">官方</text></view
+        >
+        <text class="group-card__sub">配送动态 · 优惠福利，进群早知道</text>
+        <text class="group-card__hint">长按识别二维码进群</text>
+      </view>
+    </view><!-- 支付成功页广告位（IKA57E→IKB87P 大卡版）：图上文下，最多 2 条，未配置不占位 -->
     <view v-if="ads.length" class="ads">
       <text class="ads__caption">为你推荐</text>
       <view
@@ -178,6 +206,64 @@ function openCancel() {
   50% {
     opacity: 0.55;
   }
+}
+/* 群引导卡（IKE4FR）：橙系延续首页福利群卡认知，横向 QR+文案；
+   订单卡与广告位之间（自有运营 > 商业广告），间距同 28rpx */
+.group-card {
+  margin-top: 28rpx;
+  padding: 24rpx;
+  display: flex;
+  align-items: center;
+  gap: 26rpx;
+  background: linear-gradient(150deg, #fff8f0, #fff1e2);
+  border: 2rpx solid rgba(255, 122, 33, 0.22);
+}
+.group-card__qrwrap {
+  padding: 10rpx;
+  background: #fff;
+  border-radius: 14rpx;
+  flex: none;
+  box-shadow: 0 4rpx 12rpx rgba(217, 95, 16, 0.12);
+}
+.group-card__qr {
+  width: 168rpx;
+  height: 168rpx;
+  display: block;
+}
+.group-card__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.group-card__head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+.group-card__title {
+  font-size: 30rpx;
+  font-weight: 900;
+  color: #c2570f;
+}
+.group-card__badge {
+  padding: 2rpx 14rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 122, 33, 0.16);
+  color: #c2570f;
+  font-size: 18rpx;
+  font-weight: 800;
+}
+.group-card__sub {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: #b96f33;
+  font-weight: 600;
+}
+.group-card__hint {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+  color: #c98a4a;
 }
 /* 广告位大卡（IKA57E→IKB87P）：图上文下、图满卡宽，整卡可点；
    IKB5PB 间距保留（与支付信息卡 28rpx），两卡之间 24rpx */
