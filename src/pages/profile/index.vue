@@ -10,6 +10,8 @@ setupDefaultShare();
 const session = useSessionStore(),
   addresses = ref<Address[]>([]),
   usableCouponCount = ref(0),
+  // 2026-09-08 道哥：券中心待领取数
+  claimableCouponCount = ref(0),
   orderCount = ref(0),
   /** 进群二维码（IKAJSZ）：null = 后台未配置楼栋群/校园群，入口不渲染 */
   group = ref<{ image: string; scope: "building" | "campus" } | null>(null),
@@ -50,6 +52,8 @@ onShow(async () => {
         (item.status === "claimed" || item.status === "released") &&
         new Date(item.coupon.expiresAt).getTime() > now,
     ).length;
+    // 2026-09-08 道哥：优惠券行同时显示「可领」数——引导去券中心领取
+    claimableCouponCount.value = b.value.claimable.length;
   }
   if (o.status === "fulfilled") orderCount.value = o.value.length;
   loaded.value = true;
@@ -116,7 +120,12 @@ const onlineServiceFallback = () =>
         ><text>优惠券</text
         ><view class="menu__cell"
           ><text>{{
-            loaded ? `${usableCouponCount} 张可用` : "—"
+            loaded
+              ? `${usableCouponCount} 张可用` +
+                (claimableCouponCount
+                  ? ` · ${claimableCouponCount} 张待领取`
+                  : "")
+              : "—"
           }}</text
           ></view
         ></view
