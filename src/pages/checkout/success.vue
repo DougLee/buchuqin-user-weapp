@@ -275,13 +275,15 @@ function openCancel() {
 /* 支付后推荐券卡（道哥 2026-09-08）：券额大字左 + 信息中 + 领取钮右；
    已领态整卡弱化 */
 .pay-coupon {
-  margin-top: 28rpx;
-  padding: 26rpx 28rpx;
+  margin-top: 24rpx;
+  height: 200rpx;
+  padding: 0 28rpx;
   display: flex;
   align-items: center;
   gap: 24rpx;
-  background: linear-gradient(150deg, #fff8f0, #fff1e2);
-  border: 2rpx dashed rgba(226, 92, 5, 0.45);
+  /* 白底细边（虚线券边显杂，白底更简洁） */
+  background: #fff;
+  border: 2rpx solid rgba(226, 92, 5, 0.28);
 }
 .pay-coupon--done {
   border-style: solid;
@@ -339,11 +341,13 @@ function openCancel() {
 /* 群引导卡（IKE4FR）：橙系延续首页福利群卡认知，横向 QR+文案；
    订单卡与广告位之间（自有运营 > 商业广告），间距同 28rpx */
 .group-card {
-  margin-top: 28rpx;
-  padding: 26rpx 28rpx;
+  /* 三营销卡统一 200rpx 高（道哥 2026-09-08：等大更整洁） */
+  margin-top: 24rpx;
+  height: 200rpx;
+  padding: 20rpx 24rpx;
   display: flex;
   align-items: center;
-  gap: 26rpx;
+  gap: 24rpx;
   /* 背景图同首页福利群卡（home-card-group-v4：右侧装饰左侧留白），
      文案压左、QR 白底块居右，#fff1e2 兜底 */
   background:
@@ -361,8 +365,8 @@ function openCancel() {
   box-shadow: 0 4rpx 12rpx rgba(217, 95, 16, 0.12);
 }
 .group-card__qr {
-  width: 168rpx;
-  height: 168rpx;
+  width: 152rpx;
+  height: 152rpx;
   display: block;
 }
 .group-card__meta {
@@ -421,7 +425,7 @@ function openCancel() {
 /* 媒体区：有图铺图（aspectFill 防跳版），无图落主题色块（角标仍在） */
 .ad__media {
   position: relative;
-  height: 340rpx;
+  height: 200rpx;
   background: linear-gradient(135deg, $primary, $primary-dark);
 }
 .ad__media--orange {
