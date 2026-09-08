@@ -52,8 +52,9 @@ watch(
   () => form.room,
   (v) => (roomQuery.value = v || ""),
 );
-function onRoomInput(e: { detail?: { value?: string } }) {
-  roomQuery.value = e.detail?.value ?? "";
+function onRoomInput(event: InputEvent) {
+  // uni 类型把 InputEvent.detail 收窄为 number（旧接口）——运行时是 { value }
+  roomQuery.value = (event.detail as unknown as { value: string }).value;
   roomDropdown.value = true;
 }
 function onRoomBlur() {
