@@ -15,6 +15,8 @@ const orderId = ref(""),
   ads = ref<Banner[]>([]),
   /** 楼栋福利群引导（IKE4FR）：楼栋→校级兜底后端已做；未配置 null 不渲染 */
   group = ref<Awaited<ReturnType<typeof api.wechatGroup>>>(null),
+  /** 群弹窗开合（IKE4FR 二轮）：点卡片弹大码弹窗，长按识别进群（同首页交互） */
+  groupOpen = ref(false),
   /** 支付后推荐券（道哥 2026-09-08）：featured 券中面额最大的一张，
    *  一键领取复用券中心 claimCoupon；无推荐/已领取 → 不渲染 */
   featuredCoupon = ref<Awaited<ReturnType<typeof api.coupons>>["claimable"][number]>(),
@@ -140,7 +142,12 @@ function openCancel() {
     ><!-- 楼栋福利群引导（IKE4FR 道哥拍板A，先于领券卡：群、券、广告）：
      背景图与首页福利群卡同源（home-card-group-v4 右装饰左留白），
      文字压左、二维码白底块居右；未配置群不占位 -->
-    <view v-if="group" class="group-card card" role="button">
+    <view
+      v-if="group"
+      class="group-card card"
+      role="button"
+      @tap="groupOpen = true"
+    >
       <view class="group-card__meta">
         <view class="group-card__head"
           ><text class="group-card__title">{{
@@ -149,15 +156,7 @@ function openCancel() {
           ><text class="group-card__badge">官方</text></view
         >
         <text class="group-card__sub">配送动态 · 优惠福利，进群早知道</text>
-        <text class="group-card__hint">长按右侧二维码，识别进群</text>
-      </view>
-      <view class="group-card__qrwrap">
-        <image
-          class="group-card__qr"
-          :src="group.image"
-          mode="aspectFit"
-          show-menu-by-longpress
-        />
+        <text class="group-card__cta">立即加入 ›</text>
       </view>
     </view><!-- 支付后推荐券（道哥 2026-09-08）：featured 券一键领取，
          领取后变已领态（券额大字左、按钮右），无推荐不占位 -->
@@ -222,6 +221,23 @@ function openCancel() {
         @tap="openCancel"
         >{{ cancelling ? "正在取消…" : "取消订单" }}</button
       ></view
+    ></view
+  >
+  <!-- 群码弹窗（IKE4FR 二轮，同首页交互）：大码长按识别进群 -->
+  <view v-if="groupOpen" class="group-mask" @tap="groupOpen = false"
+    ><view class="group-pop" @tap.stop
+      ><text class="group-pop__title">{{
+        group?.scope === "building" ? "本楼栋群" : "校园大群"
+      }}</text
+      ><image
+        class="group-pop__qr"
+        :src="group?.image"
+        mode="widthFix"
+        show-menu-by-longpress
+      /><text class="group-pop__tip">长按识别二维码，加入群聊</text
+      ><button class="group-pop__close" @tap="groupOpen = false">
+        我知道了
+      </button></view
     ></view
   >
   <CartOverlay />
@@ -357,17 +373,58 @@ function openCancel() {
   border: 2rpx solid rgba(255, 122, 33, 0.24);
   box-shadow: 0 8rpx 24rpx rgba(217, 95, 16, 0.08);
 }
-.group-card__qrwrap {
-  padding: 10rpx;
-  background: #fff;
-  border-radius: 14rpx;
-  flex: none;
-  box-shadow: 0 4rpx 12rpx rgba(217, 95, 16, 0.12);
+/* CTA 文字（首页福利群卡同款语态） */
+.group-card__cta {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  font-weight: 900;
+  color: #c2570f;
 }
-.group-card__qr {
-  width: 152rpx;
-  height: 152rpx;
-  display: block;
+/* ===== 群码弹窗（同首页 group-mask/group-pop）：大码长按识别 ===== */
+.group-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 30, 18, 0.55);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.group-pop {
+  width: 560rpx;
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 40rpx 36rpx 30rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.group-pop__title {
+  font-size: 32rpx;
+  font-weight: 900;
+  color: $primary-dark;
+}
+.group-pop__qr {
+  width: 440rpx;
+  margin: 28rpx 0 8rpx;
+  border-radius: 12rpx;
+}
+.group-pop__tip {
+  font-size: 24rpx;
+  color: #667069;
+  margin-bottom: 26rpx;
+}
+.group-pop__close {
+  width: 100%;
+  min-height: 84rpx;
+  background: #eaf8e8;
+  border-radius: 20rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #07883b;
+}
+.group-pop__close::after {
+  border: none;
 }
 .group-card__meta {
   flex: 1;
@@ -398,11 +455,6 @@ function openCancel() {
   font-size: 24rpx;
   color: #b96f33;
   font-weight: 600;
-}
-.group-card__hint {
-  margin-top: 16rpx;
-  font-size: 22rpx;
-  color: #c98a4a;
 }
 /* 广告位大卡（IKA57E→IKB87P）：图上文下、图满卡宽，整卡可点；
    IKB5PB 间距保留（与支付信息卡 28rpx），两卡之间 24rpx */
