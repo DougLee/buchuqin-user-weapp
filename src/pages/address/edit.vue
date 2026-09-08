@@ -38,7 +38,33 @@ const floorIndex = computed(() => floors.value.indexOf(form.floor ?? -1));
 const floorRooms = computed(() =>
   allRooms.value.filter((r) => r.floor === form.floor).map((r) => r.roomNo),
 );
-const roomIndex = computed(() => floorRooms.value.indexOf(form.room));
+/** 寝室号模糊筛选（2026-09-08 道哥）：房间多时输入数字即过滤，
+ *  点选落值——值恒来自已录入列表，不破坏后端寝室校验 */
+const roomQuery = ref("");
+const roomDropdown = ref(false);
+const filteredRooms = computed(() => {
+  const q = roomQuery.value.trim();
+  if (!q) return floorRooms.value;
+  return floorRooms.value.filter((r) => r.includes(q));
+});
+// form.room 是唯一事实源（含编辑回填/切楼层清空），输入框文案随之同步
+watch(
+  () => form.room,
+  (v) => (roomQuery.value = v || ""),
+);
+function onRoomInput(e: { detail: { value: string } }) {
+  roomQuery.value = e.detail.value;
+  roomDropdown.value = true;
+}
+function onRoomBlur() {
+  // 延时收起：给下拉项的 tap 留出触发窗口（blur 先于 tap 的平台行为）
+  setTimeout(() => (roomDropdown.value = false), 180);
+}
+function pickRoom(room: string) {
+  form.room = room;
+  roomAnchor = roomKey(currentBuilding.value?.id, form.floor);
+  roomDropdown.value = false;
+}
 /** 真实楼栋但没录寝室数据：出提示、楼层/寝室置灰、禁保存（套餐A） */
 const noRoomData = computed(() => {
   const building = currentBuilding.value;
@@ -97,14 +123,6 @@ watch(
 function onFloorPick(event: { detail: { value: number | string } }) {
   const floor = floors.value[Number(event.detail.value)];
   if (floor !== undefined) form.floor = floor;
-}
-function onRoomPick(event: { detail: { value: number | string } }) {
-  const room = floorRooms.value[Number(event.detail.value)];
-  if (room) {
-    form.room = room;
-    // 选中即锚定：层间来回切不丢已选寝室
-    roomAnchor = roomKey(currentBuilding.value?.id, form.floor);
-  }
 }
 function onBuildingPick(event: { detail: { value: number | string } }) {
   const name = buildingNames.value[Number(event.detail.value)];
@@ -239,18 +257,41 @@ async function save() {
         ></label
       ><label
         ><text>寝室号</text
-        ><picker
-          mode="selector"
-          :range="floorRooms"
-          :value="roomIndex"
-          :disabled="!floorRooms.length"
-          @change="onRoomPick"
-          ><view class="picker" :class="{ 'picker--empty': !form.room }"
-            >{{ form.room || "请选择寝室号" }}<text class="picker__arrow"
-              >⌄</text
-            ></view
-          ></picker
-        ></label
+        ><!-- 2026-09-08 道哥：房间多，滚轮改输入即筛选——值恒来自已录入列表 -->
+        <view class="room-select">
+          <input
+            class="room-input"
+            :class="{ 'picker--empty': !form.room }"
+            :value="roomQuery"
+            :placeholder="
+              floorRooms.length
+                ? '输入数字筛选，如 6'
+                : '请先选择楼栋与楼层'
+            "
+            placeholder-class="room-input__ph"
+            :disabled="!floorRooms.length"
+            @input="onRoomInput"
+            @focus="roomDropdown = true"
+            @blur="onRoomBlur"
+          />
+          <scroll-view
+            v-if="roomDropdown && floorRooms.length"
+            scroll-y
+            class="room-dropdown"
+          >
+            <view
+              v-for="room in filteredRooms"
+              :key="room"
+              class="room-option"
+              @tap="pickRoom(room)"
+              >{{ room }}</view
+            >
+            <view v-if="!filteredRooms.length" class="room-option room-option--empty"
+              >无匹配寝室，换个数字试试</view
+            >
+          </scroll-view>
+        </view>
+      </label
       ><label
         ><text>联系人</text
         ><input v-model="form.contactName" placeholder="你的称呼" /></label
@@ -320,6 +361,46 @@ async function save() {
   justify-content: space-between;
   font-size: 30rpx;
   font-weight: 700;
+}
+.room-select {
+  position: relative;
+}
+.room-input {
+  min-height: 68rpx;
+  width: 100%;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: $ink;
+}
+.room-input__ph {
+  color: $muted;
+  font-weight: 400;
+}
+.room-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 420rpx;
+  margin-top: 8rpx;
+  background: #fff;
+  border: 2rpx solid rgba(32, 74, 45, 0.12);
+  border-radius: 16rpx;
+  box-shadow: 0 12rpx 30rpx rgba(21, 75, 38, 0.12);
+}
+.room-option {
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: $ink;
+}
+.room-option:active {
+  background: $primary-soft;
+}
+.room-option--empty {
+  color: $muted;
+  font-weight: 400;
 }
 .picker--empty {
   color: $muted;
