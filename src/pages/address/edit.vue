@@ -52,8 +52,8 @@ watch(
   () => form.room,
   (v) => (roomQuery.value = v || ""),
 );
-function onRoomInput(e: { detail: { value: string } }) {
-  roomQuery.value = e.detail.value;
+function onRoomInput(e: { detail?: { value?: string } }) {
+  roomQuery.value = e.detail?.value ?? "";
   roomDropdown.value = true;
 }
 function onRoomBlur() {
