@@ -403,7 +403,10 @@ async function save() {
   left: 0;
   right: 0;
   z-index: 50;
-  max-height: 480rpx;
+  /* 行对齐定高：恰好 3 整行（84×3 + 行距×2 + 内边距 32 + 边框 4）——
+     不出现半行截断；更多行在弹窗内 scroll-y 滚动（道哥 2026-09-08） */
+  max-height: 312rpx;
+  box-sizing: border-box;
   margin-top: 8rpx;
   background: #fff;
   border: 2rpx solid rgba(32, 74, 45, 0.12);
