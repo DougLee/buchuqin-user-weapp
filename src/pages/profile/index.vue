@@ -70,6 +70,28 @@ const callService = () =>
 /** 在线客服 H5 降级：button open-type="contact" 仅小程序端可用 */
 const onlineServiceFallback = () =>
   uni.showToast({ title: "请在小程序中使用在线客服", icon: "none" });
+/** IKE3HT 方案C：我的页补绑入口（未绑定时显示）——可跳过，不强求 */
+const phoneBinding = ref(false);
+async function onGetPhone(e: { detail: { code?: string } }) {
+  const code = e.detail?.code;
+  if (!code) {
+    uni.showToast({ title: "未完成授权，可稍后再绑", icon: "none" });
+    return;
+  }
+  if (phoneBinding.value) return;
+  phoneBinding.value = true;
+  try {
+    await session.bindPhoneByCode(code);
+    uni.showToast({ title: "绑定成功", icon: "success" });
+  } catch (err) {
+    uni.showToast({
+      title: err instanceof Error ? err.message : "绑定失败，请重试",
+      icon: "none",
+    });
+  } finally {
+    phoneBinding.value = false;
+  }
+}
 </script>
 <template>
   <view class="page profile"
@@ -111,7 +133,21 @@ const onlineServiceFallback = () =>
         ><text class="muted">我的订单</text></view
       ></view
     ><view class="menu card"
-      ><!-- IK9SO5：消息中心未实现，入口先隐藏（页面保留，功能落地后再放出） --><view @tap="goOrders"
+      ><!-- IK9SO5：消息中心未实现，入口先隐藏（页面保留，功能落地后再放出） --><!-- IKE3HT 方案C：未绑手机号的补绑入口（结算页强收网外的主动通道） --><button
+        v-if="session.needsPhone"
+        class="menu__service"
+        open-type="getPhoneNumber"
+        :disabled="phoneBinding"
+        @getphonenumber="onGetPhone"
+      >
+        <text>绑定手机号</text>
+        <view class="menu__cell"
+          ><text>{{
+            phoneBinding ? "绑定中…" : "接收订单与配送通知"
+          }}</text></view
+        >
+      </button>
+      <view @tap="goOrders"
         ><text>我的订单</text
         ><view class="menu__cell"
           ><text>查看全部订单</text></view

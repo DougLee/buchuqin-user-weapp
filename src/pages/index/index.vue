@@ -5,7 +5,6 @@ import { api } from "../../api";
 import ProductCard from "../../components/ProductCard.vue";
 import WheelPanel from "../../components/WheelPanel.vue";
 import WelcomeGift from "../../components/WelcomeGift.vue";
-import PhoneGate from "../../components/PhoneGate.vue";
 import { useCartStore } from "../../stores/cart";
 import { useSessionStore } from "../../stores/session";
 import { categoryImage } from "../../utils/categoryImage";
@@ -562,8 +561,7 @@ function search() {
     ></view
   >
   <!-- IKDETO 迎新礼包：注册当次弹一次 -->
-  <!-- IKE3HT 强授权门：未绑定手机号全屏拦截（含 TabBar），绑定后自动消失 -->
-  <PhoneGate v-if="session.needsPhone" />
+  <!-- IKE3HT 方案C：首启门已撤（提审被拒），手机号改在结算页收网（checkout 挂 PhoneGate） -->
   <WelcomeGift
     v-if="giftOpen"
     :coupons="signupCoupons"

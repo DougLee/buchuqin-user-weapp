@@ -3,7 +3,9 @@ import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
+import PhoneGate from "../../components/PhoneGate.vue";
 import { useCartStore } from "../../stores/cart";
+import { useSessionStore } from "../../stores/session";
 import { fenToYuan } from "../../utils/money";
 import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
 import type { Address, Cart, UserCoupon } from "../../types";
@@ -31,6 +33,11 @@ const address = ref<Address>(),
   slots = ref<Array<{ id: string; label: string; available: boolean }>>([]);
 const usableCoupons = ref<UserCoupon[]>([]),
   selectedCouponId = ref<string>();
+/**
+ * IKE3HT 方案C：结算页收网——未绑手机号弹授权层（不可跳过），
+ * 不授权不能下单。session.user 就绪后 needsPhone 响应式驱动弹层。
+ */
+const session = useSessionStore();
 const selectedCoupon = computed(
   () =>
     usableCoupons.value.find((item) => item.id === selectedCouponId.value) ??
@@ -129,6 +136,9 @@ async function load() {
   loading.value = false;
 }
 onShow(() => {
+  // IKE3HT 方案C：扫码/分享直达本页可能未登录，ensureLogin 就绪后
+  // needsPhone 驱动授权弹层（已绑定用户全程无感）；失败不阻塞结算渲染
+  void session.ensureLogin().catch(() => {});
   load();
   void preloadPayTemplates();
 });
@@ -162,6 +172,8 @@ async function chooseCoupon(item: UserCoupon | null) {
 }
 async function submit() {
   if (submitting.value) return;
+  // IKE3HT 方案C：未绑手机号不放行下单（弹层常在，此为极端时序守卫）
+  if (session.needsPhone) return;
   // 无地址前置校验（IK9AWI）：不再等后端报错
   if (!address.value) {
     uni.showToast({ title: "请先添加寝室地址", icon: "none" });
@@ -338,6 +350,8 @@ async function submit() {
     ></template
     ></view
   >
+  <!-- IKE3HT 方案C：未绑手机号授权弹层（z-1100 盖支付栏，不可跳过） -->
+  <PhoneGate v-if="session.needsPhone" />
   <CartOverlay />
 </template>
 <style scoped lang="scss">

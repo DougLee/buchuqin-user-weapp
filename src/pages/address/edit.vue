@@ -2,6 +2,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { useSessionStore } from "../../stores/session";
 import type { Building, Room } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
@@ -151,6 +152,11 @@ onLoad(async (q) => {
   ]);
   if (buildingRes.status === "fulfilled") buildings.value = buildingRes.value;
   if (campusRes.status === "fulfilled") campusName.value = campusRes.value.name;
+  // IKE3HT 方案C：新建地址联系电话默认带出账号已绑手机号（可改）；
+  // 编辑已有地址不覆盖原值。session 未就绪（未登录上下文）不预填
+  if (!editId.value && !form.phone) {
+    form.phone = useSessionStore().user?.phone || "";
+  }
   if (!editId.value) return;
   const list = await api.addresses();
   const found = list.find((a) => a.id === editId.value);
