@@ -5,6 +5,7 @@ import { api } from "../../api";
 import ProductCard from "../../components/ProductCard.vue";
 import WheelPanel from "../../components/WheelPanel.vue";
 import WelcomeGift from "../../components/WelcomeGift.vue";
+import PhoneGate from "../../components/PhoneGate.vue";
 import { useCartStore } from "../../stores/cart";
 import { useSessionStore } from "../../stores/session";
 import { categoryImage } from "../../utils/categoryImage";
@@ -19,6 +20,7 @@ import type {
   UserCoupon,
 } from "../../types";
 
+const session = useSessionStore(); // IKE3HT 强授权门模板绑定
 const cart = useCartStore(),
   // IKAJT2：校区名接口下发（home().campus.name），空串时模板兜底「选择校区」
   campus = ref(""),
@@ -560,6 +562,8 @@ function search() {
     ></view
   >
   <!-- IKDETO 迎新礼包：注册当次弹一次 -->
+  <!-- IKE3HT 强授权门：未绑定手机号全屏拦截（含 TabBar），绑定后自动消失 -->
+  <PhoneGate v-if="session.needsPhone" />
   <WelcomeGift
     v-if="giftOpen"
     :coupons="signupCoupons"

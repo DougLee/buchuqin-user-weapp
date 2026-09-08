@@ -36,6 +36,8 @@ export const useSessionStore = defineStore("session", {
   }),
   getters: {
     nickname: (state) => readLocalNickname() || state.user?.nickname || "",
+    /** IKE3HT 强授权门：已登录但未绑定手机号 = 拦截（未登录时不拦，登录流程自己走） */
+    needsPhone: (state) => !!state.user && !state.user.phone,
   },
   actions: {
     async ensureLogin() {
