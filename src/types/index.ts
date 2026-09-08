@@ -160,6 +160,8 @@ export interface Coupon {
   expiresAt: string | null;
   total?: number;
   remain?: number;
+  /** 支付后推荐（道哥 2026-09-08）：支付成功页领券卡筛选用 */
+  featuredAfterPay?: boolean;
 }
 export type UserCouponStatus = "claimed" | "locked" | "used" | "released";
 export interface UserCoupon {

@@ -14,7 +14,11 @@ const orderId = ref(""),
   /** 支付成功页广告位（IKA57E→IKB87P 大卡版）：最多 2 条，空数组不渲染 */
   ads = ref<Banner[]>([]),
   /** 楼栋福利群引导（IKE4FR）：楼栋→校级兜底后端已做；未配置 null 不渲染 */
-  group = ref<Awaited<ReturnType<typeof api.wechatGroup>>>(null);
+  group = ref<Awaited<ReturnType<typeof api.wechatGroup>>>(null),
+  /** 支付后推荐券（道哥 2026-09-08）：featured 券中面额最大的一张，
+   *  一键领取复用券中心 claimCoupon；无推荐/已领取 → 不渲染 */
+  featuredCoupon = ref<Awaited<ReturnType<typeof api.coupons>>["claimable"][number]>(),
+  couponClaimed = ref(false);
 onLoad(async (q) => {
   orderId.value = String(q?.id || "");
   // 广告位拉取失败静默（不影响支付结果展示）
@@ -27,6 +31,16 @@ onLoad(async (q) => {
     .wechatGroup()
     .then((g) => (group.value = g))
     .catch(() => {});
+  // 支付后推荐券：featured 且可领的取面额最大一张；拉取失败静默
+  api
+    .coupons()
+    .then((bundle) => {
+      const picks = bundle.claimable
+        .filter((c) => c.featuredAfterPay)
+        .sort((a, b) => b.amount - a.amount);
+      featuredCoupon.value = picks[0];
+    })
+    .catch(() => {});
   try {
     if (orderId.value) order.value = await api.order(orderId.value);
   } finally {
@@ -37,6 +51,25 @@ onLoad(async (q) => {
 function openAd(banner: Banner) {
   uni.setStorageSync("bannerContent", JSON.stringify(banner));
   uni.navigateTo({ url: "/pages/content/detail" });
+}
+/** 一键领取推荐券（道哥 2026-09-08）：领取成功卡片变已领态 */
+const claimingCoupon = ref(false);
+async function claimFeaturedCoupon() {
+  const c = featuredCoupon.value;
+  if (!c || claimingCoupon.value) return;
+  claimingCoupon.value = true;
+  try {
+    await api.claimCoupon(c.id);
+    couponClaimed.value = true;
+    uni.showToast({ title: `已领取 ¥${fenToYuan(c.amount)} 券`, icon: "none" });
+  } catch (err) {
+    uni.showToast({
+      title: err instanceof Error ? err.message : "领取失败，请重试",
+      icon: "none",
+    });
+  } finally {
+    claimingCoupon.value = false;
+  }
 }
 function goHome() {
   // IK9SNY：switchTab 失败（极端栈状态）兜底 reLaunch，确保落到首页而非上一页
@@ -119,7 +152,37 @@ function openCancel() {
         <text class="group-card__sub">配送动态 · 优惠福利，进群早知道</text>
         <text class="group-card__hint">长按识别二维码进群</text>
       </view>
-    </view><!-- 支付成功页广告位（IKA57E→IKB87P 大卡版）：图上文下，最多 2 条，未配置不占位 -->
+    </view><!-- 支付后推荐券（道哥 2026-09-08）：featured 券一键领取，
+         领取后变已领态（券额大字左、按钮右），无推荐不占位 -->
+    <view
+      v-if="featuredCoupon && !couponClaimed"
+      class="pay-coupon card"
+      role="button"
+      @tap="claimFeaturedCoupon"
+    >
+      <view class="pay-coupon__amount"
+        ><text class="pay-coupon__symbol">¥</text
+        >{{ fenToYuan(featuredCoupon.amount) }}</view
+      >
+      <view class="pay-coupon__meta">
+        <text class="pay-coupon__name">{{ featuredCoupon.name }}</text>
+        <text class="pay-coupon__cond"
+          >{{
+            featuredCoupon.threshold > 0
+              ? `满 ${fenToYuan(featuredCoupon.threshold)} 元可用`
+              : "无门槛"
+          }} · 下单自动抵扣</text
+        >
+      </view>
+      <view class="pay-coupon__btn" :class="{ 'pay-coupon__btn--busy': claimingCoupon }">
+        {{ claimingCoupon ? "领取中…" : "领取" }}
+      </view>
+    </view>
+    <view
+      v-else-if="couponClaimed"
+      class="pay-coupon pay-coupon--done card"
+      >已放入你的优惠券账户，下单立减</view
+    ><!-- 支付成功页广告位（IKA57E→IKB87P 大卡版）：图上文下，最多 2 条，未配置不占位 -->
     <view v-if="ads.length" class="ads">
       <text class="ads__caption">为你推荐</text>
       <view
@@ -206,6 +269,70 @@ function openCancel() {
   50% {
     opacity: 0.55;
   }
+}
+/* 支付后推荐券卡（道哥 2026-09-08）：券额大字左 + 信息中 + 领取钮右；
+   已领态整卡弱化 */
+.pay-coupon {
+  margin-top: 28rpx;
+  padding: 26rpx 28rpx;
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  background: linear-gradient(150deg, #fff8f0, #fff1e2);
+  border: 2rpx dashed rgba(226, 92, 5, 0.45);
+}
+.pay-coupon--done {
+  border-style: solid;
+  justify-content: center;
+  color: #b96f33;
+  font-weight: 700;
+  font-size: 26rpx;
+}
+.pay-coupon__amount {
+  font-size: 56rpx;
+  font-weight: 900;
+  color: #e25c05;
+  line-height: 1;
+  flex: none;
+}
+.pay-coupon__symbol {
+  font-size: 26rpx;
+  margin-right: 4rpx;
+}
+.pay-coupon__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+.pay-coupon__name {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: $ink;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pay-coupon__cond {
+  font-size: 22rpx;
+  color: #b96f33;
+}
+.pay-coupon__btn {
+  flex: none;
+  min-height: 72rpx;
+  padding: 0 36rpx;
+  display: flex;
+  align-items: center;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #ff9a5c, $orange);
+  color: #fff;
+  font-size: 27rpx;
+  font-weight: 900;
+  box-shadow: 0 6rpx 16rpx rgba(217, 95, 16, 0.25);
+}
+.pay-coupon__btn--busy {
+  opacity: 0.6;
 }
 /* 群引导卡（IKE4FR）：橙系延续首页福利群卡认知，横向 QR+文案；
    订单卡与广告位之间（自有运营 > 商业广告），间距同 28rpx */
