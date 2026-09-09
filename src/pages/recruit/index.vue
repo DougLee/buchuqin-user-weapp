@@ -7,10 +7,12 @@ import type { Building, RecruitingApplication } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
 /**
- * 楼长招募报名页（IKEAGE，2026-09-09 道哥设计稿）：
- * banner 配自定义路径直达。报名页即进度页——首访表单（校区自由选、
- * 楼栋联动、手机号预填授权号）；在途显示进度；被拒显示原因可重报；
- * 通过显示工号 + 骑手小程序登录指引。身份证不采集（后台补录）。
+ * 楼长招募报名页（IKEAGE，2026-09-09 道哥定稿「高级简洁」重设计）：
+ * 纯 CSS 浅绿渐变打底（无图片背景，永无接缝）；横幅为圆角卡片；
+ * 权益四列白卡上浮叠横幅；表单横排字段；橙色 CTA 点睛。
+ * 报名页即进度页——首访表单（校区自由选、楼栋联动、手机号预填授权号）；
+ * 在途显示进度；被拒显示原因可重报；通过显示工号 + 骑手小程序登录指引。
+ * 身份证不采集（后台补录）。
  */
 const session = useSessionStore();
 const loading = ref(true),
@@ -129,27 +131,33 @@ async function submit() {
 </script>
 <template>
   <view class="page recruit">
-    <!-- 三段式（道哥 2026-09-09 拆图拍板）：顶部横幅 / 中间内容（渐变底自适应）/
-         底部品牌区贴底。素材拆两张独立小图，各机型显示精确可控 -->
+    <!-- 横幅：圆角卡片（素材横幅整图自带全部文案），不上浮遮挡 -->
     <image
       class="recruit__banner"
       src="https://static.buchuqin.com/app/public/recruit-banner-v2.webp"
       mode="widthFix"
     />
-    <view class="recruit__content">
-    <!-- 卖点（设计稿权益区） -->
+    <!-- 权益四列：白卡上浮叠横幅下沿，形成层次 -->
     <view class="perks card">
       <view class="perk">
-        <text class="perk__title">配送提成</text>
-        <text class="perk__desc">每单结算，多劳多得</text>
-      </view>
-      <view class="perk">
+        <view class="perk__ico"><text>时</text></view>
         <text class="perk__title">时间自由</text>
-        <text class="perk__desc">课余接单，不耽误学业</text>
+        <text class="perk__desc">灵活安排</text>
       </view>
       <view class="perk">
-        <text class="perk__title">楼栋我做主</text>
-        <text class="perk__desc">本楼栋零食运营与售后</text>
+        <view class="perk__ico"><text>佣</text></view>
+        <text class="perk__title">佣金奖励</text>
+        <text class="perk__desc">多劳多得</text>
+      </view>
+      <view class="perk">
+        <view class="perk__ico"><text>福</text></view>
+        <text class="perk__title">专属福利</text>
+        <text class="perk__desc">不定期惊喜</text>
+      </view>
+      <view class="perk">
+        <view class="perk__ico"><text>楼</text></view>
+        <text class="perk__title">服务本楼栋</text>
+        <text class="perk__desc">同学更便利</text>
       </view>
     </view>
 
@@ -158,9 +166,10 @@ async function submit() {
       <view v-for="n in 4" :key="n" class="skeleton-row" />
     </view>
     <view v-else-if="showForm" class="card form-card">
-      <text class="form-card__title">留下你的信息</text>
-      <text class="form-card__hint">运营同学会尽快联系你安排面试</text>
-      <!-- 横排字段（设计稿 #71 式，道哥 2026-09-09：紧凑一屏不滚动） -->
+      <view class="form-card__head">
+        <text class="form-card__title">楼长报名信息</text>
+        <text class="form-card__hint">期待优秀的你加入</text>
+      </view>
       <view class="field">
         <text class="field__label">姓名<text class="field__req"> *</text></text>
         <input
@@ -191,7 +200,7 @@ async function submit() {
           @change="onCampusPick"
         >
           <view class="field__control field__control--select">
-            <text :class="{ 'field__placeholder': !campusName }">{{
+            <text :class="{ field__placeholder: !campusName }">{{
               campusName || "选择学校"
             }}</text>
             <text class="field__arrow">›</text>
@@ -207,7 +216,7 @@ async function submit() {
           @change="onBuildingPick"
         >
           <view class="field__control field__control--select">
-            <text :class="{ 'field__placeholder': !buildingName }">{{
+            <text :class="{ field__placeholder: !buildingName }">{{
               buildingName || "选择楼栋"
             }}</text>
             <text class="field__arrow">›</text>
@@ -216,16 +225,19 @@ async function submit() {
       </view>
       <view class="field field--top">
         <text class="field__label">自我介绍</text>
-        <textarea
-          v-model="form.note"
-          class="field__area"
-          placeholder="选填：空闲时间、寝室经历等"
-          placeholder-class="field__placeholder"
-          maxlength="200"
-        />
+        <view class="field__area-wrap">
+          <textarea
+            v-model="form.note"
+            class="field__area"
+            placeholder="选填：空闲时间、相关经验等"
+            placeholder-class="field__placeholder"
+            maxlength="200"
+          />
+          <text class="field__count">{{ form.note.length }}/200</text>
+        </view>
       </view>
-      <button class="primary-btn submit-btn" :disabled="submitting" @tap="submit">
-        {{ submitting ? "提交中…" : "报名成为楼长" }}
+      <button class="cta" :disabled="submitting" @tap="submit">
+        {{ submitting ? "提交中…" : "提交报名" }}
       </button>
       <text v-if="app?.status === 'rejected'" class="rejected-tip"
         >上次报名未通过：{{ app.rejectReason || "未通过" }}，可调整后重新报名</text
@@ -273,87 +285,120 @@ async function submit() {
         <text>3. 开始接单，收入实时可查</text>
       </view>
     </view>
+
+    <!-- 报名说明：一行三列极简（替代大说明卡） -->
+    <view class="notes">
+      <view class="note"
+        ><text class="note__no">1</text
+        ><text class="note__text">审核后 1-3 个工作日联系</text></view
+      >
+      <view class="note"
+        ><text class="note__no">2</text
+        ><text class="note__text">仅面向在校学生</text></view
+      >
+      <view class="note"
+        ><text class="note__no">3</text
+        ><text class="note__text">信息仅用于报名审核</text></view
+      >
     </view>
-    <!-- 底部品牌区：margin-top:auto 贴底（内容不足一屏时顶到视口底） -->
-    <image
-      class="recruit__footer"
-      src="https://static.buchuqin.com/app/public/recruit-footer-v1.webp"
-      mode="widthFix"
-    />
+    <text class="brand-foot">不出寝食社 · 让校园生活更轻松</text>
   </view>
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
-/* 三段式：页面渐变打底（顶部色与素材顶部/导航栏 #d8fcea 一致），
-   flex 纵向布局——内容不足一屏时 footer 贴底，超出时整体滚动 */
+/* 纯 CSS 渐变打底（顶部与导航栏 #d8fcea 同源），顶部署一层径向光晕提亮；
+   无图片背景——任何屏高都无接缝 */
 .recruit {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: linear-gradient(180deg, #d8fcea 0%, #dafbe8 55%, #e3f7e6 100%);
+  padding: 16rpx 24rpx calc(28rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  background:
+    radial-gradient(120% 30% at 50% 0%, rgba(255, 255, 255, 0.55), transparent 70%),
+    linear-gradient(180deg, #d8fcea 0%, #ddf9ea 46%, #eaf8ec 100%);
 }
+/* 横幅圆角卡：素材横幅自带全部文案，投影轻、贴顶呼吸 8rpx */
 .recruit__banner {
   width: 100%;
   display: block;
+  border-radius: 24rpx;
+  box-shadow: 0 12rpx 32rpx rgba(31, 122, 68, 0.14);
 }
-.recruit__content {
-  flex: 1;
-  padding-bottom: 24rpx;
-}
-.recruit__footer {
-  width: 100%;
-  display: block;
-  margin-top: auto;
-}
-/* 卖点三列（设计稿权益区）：白卡浮于浅绿背景（紧凑单行化） */
+/* 权益四列：白卡上浮叠横幅下沿 44rpx 形成层次 */
 .perks {
-  margin: 0 28rpx;
-  padding: 20rpx 14rpx;
+  position: relative;
+  z-index: 2;
+  margin: -44rpx 8rpx 0;
+  padding: 22rpx 8rpx;
+  border-radius: 20rpx;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6rpx;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4rpx;
+  box-shadow: 0 10rpx 30rpx rgba(31, 122, 68, 0.08);
 }
 .perk {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 4rpx;
+  gap: 6rpx;
 }
-.perk__title {
+.perk__ico {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: #e8f8ef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4rpx;
+}
+.perk__ico text {
   font-size: 24rpx;
   font-weight: 900;
-  color: $primary-dark;
+  color: #159c55;
+}
+.perk__title {
+  font-size: 23rpx;
+  font-weight: 800;
+  color: $ink;
 }
 .perk__desc {
   font-size: 18rpx;
-  color: #667069;
+  color: #8a958e;
 }
-/* 表单/进度/通过统一浮卡（紧凑化：横排字段，一屏不放滚动条） */
+/* 卡片基准：白底大圆角，统一投影（高级感核心=少而轻的阴影） */
+.card {
+  background: #fff;
+  border-radius: 24rpx;
+}
+/* 表单卡 */
 .form-card {
-  margin: 20rpx 28rpx 0;
-  padding: 28rpx 30rpx;
+  margin-top: 20rpx;
+  padding: 30rpx;
+}
+.form-card__head {
+  display: flex;
+  align-items: baseline;
+  gap: 14rpx;
+  margin-bottom: 10rpx;
 }
 .form-card__title {
-  display: block;
   font-size: 32rpx;
   font-weight: 900;
   color: $ink;
 }
 .form-card__hint {
-  display: block;
-  margin-top: 6rpx;
-  font-size: 22rpx;
-  color: #667069;
+  font-size: 21rpx;
+  color: #8a958e;
 }
-/* 横排字段（设计稿 #71 式）：左标签右控件，行高 76，gap 18 */
+/* 横排字段：左标签右控件，无边框浅灰底控件（更精致） */
 .field {
   display: grid;
-  grid-template-columns: 148rpx 1fr;
+  grid-template-columns: 132rpx 1fr;
   align-items: center;
   gap: 20rpx;
   margin-top: 18rpx;
-  min-height: 76rpx;
+  min-height: 72rpx;
 }
 .field--top {
   align-items: start;
@@ -371,14 +416,15 @@ async function submit() {
 }
 .field__control {
   width: 100%;
-  min-height: 76rpx;
+  min-height: 72rpx;
   box-sizing: border-box;
   padding: 0 22rpx;
-  border: 2rpx solid $line;
+  border: 2rpx solid transparent;
   border-radius: 14rpx;
-  background: #fafcfa;
+  background: #f5f8f5;
   font-size: 27rpx;
   color: $ink;
+  transition: border-color 0.2s;
 }
 .field__control--select {
   display: flex;
@@ -386,42 +432,59 @@ async function submit() {
   justify-content: space-between;
 }
 .field__arrow {
-  color: #9aa39d;
+  color: #b3bcb5;
   font-size: 30rpx;
 }
 .field__placeholder {
-  color: #9aa39d;
+  color: #a8b1aa;
+}
+.field__area-wrap {
+  position: relative;
 }
 .field__area {
   width: 100%;
   box-sizing: border-box;
-  min-height: 96rpx;
-  padding: 14rpx 22rpx;
-  border: 2rpx solid $line;
+  min-height: 104rpx;
+  padding: 14rpx 22rpx 34rpx;
+  border: 2rpx solid transparent;
   border-radius: 14rpx;
-  background: #fafcfa;
+  background: #f5f8f5;
   font-size: 25rpx;
 }
-.submit-btn {
-  margin-top: 28rpx;
-  width: 100%;
-  min-height: 84rpx;
-  font-size: 29rpx;
+.field__count {
+  position: absolute;
+  right: 18rpx;
+  bottom: 10rpx;
+  font-size: 19rpx;
+  color: #b3bcb5;
 }
-.submit-btn[disabled] {
+/* CTA：橙色渐变点睛（设计稿语言），大圆角+轻投影 */
+.cta {
+  margin: 32rpx 0 0;
+  width: 100%;
+  min-height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #ffa940, #ff7a1f);
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 900;
+  box-shadow: 0 10rpx 26rpx rgba(255, 122, 31, 0.28);
+}
+.cta[disabled] {
   opacity: 0.6;
 }
 .rejected-tip {
   display: block;
-  margin-top: 20rpx;
+  margin-top: 16rpx;
   font-size: 22rpx;
   color: #b96f33;
 }
 .skeleton-row {
-  height: 88rpx;
-  border-radius: 16rpx;
-  margin: 22rpx 0;
-  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  height: 72rpx;
+  border-radius: 14rpx;
+  margin: 18rpx 0;
+  background: linear-gradient(90deg, #eef4ef, #fff, #eef4ef);
   animation: recruit-pulse 1.2s infinite;
 }
 @keyframes recruit-pulse {
@@ -435,33 +498,34 @@ async function submit() {
   flex-direction: column;
   align-items: center;
   text-align: center;
+  padding: 44rpx 30rpx;
 }
 .status-dot {
-  width: 20rpx;
-  height: 20rpx;
+  width: 18rpx;
+  height: 18rpx;
   border-radius: 50%;
-  background: $primary;
-  box-shadow: 0 0 0 10rpx rgba(37, 185, 90, 0.15);
+  background: #25b95a;
+  box-shadow: 0 0 0 10rpx rgba(37, 185, 90, 0.14);
   animation: recruit-blink 1.6s infinite;
 }
 @keyframes recruit-blink {
   50% {
-    box-shadow: 0 0 0 18rpx rgba(37, 185, 90, 0.06);
+    box-shadow: 0 0 0 16rpx rgba(37, 185, 90, 0.05);
   }
 }
 .status-card__title {
-  margin-top: 24rpx;
-  font-size: 36rpx;
+  margin-top: 22rpx;
+  font-size: 34rpx;
   font-weight: 900;
   color: $ink;
 }
 .status-card__info {
-  margin-top: 10rpx;
+  margin-top: 8rpx;
   font-size: 24rpx;
   color: #667069;
 }
 .steps {
-  margin: 36rpx 0 8rpx;
+  margin: 32rpx 0 6rpx;
   width: 100%;
   display: flex;
   justify-content: space-around;
@@ -470,15 +534,15 @@ async function submit() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10rpx;
-  font-size: 22rpx;
+  gap: 8rpx;
+  font-size: 21rpx;
   color: #9aa39d;
 }
 .step__no {
-  width: 44rpx;
-  height: 44rpx;
+  width: 42rpx;
+  height: 42rpx;
   border-radius: 50%;
-  border: 2rpx solid $line;
+  border: 2rpx solid #e3e8e4;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -486,18 +550,18 @@ async function submit() {
   color: #9aa39d;
 }
 .step--done {
-  color: $primary-dark;
+  color: #159c55;
   font-weight: 700;
 }
 .step--done .step__no {
-  background: $primary;
-  border-color: $primary;
+  background: #25b95a;
+  border-color: #25b95a;
   color: #fff;
 }
 .status-card__hint {
-  margin-top: 20rpx;
-  font-size: 22rpx;
-  color: #667069;
+  margin-top: 18rpx;
+  font-size: 21rpx;
+  color: #8a958e;
 }
 /* 通过卡 */
 .pass-card {
@@ -507,49 +571,87 @@ async function submit() {
   text-align: center;
 }
 .pass-card__badge {
-  padding: 6rpx 26rpx;
+  padding: 6rpx 24rpx;
   border-radius: 999rpx;
-  background: $primary-soft;
-  color: $primary-dark;
-  font-size: 24rpx;
+  background: #e8f8ef;
+  color: #159c55;
+  font-size: 23rpx;
   font-weight: 800;
 }
 .pass-card__title {
-  margin-top: 20rpx;
-  font-size: 38rpx;
+  margin-top: 18rpx;
+  font-size: 36rpx;
   font-weight: 900;
   color: $ink;
 }
 .pass-card__no {
-  margin-top: 28rpx;
+  margin-top: 24rpx;
   width: 100%;
-  padding: 26rpx;
-  border-radius: 20rpx;
-  background: linear-gradient(135deg, $primary-soft, #fff);
-  border: 2rpx dashed rgba(37, 185, 90, 0.4);
+  padding: 24rpx;
+  border-radius: 18rpx;
+  background: linear-gradient(135deg, #e8f8ef, #fff);
+  border: 2rpx dashed rgba(37, 185, 90, 0.35);
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
+  gap: 6rpx;
 }
 .pass-card__no-label {
-  font-size: 22rpx;
+  font-size: 21rpx;
   color: #667069;
 }
 .pass-card__no-value {
-  font-size: 52rpx;
+  font-size: 48rpx;
   font-weight: 900;
-  color: $primary-dark;
+  color: #159c55;
   letter-spacing: 4rpx;
 }
 .pass-card__guide {
-  margin-top: 28rpx;
+  margin-top: 24rpx;
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 12rpx;
-  font-size: 24rpx;
+  gap: 10rpx;
+  font-size: 23rpx;
   color: $ink;
   text-align: left;
+}
+/* 报名说明：一行三列极简 */
+.notes {
+  margin-top: 22rpx;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10rpx;
+}
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10rpx;
+}
+.note__no {
+  flex: none;
+  width: 30rpx;
+  height: 30rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  color: #159c55;
+  font-size: 19rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2rpx;
+}
+.note__text {
+  font-size: 19rpx;
+  color: #6f7d74;
+  line-height: 1.5;
+}
+.brand-foot {
+  display: block;
+  text-align: center;
+  margin-top: 26rpx;
+  font-size: 20rpx;
+  color: #93a299;
 }
 </style>
