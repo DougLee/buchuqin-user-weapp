@@ -21,7 +21,9 @@ const loading = ref(true),
   buildings = ref<Building[]>([]),
   submitting = ref(false),
   /** rejected 后的「重新报名」：置 true 回到表单态（保留上次填写） */
-  reapplying = ref(false);
+  reapplying = ref(false),
+  /** 审核前修改报名（IKEAGE）：pending/interviewing 回填表单走 PATCH */
+  editing = ref(false);
 const form = reactive({
   campusId: "",
   buildingId: "",
@@ -35,13 +37,29 @@ const campusName = computed(
 const buildingName = computed(
   () => buildings.value.find((b) => b.id === form.buildingId)?.name ?? "",
 );
-/** 页面态：表单（无在途 / 被拒重报）或进度（pending/interviewing/approved） */
+/** 页面态：表单（无在途 / 被拒 / 审核前点「修改」）或进度卡 */
 const showForm = computed(
   () =>
     !app.value ||
-    (app.value.status === "rejected" && reapplying.value) ||
-    app.value.status === "rejected",
+    app.value.status === "rejected" ||
+    ((app.value.status === "pending" ||
+      app.value.status === "interviewing") &&
+      editing.value),
 );
+/** 进入编辑：回填当前报名数据，楼栋列表随校区联动 */
+async function enterEdit() {
+  if (!app.value) return;
+  form.campusId = app.value.campusId;
+  form.buildingId = app.value.buildingId;
+  form.name = app.value.name;
+  form.phone = app.value.phone;
+  form.note = app.value.note;
+  editing.value = true;
+  await loadBuildings();
+}
+function cancelEdit() {
+  editing.value = false;
+}
 const statusText = computed(() => {
   switch (app.value?.status) {
     case "pending":
@@ -113,15 +131,20 @@ async function submit() {
   }
   submitting.value = true;
   try {
-    app.value = await api.recruitApply({
+    const body = {
       campusId: form.campusId,
       buildingId: form.buildingId,
       name: form.name.trim(),
       phone: form.phone.trim(),
       note: form.note.trim() || undefined,
-    });
+    };
+    app.value = editing.value
+      ? await api.recruitUpdate(body)
+      : await api.recruitApply(body);
+    const doneText = editing.value ? "已保存" : "报名成功";
+    editing.value = false;
     reapplying.value = false;
-    uni.showToast({ title: "报名成功", icon: "success" });
+    uni.showToast({ title: doneText, icon: "success" });
   } catch {
     /* 业务原因 request 层已 toast（在途拦截等） */
   } finally {
@@ -164,8 +187,12 @@ async function submit() {
     </view>
     <view v-else-if="showForm" class="card form-card">
       <view class="form-card__head">
-        <text class="form-card__title">楼长报名信息</text>
-        <text class="form-card__hint">期待优秀的你加入</text>
+        <text class="form-card__title">{{
+          editing ? "修改报名信息" : "楼长报名信息"
+        }}</text>
+        <text class="form-card__hint">{{
+          editing ? "审核通过前可随时修改" : "期待优秀的你加入"
+        }}</text>
       </view>
       <view class="field">
         <text class="field__label">姓名<text class="field__req"> *</text></text>
@@ -238,8 +265,9 @@ async function submit() {
         </view>
       </view>
       <button class="cta" :disabled="submitting" @tap="submit">
-        {{ submitting ? "提交中…" : "提交报名" }}
+        {{ submitting ? "提交中…" : editing ? "保存修改" : "提交报名" }}
       </button>
+      <text v-if="editing" class="cancel-edit" @tap="cancelEdit">取消修改</text>
       <text v-if="app?.status === 'rejected'" class="rejected-tip"
         >上次报名未通过：{{
           app.rejectReason || "未通过"
@@ -272,6 +300,12 @@ async function submit() {
         </view>
       </view>
       <text class="status-card__hint">保持手机畅通，运营同学会联系你</text>
+      <!-- IKEAGE：审核前可修改报名信息（回填表单走 PATCH） -->
+      <view class="status-card__actions">
+        <button class="edit-btn" :disabled="submitting" @tap="enterEdit">
+          修改报名信息
+        </button>
+      </view>
     </view>
 
     <!-- 通过态：工号 + 上岗指引 -->
@@ -288,23 +322,6 @@ async function submit() {
         <text>3. 开始接单，收入实时可查</text>
       </view>
     </view>
-
-    <!-- 报名说明：一行三列极简（替代大说明卡） -->
-    <view class="notes">
-      <view class="note"
-        ><text class="note__no">1</text
-        ><text class="note__text">审核后 1-3 个工作日联系</text></view
-      >
-      <view class="note"
-        ><text class="note__no">2</text
-        ><text class="note__text">仅面向在校学生</text></view
-      >
-      <view class="note"
-        ><text class="note__no">3</text
-        ><text class="note__text">信息仅用于报名审核</text></view
-      >
-    </view>
-    <text class="brand-foot">不出寝食社 · 让校园生活更轻松</text>
   </view>
 </template>
 <style scoped lang="scss">
@@ -315,10 +332,10 @@ async function submit() {
 .recruit {
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 51vw 24rpx calc(20rpx + env(safe-area-inset-bottom));
+  padding: 56vw 24rpx calc(20rpx + env(safe-area-inset-bottom));
   background:
-    url("https://static.buchuqin.com/app/public/recruit-banner-v3.webp")
-      center top / 100% auto no-repeat,
+    url("https://static.buchuqin.com/app/public/recruit-banner-v3.webp") center
+      top / 100% auto no-repeat,
     url("https://static.buchuqin.com/app/public/recruit-bg-bottom-v1.webp")
       center bottom / 100% auto no-repeat,
     linear-gradient(180deg, #d9f9e8 0%, #ddf9ea 100%);
@@ -327,7 +344,7 @@ async function submit() {
 .perks {
   position: relative;
   z-index: 2;
-  margin: 0 8rpx;
+  margin: -150rpx 8rpx 0 8rpx;
   padding: 20rpx 8rpx;
   border-radius: 20rpx;
   display: grid;
@@ -561,6 +578,32 @@ async function submit() {
 .status-card__hint {
   margin-top: 18rpx;
   font-size: 21rpx;
+  color: #8a958e;
+}
+/* 审核前修改报名入口（IKEAGE）：白底绿描边轻量按钮 */
+.status-card__actions {
+  margin-top: 28rpx;
+  width: 100%;
+}
+.edit-btn {
+  width: 100%;
+  min-height: 80rpx;
+  line-height: 80rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  border: 2rpx solid rgba(37, 185, 90, 0.45);
+  color: #159c55;
+  font-size: 27rpx;
+  font-weight: 800;
+}
+.edit-btn::after {
+  border: none;
+}
+.cancel-edit {
+  display: block;
+  text-align: center;
+  margin-top: 20rpx;
+  font-size: 24rpx;
   color: #8a958e;
 }
 /* 通过卡 */

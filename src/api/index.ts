@@ -82,6 +82,18 @@ export const api = {
       method: "POST",
       data,
     }),
+  /** 审核前修改报名（待联系/面试中可改），body 同报名 */
+  recruitUpdate: (data: {
+    campusId: string;
+    buildingId: string;
+    name: string;
+    phone: string;
+    note?: string;
+  }) =>
+    request<RecruitingApplication>("/recruit/application", {
+      method: "PATCH",
+      data,
+    }),
 
   /** 进群二维码（IKAJSZ）：楼栋群→校园大群回落；null = 后台未配置，入口不显示 */
   wechatGroup: () =>
