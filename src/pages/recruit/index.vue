@@ -131,13 +131,9 @@ async function submit() {
 </script>
 <template>
   <view class="page recruit">
-    <!-- 横幅：圆角卡片（素材横幅整图自带全部文案），不上浮遮挡 -->
-    <image
-      class="recruit__banner"
-      src="https://static.buchuqin.com/app/public/recruit-banner-v2.webp"
-      mode="widthFix"
-    />
-    <!-- 权益四列：白卡上浮叠横幅下沿，形成层次 -->
+    <!-- 背景即素材整图（.recruit__bg 渐变兜底衔接），横幅在背景图顶部，
+         内容经 padding-top 让位；权益卡轻压横幅下沿形成层次 -->
+    <!-- 权益四列：白卡压横幅下沿 -->
     <view class="perks card">
       <view class="perk">
         <view class="perk__ico"><text>时</text></view>
@@ -306,28 +302,27 @@ async function submit() {
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
-/* 纯 CSS 渐变打底（顶部与导航栏 #d8fcea 同源），顶部署一层径向光晕提亮；
-   无图片背景——任何屏高都无接缝 */
+/* 背景整图（道哥 2026-09-09 定稿）：素材 recruit-bg-v1 铺顶（100% 宽，
+   显示高 ~178vw，含顶部横幅+浅绿底+底部品牌区），图外/图下由同源
+   渐变兜底（色调一致无接缝）。padding-top 48vw 让位背景横幅
+   （横幅底 ≈ 49.8vw，权益卡轻微压住下沿 2vw 形成层次） */
+.recruit__bg,
+.recruit {
+  background:
+    url("https://static.buchuqin.com/app/public/recruit-bg-v1.webp") center
+      top / 100% auto no-repeat,
+    linear-gradient(180deg, #d8fcea 0%, #dafbe8 60%, #e3f7e6 100%);
+}
 .recruit {
   min-height: 100vh;
-  padding: 16rpx 24rpx calc(28rpx + env(safe-area-inset-bottom));
+  padding: 48vw 24rpx calc(28rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
-  background:
-    radial-gradient(120% 30% at 50% 0%, rgba(255, 255, 255, 0.55), transparent 70%),
-    linear-gradient(180deg, #d8fcea 0%, #ddf9ea 46%, #eaf8ec 100%);
 }
-/* 横幅圆角卡：素材横幅自带全部文案，投影轻、贴顶呼吸 8rpx */
-.recruit__banner {
-  width: 100%;
-  display: block;
-  border-radius: 24rpx;
-  box-shadow: 0 12rpx 32rpx rgba(31, 122, 68, 0.14);
-}
-/* 权益四列：白卡上浮叠横幅下沿 44rpx 形成层次 */
+/* 权益四列：白卡压背景横幅下沿形成层次 */
 .perks {
   position: relative;
   z-index: 2;
-  margin: -44rpx 8rpx 0;
+  margin: 0 8rpx;
   padding: 22rpx 8rpx;
   border-radius: 20rpx;
   display: grid;
