@@ -129,11 +129,15 @@ async function submit() {
 </script>
 <template>
   <view class="page recruit">
-    <!-- 整页固定背景（道哥 2026-09-09 纠偏）：素材整图铺视口顶部，横幅/浅绿底/
-         品牌区都在背景里，内容浮于其上滚动。图外底色取素材近似色衔接 -->
-    <view class="recruit__bg" />
+    <!-- 三段式（道哥 2026-09-09 拆图拍板）：顶部横幅 / 中间内容（渐变底自适应）/
+         底部品牌区贴底。素材拆两张独立小图，各机型显示精确可控 -->
+    <image
+      class="recruit__banner"
+      src="https://static.buchuqin.com/app/public/recruit-banner-v2.webp"
+      mode="widthFix"
+    />
     <view class="recruit__content">
-    <!-- 卖点（设计稿权益区）：浮在背景横幅下方 -->
+    <!-- 卖点（设计稿权益区） -->
     <view class="perks card">
       <view class="perk">
         <text class="perk__title">配送提成</text>
@@ -270,28 +274,36 @@ async function submit() {
       </view>
     </view>
     </view>
+    <!-- 底部品牌区：margin-top:auto 贴底（内容不足一屏时顶到视口底） -->
+    <image
+      class="recruit__footer"
+      src="https://static.buchuqin.com/app/public/recruit-footer-v1.webp"
+      mode="widthFix"
+    />
   </view>
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
-/* 整页固定背景（素材整图 750x1333@750w）：横幅占图顶部 ~39%，下接浅绿留白；
-   图外底色用素材近似色衔接（#dafbe8 主调 → 底部波浪 #8acf9f 偏深不取）。
-   fixed 层不随内容滚动，长表单滚动时横幅常驻视口顶部 */
-.recruit__bg {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background:
-    url("https://static.buchuqin.com/app/public/recruit-bg-v1.webp") center
-      top / 100% auto no-repeat,
-    linear-gradient(180deg, #e2fcee 0%, #dafbe8 70%, #c9efdc 100%);
+/* 三段式：页面渐变打底（顶部色与素材顶部/导航栏 #d8fcea 一致），
+   flex 纵向布局——内容不足一屏时 footer 贴底，超出时整体滚动 */
+.recruit {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #d8fcea 0%, #dafbe8 55%, #e3f7e6 100%);
+}
+.recruit__banner {
+  width: 100%;
+  display: block;
 }
 .recruit__content {
-  position: relative;
-  z-index: 1;
-  /* 让位背景横幅：横幅显示高 = 100vw * (469-100)/941 ≈ 39.2vw ≈ 294rpx@750，
-     再加呼吸间距 */
-  padding-top: 46vw;
+  flex: 1;
+  padding-bottom: 24rpx;
+}
+.recruit__footer {
+  width: 100%;
+  display: block;
+  margin-top: auto;
 }
 /* 卖点三列（设计稿权益区）：白卡浮于浅绿背景（紧凑单行化） */
 .perks {
