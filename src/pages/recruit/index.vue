@@ -131,9 +131,10 @@ async function submit() {
 </script>
 <template>
   <view class="page recruit">
-    <!-- 背景即素材整图（.recruit__bg 渐变兜底衔接），横幅在背景图顶部，
-         内容经 padding-top 让位；权益卡轻压横幅下沿形成层次 -->
-    <!-- 权益四列：白卡压横幅下沿 -->
+    <!-- 双背景图（道哥 2026-09-09 定稿）：#77 横幅背景贴顶、#78 波浪品牌
+         背景贴底（.recruit 三层 background），中段同源底色衔接；
+         内容 padding-top 让位顶部背景，一屏呈现 -->
+    <!-- 权益四列 -->
     <view class="perks card">
       <view class="perk">
         <view class="perk__ico"><text>时</text></view>
@@ -177,7 +178,9 @@ async function submit() {
         />
       </view>
       <view class="field">
-        <text class="field__label">手机号<text class="field__req"> *</text></text>
+        <text class="field__label"
+          >手机号<text class="field__req"> *</text></text
+        >
         <input
           v-model="form.phone"
           class="field__control"
@@ -204,7 +207,9 @@ async function submit() {
         </picker>
       </view>
       <view class="field">
-        <text class="field__label">宿舍楼<text class="field__req"> *</text></text>
+        <text class="field__label"
+          >宿舍楼<text class="field__req"> *</text></text
+        >
         <picker
           class="field__picker"
           mode="selector"
@@ -236,7 +241,9 @@ async function submit() {
         {{ submitting ? "提交中…" : "提交报名" }}
       </button>
       <text v-if="app?.status === 'rejected'" class="rejected-tip"
-        >上次报名未通过：{{ app.rejectReason || "未通过" }}，可调整后重新报名</text
+        >上次报名未通过：{{
+          app.rejectReason || "未通过"
+        }}，可调整后重新报名</text
       >
     </view>
 
@@ -302,28 +309,26 @@ async function submit() {
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
-/* 背景整图（道哥 2026-09-09 定稿）：素材 recruit-bg-v1 铺顶（100% 宽，
-   显示高 ~178vw，含顶部横幅+浅绿底+底部品牌区），图外/图下由同源
-   渐变兜底（色调一致无接缝）。padding-top 48vw 让位背景横幅
-   （横幅底 ≈ 49.8vw，权益卡轻微压住下沿 2vw 形成层次） */
-.recruit__bg,
-.recruit {
-  background:
-    url("https://static.buchuqin.com/app/public/recruit-bg-v1.webp") center
-      top / 100% auto no-repeat,
-    linear-gradient(180deg, #d8fcea 0%, #dafbe8 60%, #e3f7e6 100%);
-}
+/* 双背景图（道哥 2026-09-09 定稿）：#77 横幅贴顶 + #78 波浪品牌贴底，
+   中段纯色 #d9f9e8 与两图底色同源无缝；100% 宽时两图各显示高 ~59vw，
+   padding-top 56vw 让位顶部背景（权益卡轻压其下沿 3vw 层次） */
 .recruit {
   min-height: 100vh;
-  padding: 48vw 24rpx calc(28rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
+  padding: 56vw 24rpx calc(20rpx + env(safe-area-inset-bottom));
+  background:
+    url("https://static.buchuqin.com/app/public/recruit-banner-v3.webp")
+      center top / 100% auto no-repeat,
+    url("https://static.buchuqin.com/app/public/recruit-bg-bottom-v1.webp")
+      center bottom / 100% auto no-repeat,
+    linear-gradient(180deg, #d9f9e8 0%, #ddf9ea 100%);
 }
-/* 权益四列：白卡压背景横幅下沿形成层次 */
+/* 权益四列：白卡上浮压顶部背景下沿形成层次 */
 .perks {
   position: relative;
   z-index: 2;
   margin: 0 8rpx;
-  padding: 22rpx 8rpx;
+  padding: 20rpx 8rpx;
   border-radius: 20rpx;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
