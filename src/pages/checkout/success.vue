@@ -5,6 +5,7 @@ import { api } from "../../api";
 import { fenToYuan } from "../../utils/money";
 import type { Banner, Order } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
+import { openBannerTarget } from "../../utils/bannerLink";
 setupDefaultShare();
 const orderId = ref(""),
   order = ref<Order>(),
@@ -55,10 +56,9 @@ onLoad(async (q) => {
     loading.value = false;
   }
 });
-/** 广告点击进图文详情（IKA57E）：复用 Banner 图文基建，storage 传参 */
+/** 广告点击（IKE4FR→IKE9YC）：配置了站内跳转优先，否则图文详情——与首页 banner 同一分发 */
 function openAd(banner: Banner) {
-  uni.setStorageSync("bannerContent", JSON.stringify(banner));
-  uni.navigateTo({ url: "/pages/content/detail" });
+  openBannerTarget(banner);
 }
 /** 一键领取推荐券（道哥 2026-09-08）：领取成功卡片变已领态 */
 const claimingCoupon = ref(false);

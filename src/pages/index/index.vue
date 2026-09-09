@@ -8,6 +8,7 @@ import WelcomeGift from "../../components/WelcomeGift.vue";
 import PhoneGate from "../../components/PhoneGate.vue";
 import { useCartStore } from "../../stores/cart";
 import { useSessionStore } from "../../stores/session";
+import { bannerClickable, openBannerTarget } from "../../utils/bannerLink";
 import { categoryImage } from "../../utils/categoryImage";
 import { fenToYuan } from "../../utils/money";
 import { PROMO_TITLE } from "../../utils/promotion";
@@ -193,28 +194,14 @@ function bannerStyle(banner: Banner) {
   return { background: banner.color || "#07883b" };
 }
 /**
- * Banner 点击跳图文详情（IK9SNN）：后台配了详情内容才可点，
- * 数据经 storage 传给图文页（/home 已拉全量，不建详情端点）。
- * IKC1AD：详情主口径改为「长图」（detailImage），旧文字 content 保留兼容。
+ * Banner 点击分发（IKE9YC）：配置了站内跳转优先（tab 页 switchTab），
+ * 否则走图文详情（IK9SNN/IKC1AD 老逻辑）——统一收口 utils/bannerLink。
  */
 function openBanner(banner: Banner) {
-  if (!banner.detailImage?.trim() && !banner.content?.trim()) return;
-  uni.setStorageSync(
-    "bannerContent",
-    JSON.stringify({
-      title: banner.title,
-      subtitle: banner.subtitle,
-      badge: banner.badge,
-      image: banner.image,
-      detailImage: banner.detailImage ?? "",
-      content: banner.content ?? "",
-    }),
-  );
-  uni.navigateTo({ url: "/pages/content/detail" });
+  openBannerTarget(banner);
 }
-/** Banner 可点性（IKC1AD）：配了长图或旧文字详情才算可点（驱动按压反馈样式） */
-const hasBannerDetail = (banner: Banner) =>
-  Boolean(banner.detailImage?.trim() || banner.content?.trim());
+/** Banner 可点性（IKE9YC）：配了跳转或图文详情都可点（驱动按压反馈样式） */
+const hasBannerDetail = (banner: Banner) => bannerClickable(banner);
 /** IKE3HT 加购收网（拍板A 不可跳过）：未绑手机号先弹授权，
  *  绑定成功（@bound）补执行被拦的加购——用户不必再点一次 */
 const phoneGateOpen = ref(false);
