@@ -4,6 +4,7 @@ import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
 import PhoneGate from "../../components/PhoneGate.vue";
+import { pickCurrentAddress } from "../../utils/currentAddress";
 import { useCartStore } from "../../stores/cart";
 import { useSessionStore } from "../../stores/session";
 import { fenToYuan } from "../../utils/money";
@@ -18,7 +19,7 @@ interface Settlement {
   discount: number;
   payableAmount: number;
 }
-const address = ref<Address>(),
+const address = ref<Address | null>(),
   cart = ref<Cart>(),
   mode = ref<"instant" | "scheduled">("instant"),
   slot = ref(""),
@@ -83,9 +84,9 @@ async function load() {
     api.coupons(),
   ]);
   if (a.status === "fulfilled") {
-    const selected = uni.getStorageSync("selectedAddressId");
-    address.value =
-      a.value.find((item) => item.id === selected) || a.value[0];
+    // 当前地址统一走 pickCurrentAddress（道哥 2026-09-09）：与首页/我的页
+    // 同源同序（选中 → 默认 → 第一条），三处展示恒一致
+    address.value = pickCurrentAddress(a.value);
   }
   if (c.status === "fulfilled") cart.value = c.value;
   if (s.status === "fulfilled") {

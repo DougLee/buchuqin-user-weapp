@@ -36,10 +36,7 @@ onLoad(async (q) => {
     .then((list) => (ads.value = (list ?? []).slice(0, 2)))
     .catch(() => {});
   // 群码拉取失败静默：卡片不渲染即可，不影响支付结果展示
-  api
-    .wechatGroup()
-    .then((g) => (group.value = g))
-    .catch(() => {});
+  // （拉取移至订单加载后，带订单楼栋参数——见 onLoad 尾部）
   // 支付后推荐券：featured 且可领的取面额最大一张；拉取失败静默
   api
     .coupons()
@@ -55,6 +52,15 @@ onLoad(async (q) => {
   } finally {
     loading.value = false;
   }
+  // 群码跟随当前收货地址楼栋（道哥 2026-09-09）：订单地址快照即本单楼栋
+  const bid = (order.value?.address as { buildingId?: string } | undefined)
+    ?.buildingId;
+  api
+    .wechatGroup(bid || undefined)
+    .then((g) => {
+      if (g) group.value = g;
+    })
+    .catch(() => {});
 });
 /** 广告点击（IKE4FR→IKE9YC）：配置了站内跳转优先，否则图文详情——与首页 banner 同一分发 */
 function openAd(banner: Banner) {

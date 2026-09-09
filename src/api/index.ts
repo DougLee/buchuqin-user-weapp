@@ -95,10 +95,11 @@ export const api = {
       data,
     }),
 
-  /** 进群二维码（IKAJSZ）：楼栋群→校园大群回落；null = 后台未配置，入口不显示 */
-  wechatGroup: () =>
+  /** 进群二维码（IKAJSZ）：楼栋群→校园大群回落；null = 后台未配置，入口不显示。
+   *  buildingId（道哥 2026-09-09）：跟随当前收货地址楼栋，缺省后端按默认地址 */
+  wechatGroup: (buildingId?: string) =>
     request<{ image: string; scope: "building" | "campus" } | null>(
-      "/wechat-group",
+      `/wechat-group${buildingId ? `?buildingId=${encodeURIComponent(buildingId)}` : ""}`,
     ),
   /** 抽奖大转盘（IKD6FB）：active=false 首页入口不渲染；drawnToday 供转盘页置灰 */
   wheel: () =>

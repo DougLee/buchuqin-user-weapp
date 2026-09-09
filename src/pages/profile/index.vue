@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { pickCurrentAddress } from "../../utils/currentAddress";
 import { useSessionStore } from "../../stores/session";
 import { SERVICE_HOURS, SERVICE_PHONE } from "../../utils/service";
 import type { Address } from "../../types";
@@ -21,9 +22,9 @@ const session = useSessionStore(),
   /** 首拉完成标记（2026-08-24）：统计/地址文案加载中不抢跑——
    *  0 闪现像「没订单」，「去添加」闪现误导已有地址的用户 */
   loaded = ref(false);
-const defaultAddress = computed(
-  () => addresses.value.find((item) => item.isDefault) || addresses.value[0],
-);
+// 当前地址统一走 pickCurrentAddress（道哥 2026-09-09：切地址后我的页跟随）——
+// selectedAddressId 非响应式，onShow 刷 addresses 触发重算即取到最新选中
+const defaultAddress = computed(() => pickCurrentAddress(addresses.value));
 const roomSummary = computed(() =>
   defaultAddress.value
     ? `${defaultAddress.value.buildingName} · ${defaultAddress.value.room}`
@@ -45,6 +46,18 @@ onShow(async () => {
   if (a.status === "fulfilled") addresses.value = a.value;
   if (c.status === "fulfilled") campusName.value = c.value.name;
   if (g.status === "fulfilled") group.value = g.value;
+  // 群码跟随当前收货地址楼栋（道哥 2026-09-09）：地址就位后带 buildingId 重拉
+  if (a.status === "fulfilled") {
+    const bid = pickCurrentAddress(a.value)?.buildingId;
+    if (bid)
+      api
+        .wechatGroup(bid)
+        .then((ng) => {
+          if (ng) group.value = ng;
+          else group.value = null;
+        })
+        .catch(() => {});
+  }
   if (b.status === "fulfilled") {
     const now = Date.now();
     usableCouponCount.value = b.value.mine.filter(

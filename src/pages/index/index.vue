@@ -9,6 +9,7 @@ import PhoneGate from "../../components/PhoneGate.vue";
 import { useCartStore } from "../../stores/cart";
 import { useSessionStore } from "../../stores/session";
 import { bannerClickable, openBannerTarget } from "../../utils/bannerLink";
+import { pickCurrentAddress } from "../../utils/currentAddress";
 import { categoryImage } from "../../utils/categoryImage";
 import { fenToYuan } from "../../utils/money";
 import { PROMO_TITLE } from "../../utils/promotion";
@@ -43,9 +44,9 @@ const addressText = computed(() =>
 onShow(async () => {
   await useSessionStore().ensureLogin();
   const [home, addresses] = await Promise.all([api.home(), api.addresses()]);
+  // 当前地址统一走 pickCurrentAddress（道哥 2026-09-09：切地址后首页跟随）
+  defaultAddress.value = pickCurrentAddress(addresses);
   campus.value = home.campus.name;
-  defaultAddress.value =
-    addresses.find((item) => item.isDefault) || addresses[0] || null;
   categories.value = home.categories;
   banners.value = home.banners;
   products.value = home.hotProducts;
