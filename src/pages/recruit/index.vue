@@ -156,21 +156,22 @@ async function submit() {
     <view v-else-if="showForm" class="card form-card">
       <text class="form-card__title">留下你的信息</text>
       <text class="form-card__hint">运营同学会尽快联系你安排面试</text>
+      <!-- 横排字段（设计稿 #71 式，道哥 2026-09-09：紧凑一屏不滚动） -->
       <view class="field">
-        <text class="field__label">姓名</text>
+        <text class="field__label">姓名<text class="field__req"> *</text></text>
         <input
           v-model="form.name"
-          class="field__input"
+          class="field__control"
           placeholder="真实姓名"
           placeholder-class="field__placeholder"
           maxlength="20"
         />
       </view>
       <view class="field">
-        <text class="field__label">手机号</text>
+        <text class="field__label">手机号<text class="field__req"> *</text></text>
         <input
           v-model="form.phone"
-          class="field__input"
+          class="field__control"
           type="number"
           placeholder="保持畅通，方便联系"
           placeholder-class="field__placeholder"
@@ -178,14 +179,14 @@ async function submit() {
         />
       </view>
       <view class="field">
-        <text class="field__label">学校</text>
+        <text class="field__label">学校<text class="field__req"> *</text></text>
         <picker
           class="field__picker"
           mode="selector"
           :range="campuses.map((c) => c.name)"
           @change="onCampusPick"
         >
-          <view class="field__input field__input--select">
+          <view class="field__control field__control--select">
             <text :class="{ 'field__placeholder': !campusName }">{{
               campusName || "选择学校"
             }}</text>
@@ -194,14 +195,14 @@ async function submit() {
         </picker>
       </view>
       <view class="field">
-        <text class="field__label">宿舍楼</text>
+        <text class="field__label">宿舍楼<text class="field__req"> *</text></text>
         <picker
           class="field__picker"
           mode="selector"
           :range="buildings.map((b) => b.name)"
           @change="onBuildingPick"
         >
-          <view class="field__input field__input--select">
+          <view class="field__control field__control--select">
             <text :class="{ 'field__placeholder': !buildingName }">{{
               buildingName || "选择楼栋"
             }}</text>
@@ -209,12 +210,12 @@ async function submit() {
           </view>
         </picker>
       </view>
-      <view class="field">
+      <view class="field field--top">
         <text class="field__label">自我介绍</text>
         <textarea
           v-model="form.note"
-          class="field__textarea"
-          placeholder="选填：说说你的空闲时间、寝室经历等"
+          class="field__area"
+          placeholder="选填：空闲时间、寝室经历等"
           placeholder-class="field__placeholder"
           maxlength="200"
         />
@@ -292,95 +293,108 @@ async function submit() {
      再加呼吸间距 */
   padding-top: 46vw;
 }
-/* 卖点三列（设计稿权益区）：白卡浮于浅绿背景 */
+/* 卖点三列（设计稿权益区）：白卡浮于浅绿背景（紧凑单行化） */
 .perks {
   margin: 0 28rpx;
-  padding: 28rpx 20rpx;
+  padding: 20rpx 14rpx;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8rpx;
+  gap: 6rpx;
 }
 .perk {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 8rpx;
+  gap: 4rpx;
 }
 .perk__title {
-  font-size: 26rpx;
+  font-size: 24rpx;
   font-weight: 900;
   color: $primary-dark;
 }
 .perk__desc {
-  font-size: 20rpx;
+  font-size: 18rpx;
   color: #667069;
 }
-/* 表单/进度/通过统一浮卡 */
+/* 表单/进度/通过统一浮卡（紧凑化：横排字段，一屏不放滚动条） */
 .form-card {
-  margin: 24rpx 28rpx 0;
-  padding: 36rpx 32rpx;
+  margin: 20rpx 28rpx 0;
+  padding: 28rpx 30rpx;
 }
 .form-card__title {
   display: block;
-  font-size: 34rpx;
+  font-size: 32rpx;
   font-weight: 900;
   color: $ink;
 }
 .form-card__hint {
   display: block;
-  margin-top: 8rpx;
-  font-size: 23rpx;
+  margin-top: 6rpx;
+  font-size: 22rpx;
   color: #667069;
 }
+/* 横排字段（设计稿 #71 式）：左标签右控件，行高 76，gap 18 */
 .field {
-  margin-top: 30rpx;
+  display: grid;
+  grid-template-columns: 148rpx 1fr;
+  align-items: center;
+  gap: 20rpx;
+  margin-top: 18rpx;
+  min-height: 76rpx;
+}
+.field--top {
+  align-items: start;
+}
+.field--top .field__label {
+  padding-top: 16rpx;
 }
 .field__label {
-  display: block;
-  font-size: 24rpx;
+  font-size: 26rpx;
   font-weight: 700;
   color: $ink;
-  margin-bottom: 12rpx;
 }
-.field__input {
+.field__req {
+  color: #e25c05;
+}
+.field__control {
   width: 100%;
-  min-height: 88rpx;
+  min-height: 76rpx;
   box-sizing: border-box;
-  padding: 0 24rpx;
+  padding: 0 22rpx;
   border: 2rpx solid $line;
-  border-radius: 16rpx;
+  border-radius: 14rpx;
   background: #fafcfa;
-  font-size: 28rpx;
+  font-size: 27rpx;
   color: $ink;
 }
-.field__input--select {
+.field__control--select {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 .field__arrow {
   color: #9aa39d;
-  font-size: 32rpx;
+  font-size: 30rpx;
 }
 .field__placeholder {
   color: #9aa39d;
 }
-.field__textarea {
+.field__area {
   width: 100%;
   box-sizing: border-box;
-  min-height: 140rpx;
-  padding: 20rpx 24rpx;
+  min-height: 96rpx;
+  padding: 14rpx 22rpx;
   border: 2rpx solid $line;
-  border-radius: 16rpx;
+  border-radius: 14rpx;
   background: #fafcfa;
-  font-size: 26rpx;
+  font-size: 25rpx;
 }
 .submit-btn {
-  margin-top: 40rpx;
+  margin-top: 28rpx;
   width: 100%;
-  min-height: 92rpx;
-  font-size: 30rpx;
+  min-height: 84rpx;
+  font-size: 29rpx;
 }
 .submit-btn[disabled] {
   opacity: 0.6;
