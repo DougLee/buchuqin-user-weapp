@@ -15,6 +15,7 @@ import type {
   PrepayResult,
   Product,
   Refund,
+  RecruitingApplication,
   Room,
   SessionUser,
   Settlement,
@@ -65,6 +66,23 @@ export const api = {
   /** 支付成功页广告位（IKA57E→IKB87P）：大卡列表，sort 升序最多 2 条；空数组不占位 */
   paySuccessBanners: () =>
     request<Banner[]>("/banners/current?placement=pay-success"),
+  /* ---------- 楼长招募（IKEAGE） ---------- */
+  /** 我的报名（最新一条任意状态；approved 附工号）——报名页即进度页 */
+  recruitApplication: () =>
+    request<RecruitingApplication | null>("/recruit/application"),
+  /** 报名（校区自由选，楼栋属该校区；一人一条在途） */
+  recruitApply: (data: {
+    campusId: string;
+    buildingId: string;
+    name: string;
+    phone: string;
+    note?: string;
+  }) =>
+    request<RecruitingApplication>("/recruit/applications", {
+      method: "POST",
+      data,
+    }),
+
   /** 进群二维码（IKAJSZ）：楼栋群→校园大群回落；null = 后台未配置，入口不显示 */
   wechatGroup: () =>
     request<{ image: string; scope: "building" | "campus" } | null>(
@@ -125,8 +143,10 @@ export const api = {
   setDefaultAddress: (id: string) =>
     request<Address>(`/addresses/${id}/default`, { method: "PUT" }),
   /** 当前校园的楼栋预设列表（地址表单楼栋选择器） */
-  buildings: () =>
-    request<Building[]>("/campuses/current/buildings"),
+  buildings: (campusId?: string) =>
+    request<Building[]>(
+      `/campuses/current/buildings${campusId ? `?campusId=${encodeURIComponent(campusId)}` : ""}`,
+    ),
   /** 楼栋寝室列表（寝室地址三级联动数据源）：floor 选填（不传=全楼，页面拉全按层分组）。
    *  silent：未导入寝室数据的楼返回空数组、失败不弹 toast，页面按「未录入」处理 */
   buildingRooms: (buildingId: string, floor?: number) =>

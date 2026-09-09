@@ -69,6 +69,10 @@
     {
       "path": "pages/content/detail",
       "style": { "navigationBarTitleText": "活动详情" }
+    },
+    {
+      "path": "pages/recruit/index",
+      "style": { "navigationBarTitleText": "楼长招募" }
     }
   ],
   // IKAHBQ: 购物车回归 Tab（订单降级普通页，入口在「我的」/支付成功页）。

@@ -140,6 +140,22 @@ export interface SessionUser {
   phone?: string;
   avatar?: string;
 }
+/** 楼长招募报名（IKEAGE）：一人一条在途，报名页即进度页 */
+export interface RecruitingApplication {
+  id: string;
+  campusId: string;
+  buildingId: string;
+  buildingName: string;
+  name: string;
+  phone: string;
+  note: string;
+  /** pending 待联系 | interviewing 面试中 | approved 已通过 | rejected 已拒绝 */
+  status: "pending" | "interviewing" | "approved" | "rejected";
+  rejectReason: string;
+  /** approved 时后端附带：实习楼长工号（骑手小程序登录凭证） */
+  staffNo?: string;
+  createdAt: string;
+}
 export interface LoginResult {
   token: string;
   /** IKDETO：当次为注册（首建档）——C 端据此弹一次迎新礼包 */
