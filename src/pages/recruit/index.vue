@@ -129,19 +129,11 @@ async function submit() {
 </script>
 <template>
   <view class="page recruit">
-    <!-- Hero：背景素材（static 域名，50KB webp）+ 标题排版压图 -->
-    <view class="hero">
-      <image
-        class="hero__bg"
-        src="https://static.buchuqin.com/app/public/recruit-bg-v1.webp"
-        mode="widthFix"
-      />
-      <view class="hero__text">
-        <text class="hero__title">楼长招募</text>
-        <text class="hero__sub">做本楼栋的零食管家，吃住寝室楼里的小生意</text>
-      </view>
-    </view>
-    <!-- 卖点（设计稿权益区） -->
+    <!-- 整页固定背景（道哥 2026-09-09 纠偏）：素材整图铺视口顶部，横幅/浅绿底/
+         品牌区都在背景里，内容浮于其上滚动。图外底色取素材近似色衔接 -->
+    <view class="recruit__bg" />
+    <view class="recruit__content">
+    <!-- 卖点（设计稿权益区）：浮在背景横幅下方 -->
     <view class="perks card">
       <view class="perk">
         <text class="perk__title">配送提成</text>
@@ -276,47 +268,33 @@ async function submit() {
         <text>3. 开始接单，收入实时可查</text>
       </view>
     </view>
+    </view>
   </view>
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
-.page {
-  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+/* 整页固定背景（素材整图 750x1333@750w）：横幅占图顶部 ~39%，下接浅绿留白；
+   图外底色用素材近似色衔接（#dafbe8 主调 → 底部波浪 #8acf9f 偏深不取）。
+   fixed 层不随内容滚动，长表单滚动时横幅常驻视口顶部 */
+.recruit__bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    url("https://static.buchuqin.com/app/public/recruit-bg-v1.webp") center
+      top / 100% auto no-repeat,
+    linear-gradient(180deg, #e2fcee 0%, #dafbe8 70%, #c9efdc 100%);
 }
-/* Hero：素材图通栏铺顶，标题压在图上（图自带留白，text 定位其上） */
-.hero {
+.recruit__content {
   position: relative;
+  z-index: 1;
+  /* 让位背景横幅：横幅显示高 = 100vw * (469-100)/941 ≈ 39.2vw ≈ 294rpx@750，
+     再加呼吸间距 */
+  padding-top: 46vw;
 }
-.hero__bg {
-  width: 100%;
-  display: block;
-}
-.hero__text {
-  position: absolute;
-  left: 48rpx;
-  bottom: 64rpx;
-  right: 48rpx;
-  display: flex;
-  flex-direction: column;
-}
-.hero__title {
-  font-size: 56rpx;
-  font-weight: 900;
-  color: #fff;
-  text-shadow: 0 4rpx 16rpx rgba(7, 60, 30, 0.35);
-}
-.hero__sub {
-  margin-top: 10rpx;
-  font-size: 24rpx;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
-  text-shadow: 0 2rpx 8rpx rgba(7, 60, 30, 0.4);
-}
-/* 卖点三列（设计稿权益区） */
+/* 卖点三列（设计稿权益区）：白卡浮于浅绿背景 */
 .perks {
-  margin: -36rpx 28rpx 0;
-  position: relative;
-  z-index: 2;
+  margin: 0 28rpx;
   padding: 28rpx 20rpx;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
