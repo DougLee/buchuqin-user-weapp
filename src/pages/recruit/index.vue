@@ -315,7 +315,7 @@ async function submit() {
 .recruit {
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 56vw 24rpx calc(20rpx + env(safe-area-inset-bottom));
+  padding: 51vw 24rpx calc(20rpx + env(safe-area-inset-bottom));
   background:
     url("https://static.buchuqin.com/app/public/recruit-banner-v3.webp")
       center top / 100% auto no-repeat,
