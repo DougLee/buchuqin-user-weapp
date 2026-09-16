@@ -91,7 +91,19 @@ onShow(async () => {
  *  在当前搜索结果内缩小到该分类；清空输入再点搜索 = 退出搜索回全品类 */
 async function pick(id: string) {
   active.value = id;
+  // IKG8PC：切分类回顶（scroll-top 值变化才生效——到底触发续跳时位置必>0）
+  mainTop.value = 0;
   await load();
+}
+/** IKG8PC 到底自动续跳（道哥 2026-09-16）：严格按侧栏顺序（含「全部」「限时
+ *  秒杀」伪分类），滚完最后一个分类停住；搜索态（关键词非空）停用——搜索
+ *  是目标明确的行为，不被自动切分类抢方向盘；loading/错误态不触发。 */
+const mainTop = ref(0);
+async function onReachEnd() {
+  if (keyword.value || loading.value || error.value) return;
+  const idx = categories.value.findIndex((c) => c.id === active.value);
+  const next = idx >= 0 ? categories.value[idx + 1] : undefined;
+  if (next) await pick(next.id);
 }
 /** IKDBFT：快捷分类横滑条（原首页分类条同款）——仅真实 DB 分类，
  *  「全部」「限时秒杀」伪分类留给左侧栏；点击 pick() 页内联动 */
@@ -149,7 +161,11 @@ const currentName = () => {
           图标识别职责交给首页横滑条，侧栏回归单行导航（美团式分类页形态） -->
           <text class="side__name">{{ c.name }}</text></view
         ></scroll-view
-      ><scroll-view scroll-y class="main"
+      ><scroll-view
+        scroll-y
+        class="main"
+        :scroll-top="mainTop"
+        @scrolltolower="onReachEnd"
         ><view class="main__title">{{ currentName() }}</view
         ><view v-if="error" class="cat-retry card" @tap="load"
           ><text class="cat-retry__title">商品加载失败</text
@@ -181,7 +197,8 @@ const currentName = () => {
                   <text v-if="p.originalPrice" class="item__strike"
                     >¥{{ fenToYuan(p.originalPrice) }}</text
                   ></view
-                ><!-- 计数器（IK9AWL）：数量>0 时展开 − n ＋，数字不再是隐形加号 -->
+                ><!-- 计数器（IK9AWL）：数量>0 时展开 − n ＋，数字不再是隐形加号；
+                     IKG8FF 秒杀限购：达到 limit 上限后 ＋ 禁用 -->
                 <view v-if="cart.quantity(p.id)" class="counter" @tap.stop
                   ><button
                     class="counter__btn counter__btn--minus"
@@ -193,12 +210,29 @@ const currentName = () => {
                   ><text class="counter__num">{{ cart.quantity(p.id) }}</text
                   ><button
                     class="counter__btn"
+                    :class="{
+                      'counter__btn--cap':
+                        p.seckillLimit &&
+                        cart.quantity(p.id) >= p.seckillLimit.limit,
+                    }"
+                    :disabled="
+                      !!p.seckillLimit &&
+                      cart.quantity(p.id) >= p.seckillLimit.limit
+                    "
                     aria-label="增加一件"
                     @tap.stop="cart.set(p, cart.quantity(p.id) + 1)"
                   >
                     ＋
                   </button></view
-                ><button
+                ><!-- IKG8FF：已抢购的秒杀商品置灰文案，不再给加购热区 -->
+                <button
+                  v-else-if="p.seckillLimit?.purchased"
+                  class="add add--bought"
+                  disabled
+                  aria-label="已抢购"
+                >
+                  已抢
+                </button><button
                   v-else
                   class="add"
                   aria-label="加入购物车"
@@ -436,6 +470,16 @@ const currentName = () => {
 .counter__btn--minus {
   background: $primary-soft;
   color: $primary-dark;
+}
+/* IKG8FF：秒杀限购达到上限的 ＋ 与已抢购按钮——灰化禁用态 */
+.counter__btn--cap,
+.add--bought {
+  background: #e5e7e5;
+  color: $muted;
+}
+.add--bought {
+  font-size: 20rpx;
+  font-weight: 700;
 }
 .counter__num {
   min-width: 40rpx;

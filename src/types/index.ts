@@ -23,6 +23,8 @@ export interface Product {
     price: number;
     endsAt: string;
   };
+  /** IKG8FF 秒杀限购：生效秒杀活动商品才有——purchased=true 置灰「已抢购」，数量上限 limit */
+  seckillLimit?: { limit: number; purchased: boolean };
   weight: number;
 }
 /** /home 促销分组条目（IKAHFG/ADR-0006）：活动 + 商品视图 */

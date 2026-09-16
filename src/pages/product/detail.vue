@@ -70,10 +70,18 @@ const stockHint = computed(() => {
   const rest = product.value?.stock ?? 0;
   return rest > 0 && rest <= 5 ? `仅剩 ${rest} 件` : "";
 });
+/** IKG8FF 秒杀限购：每人每活动 1 件——已抢购置灰禁买，未购提示限购规则 */
+const seckilled = computed(
+  () => product.value?.seckillLimit?.purchased ?? false,
+);
 const add = async () => {
   if (!product.value) return;
   if (soldOut.value) {
     uni.showToast({ title: "已抢完，看看别的吧", icon: "none" });
+    return;
+  }
+  if (seckilled.value) {
+    uni.showToast({ title: "您已抢购过该商品，每人限购 1 件", icon: "none" });
     return;
   }
   // IKE3HT 加购收网（拍板A 不可跳过）：未绑手机号先授权，绑定成功补执行
@@ -158,7 +166,12 @@ const gallery = computed(() => {
             v-if="soldOut"
             class="stock-flag stock-flag--out"
             >已抢完</text
-          ><text v-else-if="stockHint" class="stock-flag">{{ stockHint }}</text></view
+          ><text v-else-if="stockHint" class="stock-flag">{{ stockHint }}</text
+          ><!-- IKG8FF 秒杀限购：生效秒杀活动商品常驻限购标注 --><text
+            v-if="product.seckillLimit && !seckilled"
+            class="stock-flag"
+            >每人限购 1 件</text
+          ></view
         ></view
       ><view class="card guarantee"
         ><view
@@ -206,12 +219,12 @@ const gallery = computed(() => {
       <!-- #endif -->
       <button class="bag" @tap="uni.$emit('open-cart')">
         购物车 {{ cart.cart.totalQuantity || "" }}</button
-      ><!-- 售罄置灰禁买（ADR-0005/IKA00Q） --><button
+      ><!-- 售罄置灰禁买（ADR-0005/IKA00Q）；IKG8FF 已抢购同样置灰 --><button
         class="primary-btn"
-        :disabled="soldOut"
+        :disabled="soldOut || seckilled"
         @tap="add"
       >
-        {{ soldOut ? "已抢完" : "加入购物车" }}
+        {{ soldOut ? "已抢完" : seckilled ? "已抢购" : "加入购物车" }}
       </button></view
     ></view
   >
