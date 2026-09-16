@@ -38,6 +38,28 @@ async function load() {
   } finally {
     loading.value = false;
   }
+  void prefetchNeighbors();
+}
+/** IKG8PC 二轮（道哥 2026-09-16「不丝滑」反馈）：预取相邻分类——当前分类
+ *  就绪后后台静默拉 idx±1（60s TTL），滚动续跳命中缓存即零等待直替换，
+ *  不再闪骨架。预取失败静默，切换时回落正常 load。 */
+const prefetchCache = new Map<string, { rows: Product[]; at: number }>();
+const PREFETCH_TTL = 60_000;
+const fetchCategoryProducts = (id: string): Promise<Product[]> =>
+  id === "seckill" ? api.seckillProducts() : api.products(id, "");
+function prefetchNeighbors() {
+  // 搜索态预取无意义（续跳已停用，且结果与关键词耦合）
+  if (keyword.value) return;
+  const idx = categories.value.findIndex((c) => c.id === active.value);
+  for (const n of [idx - 1, idx + 1]) {
+    const c = categories.value[n];
+    if (!c) continue;
+    const hit = prefetchCache.get(c.id);
+    if (hit && Date.now() - hit.at < PREFETCH_TTL) continue;
+    fetchCategoryProducts(c.id)
+      .then((rows) => prefetchCache.set(c.id, { rows, at: Date.now() }))
+      .catch(() => {});
+  }
 }
 /** 搜索即全品类（IKAHBJ）：任何搜索动作先把分类重置回「全部」再拉列表 */
 async function search() {
@@ -88,23 +110,52 @@ onShow(async () => {
   await load();
 });
 /** 切分类带着搜索条件（2026-08-23 道哥反馈，优化 IKAHBJ 决策）：关键词保留，
- *  在当前搜索结果内缩小到该分类；清空输入再点搜索 = 退出搜索回全品类 */
-async function pick(id: string) {
+ *  在当前搜索结果内缩小到该分类；清空输入再点搜索 = 退出搜索回全品类。
+ *  instant=滚动续跳快通道：预取命中零等待直替换（不闪骨架），侧栏点击走原体验 */
+async function pick(id: string, instant = false) {
   active.value = id;
-  // IKG8PC：切分类回顶（scroll-top 值变化才生效——到底触发续跳时位置必>0）
+  // IKG8PC：切分类回顶（scroll-top 值变化才生效——续跳触发时位置必>0）
   mainTop.value = 0;
+  const idx = categories.value.findIndex((c) => c.id === id);
+  const hit = prefetchCache.get(id);
+  if (instant && hit && Date.now() - hit.at < PREFETCH_TTL) {
+    prefetchCache.delete(id);
+    products.value = hit.rows;
+    error.value = false;
+    loading.value = false;
+    void prefetchNeighbors();
+    return;
+  }
   await load();
 }
 /** IKG8PC 到底自动续跳（道哥 2026-09-16）：严格按侧栏顺序（含「全部」「限时
- *  秒杀」伪分类），滚完最后一个分类停住；搜索态（关键词非空）停用——搜索
- *  是目标明确的行为，不被自动切分类抢方向盘；loading/错误态不触发。 */
+ *  秒杀」伪分类），搜索态（关键词非空）停用——搜索是目标明确的行为；二轮
+ *  扩双向：到底=下一个，到顶=上一个（道哥要求）。jumpLocked 换列节流防惯性
+ *  连跳；程序置顶后 800ms 内忽略 scrolltoupper——scroll-top 置 0 的回弹会
+ *  误触发反向跳形成抖动死循环。 */
 const mainTop = ref(0);
-async function onReachEnd() {
-  if (keyword.value || loading.value || error.value) return;
+const jumpLocked = ref(false);
+let topGuardUntil = 0;
+async function jump(step: 1 | -1) {
+  if (jumpLocked.value || keyword.value || loading.value || error.value) return;
   const idx = categories.value.findIndex((c) => c.id === active.value);
-  const next = idx >= 0 ? categories.value[idx + 1] : undefined;
-  if (next) await pick(next.id);
+  const target = categories.value[idx + step];
+  if (!target) return;
+  jumpLocked.value = true;
+  setTimeout(() => (jumpLocked.value = false), 400);
+  await pick(target.id, true);
+  topGuardUntil = Date.now() + 800;
 }
+const onReachEnd = () => void jump(1);
+const onReachTop = () => {
+  if (Date.now() < topGuardUntil) return;
+  void jump(-1);
+};
+/** IKG8PC 二轮：边界预告——尾部显示下一个分类名，让续跳从"意外"变"预告" */
+const nextCategoryName = computed(() => {
+  const idx = categories.value.findIndex((c) => c.id === active.value);
+  return categories.value[idx + 1]?.name ?? "";
+});
 /** IKDBFT：快捷分类横滑条（原首页分类条同款）——仅真实 DB 分类，
  *  「全部」「限时秒杀」伪分类留给左侧栏；点击 pick() 页内联动 */
 const quickCats = computed(() =>
@@ -165,7 +216,10 @@ const currentName = () => {
         scroll-y
         class="main"
         :scroll-top="mainTop"
+        :upper-threshold="60"
+        :lower-threshold="120"
         @scrolltolower="onReachEnd"
+        @scrolltoupper="onReachTop"
         ><view class="main__title">{{ currentName() }}</view
         ><view v-if="error" class="cat-retry card" @tap="load"
           ><text class="cat-retry__title">商品加载失败</text
@@ -243,6 +297,13 @@ const currentName = () => {
               ></view
             ></view
           ></template
+        ><!-- IKG8PC 二轮：边界预告——到底/到顶续跳前给预期，从"意外跳走"变"按预告翻页" -->
+        <view
+          v-if="!loading && !error && !keyword && products.length"
+          class="next-hint"
+          ><text v-if="nextCategoryName"
+            >继续滚动 · 下一分类「{{ nextCategoryName }}」</text
+          ><text v-else>已经是最后一个分类啦</text></view
         ></scroll-view
       ></view
     ><TabBar :current="1" /><CartOverlay /></view
@@ -385,6 +446,13 @@ const currentName = () => {
   text-align: center;
   padding: 80rpx 0;
   font-size: 26rpx;
+}
+/* IKG8PC 二轮：边界预告条（克制弱化，不抢商品注意力） */
+.next-hint {
+  text-align: center;
+  padding: 26rpx 0 34rpx;
+  font-size: 22rpx;
+  color: $muted;
 }
 .item {
   display: flex;
