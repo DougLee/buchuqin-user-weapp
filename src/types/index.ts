@@ -73,6 +73,8 @@ export interface Cart {
   totalQuantity: number;
   /** 起送门槛，单位：分 */
   deliveryThreshold: number;
+  /** IKGNMV（一单一秒杀）：购物车里已有的秒杀 SKU id——其他秒杀品加购置灰用 */
+  seckillIdInCart?: string;
 }
 export interface Address {
   id: string;

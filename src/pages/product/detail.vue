@@ -78,6 +78,14 @@ const stockHint = computed(() => {
 const seckilled = computed(
   () => product.value?.seckillLimit?.purchased ?? false,
 );
+/** IKGNMV 一单一秒杀：购物车里已有**其他**秒杀品时，本秒杀品禁买 */
+const seckillLocked = computed(
+  () =>
+    !!product.value?.promotion?.type &&
+    product.value.promotion.type === "seckill" &&
+    !!cart.cart.seckillIdInCart &&
+    cart.cart.seckillIdInCart !== product.value.id,
+);
 /** IKG1C 打烊停单：整店闭店时单品状态（售罄/限购）失去意义，闭店态优先展示 */
 const closedNow = computed(() => campusStore.closedNow);
 const add = async () => {
@@ -92,6 +100,13 @@ const add = async () => {
   }
   if (seckilled.value) {
     uni.showToast({ title: "您已抢购过该商品，每人限购 1 件", icon: "none" });
+    return;
+  }
+  if (seckillLocked.value) {
+    uni.showToast({
+      title: "购物车已有秒杀商品，一个订单限一个",
+      icon: "none",
+    });
     return;
   }
   // IKE3HT 加购收网（拍板A 不可跳过）：未绑手机号先授权，绑定成功补执行
@@ -230,9 +245,10 @@ const gallery = computed(() => {
       <button class="bag" @tap="uni.$emit('open-cart')">
         购物车 {{ cart.cart.totalQuantity || "" }}</button
       ><!-- 售罄置灰禁买（ADR-0005/IKA00Q）；IKG8FF 已抢购同样置灰；
+           IKGNMV 购物车已有其他秒杀品同样置灰；
            IKG1C 闭店态优先展示（整店买不了，单品售罄/限购文案让位） --><button
         class="primary-btn"
-        :disabled="soldOut || seckilled || closedNow"
+        :disabled="soldOut || seckilled || closedNow || seckillLocked"
         @tap="add"
       >
         {{
@@ -242,7 +258,9 @@ const gallery = computed(() => {
               ? "已抢完"
               : seckilled
                 ? "已抢购"
-                : "加入购物车"
+                : seckillLocked
+                  ? "一单限一个"
+                  : "加入购物车"
         }}
       </button></view
     ></view

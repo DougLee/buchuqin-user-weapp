@@ -10,6 +10,7 @@ export const useCartStore = defineStore("cart", {
       totalQuantity: 0,
       /** 起送门槛初始占位：10 元 = 1000 分（真实值以 GET /cart 返回为准） */
       deliveryThreshold: 1000,
+      seckillIdInCart: undefined,
     } as Cart,
     loading: false,
     /**

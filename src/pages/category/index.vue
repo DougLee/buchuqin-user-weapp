@@ -27,6 +27,14 @@ const active = ref("all"),
   campusStore = useCampusStore(),
   /** 闭店时全部分类商品的加购/＋一并置灰禁用（服务端结算拦截的前端前置） */
   closedNow = computed(() => campusStore.closedNow);
+/** IKGNMV 一单一秒杀：购物车里已有**其他**秒杀品时，本秒杀品＋置灰 */
+function seckillLocked(p: Product): boolean {
+  return (
+    p.promotion?.type === "seckill" &&
+    !!cart.cart.seckillIdInCart &&
+    cart.cart.seckillIdInCart !== p.id
+  );
+}
 /** 商品列表三态（IK9AWK）：加载骨架 / 失败重试 / 列表 */
 async function load() {
   loading.value = true;
@@ -303,6 +311,15 @@ const currentName = () => {
                   aria-label="已抢购"
                 >
                   已抢
+                </button
+                ><!-- IKGNMV：购物车已有其他秒杀品——一单一秒杀置灰 -->
+                <button
+                  v-else-if="seckillLocked(p)"
+                  class="add add--bought"
+                  disabled
+                  aria-label="一单限一个"
+                >
+                  限一
                 </button><button
                   v-else
                   class="add"
