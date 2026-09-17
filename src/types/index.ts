@@ -249,6 +249,8 @@ export interface Settlement extends Cart {
   discount: number;
   payableAmount: number;
   estimatedArrival: string;
+  /** IKGN4W：楼长缺失提示（非空 = 地址楼栋无在职楼长，提交前弹窗确认） */
+  managerTip?: string;
 }
 /** 微信支付收银台参数 */
 export interface WechatPayParams {

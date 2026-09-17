@@ -185,6 +185,17 @@ async function submit() {
     uni.showToast({ title: "还差一点起送金额，再去挑一件吧", icon: "none" });
     return;
   }
+  // 楼长缺失提示（IKGN4W 道哥改版）：支付前弹窗确认——结算预览已带
+  // managerTip（服务端按地址楼栋楼长判定），用户确认后才继续建单支付
+  if (settlement.value?.managerTip) {
+    const { confirm } = await uni.showModal({
+      title: "温馨提示",
+      content: settlement.value.managerTip,
+      confirmText: "仍要下单",
+      cancelText: "暂不下单",
+    });
+    if (!confirm) return;
+  }
   submitting.value = true;
   try {
     const created = await api.createOrder(payload.value);
@@ -199,18 +210,6 @@ async function submit() {
       useCartStore().clearLocal();
       // 直达支付成功页（IK97FE/IK97FH）
       uni.redirectTo({ url: `/pages/checkout/success?id=${created.id}` });
-      // 楼长缺失提示（IKGN4W）：服务端判定楼栋无在职楼长时下发文案，
-      // 跳成功页后 toast 一次——纯预期管理，不阻断下单/支付
-      if (created.managerTip)
-        setTimeout(
-          () =>
-            uni.showToast({
-              title: String(created.managerTip),
-              icon: "none",
-              duration: 3000,
-            }),
-          400,
-        );
       return;
     }
     uni.showToast({ title: "支付未完成，可继续支付", icon: "none" });
