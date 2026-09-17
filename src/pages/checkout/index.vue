@@ -186,16 +186,22 @@ async function submit() {
     return;
   }
   // 楼长缺失提示（IKGN4W 道哥改版）：支付前弹窗确认——结算预览已带
-  // managerTip（服务端按地址楼栋楼长判定），用户确认后才继续建单支付
+  // managerTip（服务端按地址楼栋楼长判定），用户确认后才继续建单支付。
+  // 自绘弹窗（uni.showModal 原生样式与主题不符），确认后走 doSubmit
   if (settlement.value?.managerTip) {
-    const { confirm } = await uni.showModal({
-      title: "温馨提示",
-      content: settlement.value.managerTip,
-      confirmText: "仍要下单",
-      cancelText: "暂不下单",
-    });
-    if (!confirm) return;
+    tipOpen.value = true;
+    return;
   }
+  await doSubmit();
+}
+/** 弹窗状态（IKGN4W）：楼长缺失确认框开合 */
+const tipOpen = ref(false);
+/** 弹窗「仍要下单」：关弹窗继续建单+支付；「暂不下单」仅关弹窗 */
+async function confirmTip() {
+  tipOpen.value = false;
+  await doSubmit();
+}
+async function doSubmit() {
   submitting.value = true;
   try {
     const created = await api.createOrder(payload.value);
@@ -365,6 +371,22 @@ async function submit() {
   <!-- IKE3HT 方案C：未绑手机号授权弹层（z-1100 盖支付栏，不可跳过） -->
   <PhoneGate v-if="session.needsPhone" />
   <CartOverlay />
+  <!-- 楼长缺失确认弹窗（IKGN4W）：自绘样式贴合主题——品牌绿确认键，
+       浅色 ghost 取消键；遮罩点击不关闭（避免误触跳过提示） -->
+  <view v-if="tipOpen" class="tip-mask" @tap.stop>
+    <view class="tip-card">
+      <text class="tip-card__title">温馨提示</text>
+      <text class="tip-card__body">{{ settlement?.managerTip }}</text>
+      <view class="tip-card__actions">
+        <button class="tip-btn tip-btn--ghost" @tap="tipOpen = false">
+          暂不下单
+        </button>
+        <button class="tip-btn tip-btn--primary" @tap="confirmTip">
+          仍要下单
+        </button>
+      </view>
+    </view>
+  </view>
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
@@ -573,5 +595,65 @@ async function submit() {
 .submit .primary-btn {
   width: 300rpx;
   margin: 0;
+}
+/* ---------- 楼长缺失确认弹窗（IKGN4W）：贴合主题的自绘弹窗 ---------- */
+.tip-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(18, 30, 24, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 72rpx;
+}
+.tip-card {
+  width: 100%;
+  max-width: 560rpx;
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 48rpx 40rpx 36rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.tip-card__title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: $ink;
+}
+.tip-card__body {
+  margin-top: 24rpx;
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: rgba(30, 37, 32, 0.78);
+  text-align: center;
+}
+.tip-card__actions {
+  margin-top: 44rpx;
+  display: flex;
+  gap: 20rpx;
+  width: 100%;
+}
+.tip-btn {
+  flex: 1;
+  margin: 0;
+  height: 84rpx;
+  line-height: 84rpx;
+  border-radius: 42rpx;
+  font-size: 29rpx;
+  font-weight: 600;
+  padding: 0;
+}
+.tip-btn--ghost {
+  background: $primary-soft;
+  color: $primary-dark;
+}
+.tip-btn--primary {
+  background: $primary;
+  color: #fff;
+}
+.tip-btn--primary:active {
+  background: $primary-dark;
 }
 </style>
