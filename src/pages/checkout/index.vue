@@ -199,6 +199,18 @@ async function submit() {
       useCartStore().clearLocal();
       // 直达支付成功页（IK97FE/IK97FH）
       uni.redirectTo({ url: `/pages/checkout/success?id=${created.id}` });
+      // 楼长缺失提示（IKGN4W）：服务端判定楼栋无在职楼长时下发文案，
+      // 跳成功页后 toast 一次——纯预期管理，不阻断下单/支付
+      if (created.managerTip)
+        setTimeout(
+          () =>
+            uni.showToast({
+              title: String(created.managerTip),
+              icon: "none",
+              duration: 3000,
+            }),
+          400,
+        );
       return;
     }
     uni.showToast({ title: "支付未完成，可继续支付", icon: "none" });
