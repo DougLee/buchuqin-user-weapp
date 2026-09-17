@@ -4,6 +4,7 @@ import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
 import { useCartStore } from "../../stores/cart";
+import { useCampusStore } from "../../stores/campus";
 import { fenToYuan } from "../../utils/money";
 import { categoryImage } from "../../utils/categoryImage";
 import type { Category, Product } from "../../types";
@@ -21,7 +22,11 @@ const active = ref("all"),
   products = ref<Product[]>([]),
   loading = ref(true),
   error = ref(false),
-  cart = useCartStore();
+  cart = useCartStore(),
+  /** IKG1C 打烊停单：闭店态共享自 campus store（首页已随 /home 注入，这里只轻刷） */
+  campusStore = useCampusStore(),
+  /** 闭店时全部分类商品的加购/＋一并置灰禁用（服务端结算拦截的前端前置） */
+  closedNow = computed(() => campusStore.closedNow);
 /** 商品列表三态（IK9AWK）：加载骨架 / 失败重试 / 列表 */
 async function load() {
   loading.value = true;
@@ -83,6 +88,7 @@ onShow(async () => {
   const pick = (uni.getStorageSync("categoryPick") as string) || "";
   uni.removeStorageSync("categoryPick");
   await cart.load();
+  void campusStore.refresh(); // IKG1C：打烊态轻量刷新（静默，不阻塞列表）
   try {
     categories.value = await api.categories();
   } catch {
@@ -268,16 +274,27 @@ const currentName = () => {
                       'counter__btn--cap':
                         p.seckillLimit &&
                         cart.quantity(p.id) >= p.seckillLimit.limit,
+                      'add--closed': closedNow,
                     }"
                     :disabled="
-                      !!p.seckillLimit &&
-                      cart.quantity(p.id) >= p.seckillLimit.limit
+                      closedNow ||
+                      (!!p.seckillLimit &&
+                        cart.quantity(p.id) >= p.seckillLimit.limit)
                     "
                     aria-label="增加一件"
                     @tap.stop="cart.set(p, cart.quantity(p.id) + 1)"
                   >
                     ＋
                   </button></view
+                ><!-- IKG1C：闭店时 ＋ 置灰禁买，优先于已抢购（整店都买不了） -->
+                <button
+                  v-else-if="closedNow"
+                  class="add add--closed"
+                  disabled
+                  aria-label="已打烊"
+                >
+                  ＋
+                </button
                 ><!-- IKG8FF：已抢购的秒杀商品置灰文案，不再给加购热区 -->
                 <button
                   v-else-if="p.seckillLimit?.purchased"
@@ -539,9 +556,11 @@ const currentName = () => {
   background: $primary-soft;
   color: $primary-dark;
 }
-/* IKG8FF：秒杀限购达到上限的 ＋ 与已抢购按钮——灰化禁用态 */
+/* IKG8FF：秒杀限购达到上限的 ＋ 与已抢购按钮——灰化禁用态；
+   IKG1C：闭店态加购按钮同款灰化（.add--closed） */
 .counter__btn--cap,
-.add--bought {
+.add--bought,
+.add--closed {
   background: #e5e7e5;
   color: $muted;
 }

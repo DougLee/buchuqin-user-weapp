@@ -7,6 +7,7 @@ import WheelPanel from "../../components/WheelPanel.vue";
 import WelcomeGift from "../../components/WelcomeGift.vue";
 import PhoneGate from "../../components/PhoneGate.vue";
 import { useCartStore } from "../../stores/cart";
+import { useCampusStore } from "../../stores/campus";
 import { useSessionStore } from "../../stores/session";
 import { bannerClickable, openBannerTarget } from "../../utils/bannerLink";
 import { pickCurrentAddress } from "../../utils/currentAddress";
@@ -23,6 +24,8 @@ import type {
 } from "../../types";
 
 const session = useSessionStore(); // IKE3HT 强授权门模板绑定
+/** IKG1C 打烊停单：闭店态随 /home 同批到位（campusStore.apply 不加请求） */
+const campusStore = useCampusStore();
 const cart = useCartStore(),
   // IKAJT2：校区名接口下发（home().campus.name），空串时模板兜底「选择校区」
   campus = ref(""),
@@ -47,6 +50,8 @@ onShow(async () => {
   // 当前地址统一走 pickCurrentAddress（道哥 2026-09-09：切地址后首页跟随）
   defaultAddress.value = pickCurrentAddress(addresses);
   campus.value = home.campus.name;
+  // IKG1C：闭店五字段并入共享 campus 状态（详情/分类页从这里取，避免各自再拉）
+  campusStore.apply(home.campus);
   categories.value = home.categories;
   banners.value = home.banners;
   products.value = home.hotProducts;
@@ -303,6 +308,12 @@ function search() {
       ><text class="loc-sep"> · </text
       ><text class="loc-addr" @tap.stop="goAddress">{{ addressText }}</text
       ><text class="down" @tap.stop="goCampus">⌄</text></view
+    ><!-- IKG1C 打烊横幅：closedNow 服务端判定，文案随闭店原因切换（手动/时间窗） -->
+    <view v-if="campusStore.closedNow" class="closed-banner"
+      ><text class="closed-banner__dot">●</text
+      ><text class="closed-banner__text">{{
+        campusStore.closedBanner
+      }}</text></view
     >
     <view class="search"
       ><text class="search__glass">⌕</text
@@ -628,6 +639,28 @@ function search() {
 }
 .down {
   color: $primary-dark;
+}
+/* ---------- 打烊停单横幅（IKG1C）：浅底深字柔和提示，导航区下首位 ---------- */
+.closed-banner {
+  margin-top: 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  padding: 18rpx 26rpx;
+  border-radius: 20rpx;
+  background: $cream;
+  border: 2rpx solid rgba(230, 162, 60, 0.35);
+}
+.closed-banner__dot {
+  color: $orange;
+  font-size: 20rpx;
+  flex-shrink: 0;
+}
+.closed-banner__text {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #8a5a1e;
+  line-height: 1.5;
 }
 /* IKAJT2：双入口命中区放大（IK9AWL 同款 ≥88rpx 热区规范） */
 .loc-campus,

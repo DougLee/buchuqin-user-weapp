@@ -5,6 +5,7 @@ import { api } from "../../api";
 import { isRetryable } from "../../api/request";
 import PhoneGate from "../../components/PhoneGate.vue";
 import { useCartStore } from "../../stores/cart";
+import { useCampusStore } from "../../stores/campus";
 import { useSessionStore } from "../../stores/session";
 import { fenToYuan } from "../../utils/money";
 import { countdownText, PROMO_TAG } from "../../utils/promotion";
@@ -13,6 +14,8 @@ import type { Product } from "../../types";
 const product = ref<Product>(),
   cart = useCartStore(),
   session = useSessionStore(),
+  /** IKG1C 打烊停单：闭店态共享自 campus store（分享直达本页也会自刷新） */
+  campusStore = useCampusStore(),
   productId = ref(""),
   loading = ref(true),
   error = ref(false);
@@ -23,6 +26,7 @@ onUnmounted(() => clearInterval(promoTicker));
 onLoad(async (q) => {
   productId.value = String(q?.id || "");
   await cart.load();
+  void campusStore.refresh(); // IKG1C：打烊态轻量刷新，不阻塞商品加载
   await load();
 });
 /** 商品分享（IKC7V6）：头图直传 + 价格标题钩子（「¥12.9 商品名 点击抢购>>」），
@@ -74,8 +78,14 @@ const stockHint = computed(() => {
 const seckilled = computed(
   () => product.value?.seckillLimit?.purchased ?? false,
 );
+/** IKG1C 打烊停单：整店闭店时单品状态（售罄/限购）失去意义，闭店态优先展示 */
+const closedNow = computed(() => campusStore.closedNow);
 const add = async () => {
   if (!product.value) return;
+  if (closedNow.value) {
+    uni.showToast({ title: campusStore.closedToast, icon: "none" });
+    return;
+  }
   if (soldOut.value) {
     uni.showToast({ title: "已抢完，看看别的吧", icon: "none" });
     return;
@@ -219,12 +229,21 @@ const gallery = computed(() => {
       <!-- #endif -->
       <button class="bag" @tap="uni.$emit('open-cart')">
         购物车 {{ cart.cart.totalQuantity || "" }}</button
-      ><!-- 售罄置灰禁买（ADR-0005/IKA00Q）；IKG8FF 已抢购同样置灰 --><button
+      ><!-- 售罄置灰禁买（ADR-0005/IKA00Q）；IKG8FF 已抢购同样置灰；
+           IKG1C 闭店态优先展示（整店买不了，单品售罄/限购文案让位） --><button
         class="primary-btn"
-        :disabled="soldOut || seckilled"
+        :disabled="soldOut || seckilled || closedNow"
         @tap="add"
       >
-        {{ soldOut ? "已抢完" : seckilled ? "已抢购" : "加入购物车" }}
+        {{
+          closedNow
+            ? campusStore.closedLabel
+            : soldOut
+              ? "已抢完"
+              : seckilled
+                ? "已抢购"
+                : "加入购物车"
+        }}
       </button></view
     ></view
   >

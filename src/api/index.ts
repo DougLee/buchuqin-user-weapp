@@ -4,6 +4,7 @@ import type {
   AfterSale,
   Banner,
   Building,
+  CampusCloseState,
   Cart,
   Category,
   CouponBundle,
@@ -56,7 +57,8 @@ export const api = {
     }),
   home: () =>
     request<{
-      campus: { name: string };
+      /** 校区视图（IKGI1C）：闭店五字段随本接口同批下发，首页不再额外请求 */
+      campus: { name: string } & CampusCloseState;
       banners: Banner[];
       categories: Category[];
       hotProducts: Product[];
@@ -172,14 +174,15 @@ export const api = {
     request<Array<{ id: string; name: string; shortName: string }>>(
       "/campuses",
     ),
-  /** 我的校区详情（IKAJT2）：名称/仓名/配送费门槛，随切换即时生效 */
+  /** 我的校区详情（IKAJT2）：名称/仓名/配送费门槛，随切换即时生效；
+   *  IKG1C：闭店五字段同源下发，分类页/详情页用它轻量刷新打烊态 */
   currentCampus: () =>
     request<{
       id: string;
       name: string;
       shortName: string;
       warehouseName: string;
-    }>("/campus/current"),
+    } & CampusCloseState>("/campus/current"),
   /** 切换校区（IKAJT2）：返回换发 token（JWT 含新 campusId），会话按登录同款落库 */
   selectCampus: (campusId: string) =>
     request<LoginResult>("/auth/campuses/select", {

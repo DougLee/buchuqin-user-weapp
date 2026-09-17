@@ -95,6 +95,23 @@ export interface Building {
   gender: string;
   available: boolean;
 }
+/**
+ * 校区打烊配置（IKGI1C）：随校区视图下发（/home 的 campus 与 /campus/current
+ * 同源）。closedNow/closedReason 由服务端按当前时间实时算好——客户端时钟不可信，
+ * 前端直接消费，不自算时间窗。
+ */
+export interface CampusCloseState {
+  /** 打烊开始 HH:mm（start > end = 跨零点窗，如 22:00–08:00） */
+  closeStart?: string | null;
+  /** 恢复接单时间 HH:mm */
+  closeEnd?: string | null;
+  /** 商家手动闭店开关 */
+  manualClosed?: boolean;
+  /** 当前是否闭店（服务端判定） */
+  closedNow?: boolean;
+  /** 闭店原因：manual 手动闭店 | window 打烊时间窗 */
+  closedReason?: "manual" | "window" | null;
+}
 /** 楼栋寝室条目（IKD6FH 地址四级选择）：GET /campuses/current/buildings/:buildingId/rooms */
 export interface Room {
   id: string;
