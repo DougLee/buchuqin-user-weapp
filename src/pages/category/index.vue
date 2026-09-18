@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, getCurrentInstance, ref } from "vue";
+import { computed, getCurrentInstance, onMounted, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
@@ -73,9 +73,12 @@ function currentNameOf(catId: string): string {
   return categories.value.find((c) => c.id === catId)?.name ?? "全部";
 }
 async function fetchRows(catId: string): Promise<Product[]> {
-  return catId === "seckill"
-    ? await api.seckillProducts()
-    : await api.products(catId, keyword.value);
+  // mock 模式走假数据源（与预取同一开关）
+  return MOCK
+    ? mockRows(catId)
+    : catId === "seckill"
+      ? await api.seckillProducts()
+      : await api.products(catId, keyword.value);
 }
 /** 首段加载（骨架态）：首屏 / 搜索 / 侧栏跳转未接续场景 */
 async function load() {
@@ -213,7 +216,17 @@ async function scrollToSeg(segIdx: number) {
 }
 /* ---------- 无限流接续（IKGQ6R 终版）：滚到底自动 append 下一分类段 ---------- */
 const appending = ref(false);
+// mock 联调：自动触发一次接续（H5 无真实滚动）
+onMounted(() => {
+  if (!MOCK) return;
+  // 等 onShow 的 mock load 就绪后周期触发接续（便于浏览器自动化验证）
+  const timer = setInterval(() => {
+    if (loading.value) return;
+    void onReachEnd();
+  }, 2000);
+});
 async function onReachEnd() {
+  console.log('[IKGQ6R-debug]', JSON.stringify({ appending: appending.value, kw: keyword.value, loading: loading.value, previewNext: previewNext.value, flowLen: flow.value.length, active: active.value, cats: categories.value.map((c) => c.id) }));
   if (appending.value || keyword.value || loading.value) return;
   const last = flow.value[flow.value.length - 1];
   if (!last) return;
@@ -239,6 +252,23 @@ async function onReachEnd() {
 }
 /** 滚动联动左侧高亮：节流量各段顶，落在视口上缘附近者为当前分类 */
 let segSyncAt = 0;
+/** 平滑滚动（IKGQ6R）：逐帧缓动，供侧栏点击/段定位复用 */
+function smoothScrollTop(target = 0) {
+  if (scrollAnimTimer) clearTimeout(scrollAnimTimer);
+  const start = lastScrollTop;
+  if (Math.abs(start - target) < 2) return;
+  const t0 = Date.now();
+  const dur = 200;
+  const step = () => {
+    const t = Math.min(1, (Date.now() - t0) / dur);
+    const ease = 1 - Math.pow(1 - t, 3);
+    mainTop.value = Math.round(start + (target - start) * ease);
+    if (t < 1) scrollAnimTimer = setTimeout(step, 16);
+  };
+  step();
+}
+let lastScrollTop = 0;
+let scrollAnimTimer: ReturnType<typeof setTimeout> | null = null;
 function onMainScroll(e: { detail: { scrollTop: number } }) {
   lastScrollTop = e.detail.scrollTop;
   const now = Date.now();
@@ -273,6 +303,24 @@ const currentName = () => {
       : categories.value.find((c) => c.id === active.value)?.name || "全部商品";
   return keyword.value ? `“${keyword.value}” · ${base}` : base;
 };
+// IKGQ6R 联调诊断句柄（仅 MOCK）
+if (MOCK) {
+  (window as unknown as Record<string, unknown>).__cat = {
+    get active() {
+      return active.value;
+    },
+    get flow() {
+      return flow.value.map((f) => f.catId);
+    },
+    get cats() {
+      return categories.value.map((c) => c.id);
+    },
+    get loading() {
+      return loading.value;
+    },
+    reach: () => void onReachEnd(),
+  };
+}
 </script>
 <template>
   <view class="page"
@@ -436,7 +484,11 @@ const currentName = () => {
           ></view
         ></view
       ></template
-        ><!-- IKG8PC 二轮：边界预告——到底/到顶续跳前给预期，从"意外跳走"变"按预告翻页" -->
+        ><!-- IKGQ6R 联调按钮（仅 MOCK）：直触接续逻辑 -->
+        <view v-if="MOCK" style="text-align:center;padding:20rpx">
+          <button style="background:#07883b;color:#fff" @tap="onReachEnd">模拟滚到底</button>
+        </view>
+        <!-- IKG8PC 二轮：边界预告——到底/到顶续跳前给预期，从"意外跳走"变"按预告翻页" -->
         <view
           v-if="!loading && !error && !keyword && products.length"
           class="next-hint"
