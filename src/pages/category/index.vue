@@ -35,20 +35,38 @@ function seckillLocked(p: Product): boolean {
     cart.cart.seckillIdInCart !== p.id
   );
 }
-/** 商品列表三态（IK9AWK）：加载骨架 / 失败重试 / 列表 */
-async function load() {
-  loading.value = true;
+/** 商品列表三态（IK9AWK）：加载骨架 / 失败重试 / 列表。
+ *  IKGQ6R 丝滑化：silent=切换场景旧内容保留（不清列表不闪骨架，顶部细条
+ *  提示），数据到了再整体淡入；首屏/搜索仍走骨架态。 */
+const switching = ref(false);
+const listEntering = ref(false);
+function fadeIn() {
+  listEntering.value = false;
+  // 下一 tick 重触发 CSS 动画
+  setTimeout(() => (listEntering.value = true), 30);
+  setTimeout(() => (listEntering.value = false), 480);
+}
+async function load(options?: { silent?: boolean }) {
+  const silent = options?.silent && products.value.length > 0;
+  if (silent) {
+    switching.value = true;
+  } else {
+    loading.value = true;
+  }
   error.value = false;
   try {
     // IKBW0K：限时秒杀伪分类走专区接口（进行中活动带促销价），搜索词不生效
-    products.value =
+    const rows =
       active.value === "seckill"
         ? await api.seckillProducts()
         : await api.products(active.value, keyword.value);
+    products.value = rows;
+    if (silent) fadeIn();
   } catch (e) {
     // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
-    if (isRetryable(e)) error.value = true;
+    if (isRetryable(e) && !silent) error.value = true;
   } finally {
+    switching.value = false;
     loading.value = false;
   }
   void prefetchNeighbors();
@@ -128,8 +146,8 @@ onShow(async () => {
  *  instant=滚动续跳快通道：预取命中零等待直替换（不闪骨架），侧栏点击走原体验 */
 async function pick(id: string, instant = false) {
   active.value = id;
-  // IKG8PC：切分类回顶（scroll-top 值变化才生效——续跳触发时位置必>0）
-  mainTop.value = 0;
+  // IKGQ6R：切分类平滑回顶（200ms 缓动，替代视口猛跳）
+  smoothScrollTop();
   const idx = categories.value.findIndex((c) => c.id === id);
   const hit = prefetchCache.get(id);
   if (instant && hit && Date.now() - hit.at < PREFETCH_TTL) {
@@ -137,10 +155,12 @@ async function pick(id: string, instant = false) {
     products.value = hit.rows;
     error.value = false;
     loading.value = false;
+    fadeIn();
     void prefetchNeighbors();
     return;
   }
-  await load();
+  // IKGQ6R：切换未命中缓存也走旧内容保留（silent），不再闪整页骨架
+  await load({ silent: instant });
 }
 /** IKG8PC 到底自动续跳（道哥 2026-09-16）：严格按侧栏顺序（含「全部」「限时
  *  秒杀」伪分类），搜索态（关键词非空）停用——搜索是目标明确的行为；二轮
@@ -150,6 +170,27 @@ async function pick(id: string, instant = false) {
 const mainTop = ref(0);
 const jumpLocked = ref(false);
 let topGuardUntil = 0;
+/** IKGQ6R 平滑回顶：@scroll 记录实时位置，逐帧缓动 200ms 滚回顶部，
+ *  替代 scroll-top 瞬置的视口猛跳。 */
+let lastScrollTop = 0;
+let scrollAnimTimer: ReturnType<typeof setTimeout> | null = null;
+function onMainScroll(e: { detail: { scrollTop: number } }) {
+  lastScrollTop = e.detail.scrollTop;
+}
+function smoothScrollTop(target = 0) {
+  if (scrollAnimTimer) clearTimeout(scrollAnimTimer);
+  const start = lastScrollTop;
+  if (Math.abs(start - target) < 2) return;
+  const t0 = Date.now();
+  const dur = 200;
+  const step = () => {
+    const t = Math.min(1, (Date.now() - t0) / dur);
+    const ease = 1 - Math.pow(1 - t, 3);
+    mainTop.value = Math.round(start + (target - start) * ease);
+    if (t < 1) scrollAnimTimer = setTimeout(step, 16);
+  };
+  step();
+}
 async function jump(step: 1 | -1) {
   if (jumpLocked.value || keyword.value || loading.value || error.value) return;
   const idx = categories.value.findIndex((c) => c.id === active.value);
@@ -232,8 +273,11 @@ const currentName = () => {
         :scroll-top="mainTop"
         :upper-threshold="60"
         :lower-threshold="120"
+        @scroll="onMainScroll"
         @scrolltolower="onReachEnd"
         @scrolltoupper="onReachTop"
+        ><!-- IKGQ6R 丝滑化：切换期间顶部细加载条（旧内容保留不闪骨架） -->
+        <view v-if="switching" class="switch-bar"></view>
         ><view class="main__title">{{ currentName() }}</view
         ><view v-if="error" class="cat-retry card" @tap="load"
           ><text class="cat-retry__title">商品加载失败</text
@@ -241,6 +285,9 @@ const currentName = () => {
         ><view v-else-if="loading" class="cat-skeleton"
           ><view v-for="n in 4" :key="n" class="cat-skeleton__block" /></view
         ><template v-else
+          ><view
+            :class="{ 'list-fade': listEntering }"
+            class="list-wrap"
           ><view v-if="!products.length" class="main__empty muted"
             >这个分类暂时没货，去看看别的吧</view
           ><view
@@ -330,7 +377,8 @@ const currentName = () => {
                 </button></view
               ></view
             ></view
-          ></template
+          ></view
+        ></template
         ><!-- IKG8PC 二轮：边界预告——到底/到顶续跳前给预期，从"意外跳走"变"按预告翻页" -->
         <view
           v-if="!loading && !error && !keyword && products.length"
@@ -614,3 +662,43 @@ const currentName = () => {
   }
 }
 </style>
+
+/* ---------- IKGQ6R 丝滑化：切换加载条 + 列表淡入 ---------- */
+.switch-bar {
+  height: 4rpx;
+  border-radius: 2rpx;
+  overflow: hidden;
+  background: $primary-soft;
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    left: -40%;
+    width: 40%;
+    height: 100%;
+    border-radius: 2rpx;
+    background: $primary;
+    animation: switch-slide 0.9s ease-in-out infinite;
+  }
+}
+@keyframes switch-slide {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+.list-wrap.list-fade {
+  animation: list-fade-in 0.22s ease-out;
+}
+@keyframes list-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
