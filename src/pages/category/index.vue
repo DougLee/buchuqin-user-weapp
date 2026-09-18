@@ -216,14 +216,16 @@ async function scrollToCat(id: string) {
 let segSyncAt = 0;
 let lastScrollTop = 0;
 function onFlowScroll(scrollTop: number) {
-  lastScrollTop = scrollTop;
+  console.log('[flow-scroll]', Date.now() - segSyncAt, scrollTop, sections.value.length, appending.value, loading.value);
   const now = Date.now();
   if (now - segSyncAt < 150) return;
   segSyncAt = now;
   if (loading.value || !sections.value.length) return;
   const viewport = uni.getSystemInfoSync().windowHeight;
+  console.log('[flow-near]', scrollTop, viewport, document.body.scrollHeight);
   if (scrollTop + viewport >= document.body.scrollHeight - 120) {
-    void appendNextSeg();
+    console.log('[flow-near] TRIGGERED');
+    void onReachBottomFlow();
   }
   const q = uni.createSelectorQuery();
   sections.value.forEach((s) => q.select(`#cat-${s.catId}`).boundingClientRect());
@@ -239,9 +241,15 @@ function onFlowScroll(scrollTop: number) {
 onPageScroll((e) => onFlowScroll(e.scrollTop));
 onReachBottom(() => void appendNextSeg());
 // #ifdef H5
+// scroll 事件在 body（滚动层）与 document 两处都挂，确保 H5 触发
 document.body.addEventListener("scroll", () => onFlowScroll(document.body.scrollTop), {
   passive: true,
 });
+document.addEventListener("scroll", () => onFlowScroll(document.body.scrollTop), {
+  passive: true,
+});
+// uni-h5 页面结构下 scroll 事件传递不可靠——短轮询兜底驱动（开销微小）
+setInterval(() => onFlowScroll(document.body.scrollTop), 300);
 // #endif
 
 /** 边界预告 / 快捷分类 / 商品详情跳转 / 搜索态标题 */
@@ -279,7 +287,7 @@ if (MOCK) {
     get appending() {
       return appending.value;
     },
-    reach: () => void appendNextSeg(),
+    reach: () => void onReachBottomFlow(),
   };
 }
 </script>
@@ -334,14 +342,13 @@ if (MOCK) {
           ><view v-for="n in 4" :key="n" class="cat-skeleton__block" /></view
         ><template v-else
           ><view
-            :class="{ 'list-fade': listEntering }"
             class="list-wrap"
           ><view v-if="!products.length && !appending" class="main__empty muted"
             >这个分类暂时没货，去看看别的吧</view
           ><view
-            v-for="(seg, si) in flow"
+            v-for="(seg, si) in sections"
             :key="seg.catId"
-            :id="'flow-seg-' + seg.catId"
+            :id="'cat-' + seg.catId"
             class="flow-seg"
             ><view v-if="si > 0" class="flow-seg__head"
               ><text class="flow-seg__label">{{ seg.catName }}</text></view
