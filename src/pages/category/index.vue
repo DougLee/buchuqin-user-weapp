@@ -661,7 +661,6 @@ const currentName = () => {
     opacity: 0.55;
   }
 }
-</style>
 
 /* ---------- IKGQ6R 丝滑化：切换加载条 + 列表淡入 ---------- */
 .switch-bar {
@@ -702,3 +701,4 @@ const currentName = () => {
     transform: translateY(0);
   }
 }
+</style>
