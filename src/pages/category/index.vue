@@ -216,16 +216,14 @@ async function scrollToCat(id: string) {
 let segSyncAt = 0;
 let lastScrollTop = 0;
 function onFlowScroll(scrollTop: number) {
-  console.log('[flow-scroll]', Date.now() - segSyncAt, scrollTop, sections.value.length, appending.value, loading.value);
   const now = Date.now();
   if (now - segSyncAt < 150) return;
   segSyncAt = now;
   if (loading.value || !sections.value.length) return;
   const viewport = uni.getSystemInfoSync().windowHeight;
-  console.log('[flow-near]', scrollTop, viewport, document.body.scrollHeight);
   if (scrollTop + viewport >= document.body.scrollHeight - 120) {
     console.log('[flow-near] TRIGGERED');
-    void onReachBottomFlow();
+    void appendNextSeg();
   }
   const q = uni.createSelectorQuery();
   sections.value.forEach((s) => q.select(`#cat-${s.catId}`).boundingClientRect());
@@ -287,10 +285,33 @@ if (MOCK) {
     get appending() {
       return appending.value;
     },
-    reach: () => void onReachBottomFlow(),
+    reach: () => void appendNextSeg(),
   };
 }
-</script>
+
+/** 近底接续：append 下一分类段（IKGQ6R 终版） */
+async function appendNextSeg() {
+  if (appending.value || loading.value) return;
+  const last = sections.value[sections.value.length - 1];
+  if (!last) return;
+  const next = nextCatOf(last.catId);
+  if (!next) return;
+  appending.value = true;
+  try {
+    const hit = prefetchCache.get(next.id);
+    const rows =
+      hit && Date.now() - hit.at < PREFETCH_TTL
+        ? (prefetchCache.delete(next.id), hit.rows)
+        : await fetchCategoryProducts(next.id);
+    // 仍为末段才追加（防快速滚动重复接续）
+    if (sections.value[sections.value.length - 1]?.catId === last.catId)
+      sections.value.push({ catId: next.id, catName: next.name, items: rows });
+  } catch (e) {
+    /* 拉取失败静默：下次触底重试 */
+  } finally {
+    appending.value = false;
+  }
+}</script>
 <template>
   <view class="page"
     ><view class="search card"
@@ -448,7 +469,7 @@ if (MOCK) {
       ></template
         ><!-- IKGQ6R 联调按钮（仅 MOCK）：直触接续逻辑 -->
         <view v-if="MOCK" style="text-align:center;padding:20rpx">
-          <button style="background:#07883b;color:#fff" @tap="onReachEnd">模拟滚到底</button>
+          <button style="background:#07883b;color:#fff" @tap="appendNextSeg">模拟滚到底</button>
         </view>
         <!-- IKG8PC 二轮：边界预告——到底/到顶续跳前给预期，从"意外跳走"变"按预告翻页" -->
         <view
