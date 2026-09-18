@@ -15,6 +15,25 @@ setupDefaultShare();
  * 「全部」是 UI 概念（2026-08-21 数据清理）：原 id=all 的 DB 行随测试分类删除，
  * 接口列表无 all 时本地补齐，保证侧栏始终有「全部」入口可切回。
  */
+/* IKGQ6R：H5 本地联调开关（VITE_CAT_MOCK=1 时注入假分类/假商品，
+   仅 dev 手动开启，生产构建不含此分支） */
+const MOCK = !!import.meta.env.VITE_CAT_MOCK;
+const MOCK_CATS: Category[] = Array.from({ length: 6 }, (_, i) => ({
+  id: `cat${i + 1}`,
+  name: ["零食饮料", "方便速食", "甜品烘焙", "日用百货", "酒水专区", "水果生鲜"][i],
+}));
+const mockRows = (catId: string): Product[] =>
+  Array.from({ length: 14 }, (_, i) => ({
+    id: `${catId}-p${i + 1}`,
+    name: `${MOCK_CATS.find((c) => c.id === catId)?.name ?? catId}·商品${i + 1}`,
+    subtitle: "",
+    price: 300 + ((i * 137) % 1500),
+    originalPrice: 0,
+    stock: 50,
+    image: "",
+    status: "on-sale",
+    sales: 0,
+  }));
 const active = ref("all"),
   keyword = ref(""),
   draft = ref(""),
@@ -56,6 +75,10 @@ async function load(options?: { silent?: boolean }) {
   error.value = false;
   try {
     // IKBW0K：限时秒杀伪分类走专区接口（进行中活动带促销价），搜索词不生效
+    if (MOCK) {
+      products.value = mockRows(active.value);
+      return;
+    }
     const rows =
       active.value === "seckill"
         ? await api.seckillProducts()
@@ -77,7 +100,7 @@ async function load(options?: { silent?: boolean }) {
 const prefetchCache = new Map<string, { rows: Product[]; at: number }>();
 const PREFETCH_TTL = 60_000;
 const fetchCategoryProducts = (id: string): Promise<Product[]> =>
-  id === "seckill" ? api.seckillProducts() : api.products(id, "");
+  MOCK ? Promise.resolve(mockRows(id)) : id === "seckill" ? api.seckillProducts() : api.products(id, "");
 function prefetchNeighbors() {
   // 搜索态预取无意义（续跳已停用，且结果与关键词耦合）
   if (keyword.value) return;
@@ -99,6 +122,17 @@ async function search() {
   await load();
 }
 onShow(async () => {
+  // IKGQ6R mock 联调：短路一切登录/购物车依赖，只渲染分类流
+  if (MOCK) {
+    categories.value = [
+      ...MOCK_CATS,
+      { id: "all", name: "全部" },
+      { id: "seckill", name: "限时秒杀" },
+    ];
+    active.value = "all";
+    await load();
+    return;
+  }
   // 首页搜索关键词传递（IK9AWP）：switchTab 不支持 query，走 storage 携带。
   // IKAHBJ：kw 非空 = 一次新的全品类搜索，无条件重置回「全部」——切分类
   // 保留关键词（2026-08-23 优化）后同词重搜也必须落回全品类，不能卡在单分类；
@@ -115,9 +149,9 @@ onShow(async () => {
   uni.removeStorageSync("categoryPick");
   await cart.load();
   void campusStore.refresh(); // IKG1C：打烊态轻量刷新（静默，不阻塞列表）
-  try {
-    categories.value = await api.categories();
-  } catch {
+    try {
+      if (!MOCK) categories.value = await api.categories();
+    } catch {
     // 分类接口失败先退 home 接口；再失败合成裸「全部」保底 tab，商品区由 load 三态兜底
     try {
       categories.value = (await api.home()).categories;
@@ -211,6 +245,7 @@ const onReachTop = () => {
    新列表开头，视觉零跳变，近似「同一份列表继续下滑」。左侧高亮同步。 */
 const previewNext = ref(false);
 const nextRows = ref<Product[]>([]);
+let previewBaseTop = 0;
 const nextCategory = computed(
   () => categories.value[categories.value.findIndex((c) => c.id === active.value) + 1],
 );
@@ -227,8 +262,10 @@ function advance() {
   active.value = target.id;
   products.value = nextRows.value;
   nextRows.value = [];
-  // 预览块顶部恰在视口顶 → 新列表开头=刚看过的商品，归零即视觉接续
-  mainTop.value = 0;
+  // IKGQ6R 四轮（道哥「还是很差劲」反馈）：切换瞬间【保持滚动偏移】——
+  // 新列表开头 = 预览块内容，mainTop = 用户滑入预览块的深度，
+  // 视口正好落在已看过的商品之后，无回跳无跳变，真·继续下滑
+  mainTop.value = Math.max(0, Math.round(lastScrollTop - previewBaseTop));
   topGuardUntil = Date.now() + 800;
   jumpLocked.value = true;
   setTimeout(() => (jumpLocked.value = false), 300);
@@ -249,7 +286,9 @@ function armAdvanceObserver() {
 const onReachEnd = () => {
   if (jumpLocked.value || keyword.value || loading.value || error.value) return;
   if (!nextCategory.value || previewNext.value) return;
-  // 进入预览态：尾部追加下一分类预览块（数据就绪后武装无缝切换观察器）
+  // 进入预览态：尾部追加下一分类预览块（数据就绪后武装无缝切换观察器）。
+  // 记录此刻滚动位——切换时用「滑过预览块的偏移量」保持视口连续
+  previewBaseTop = lastScrollTop;
   previewNext.value = true;
   const target = nextCategory.value;
   const hit = prefetchCache.get(target.id);
@@ -440,8 +479,7 @@ const currentName = () => {
         ><!-- IKGQ6R 三轮：下一分类预览块——滑过即无缝切到下一分类，左侧高亮同步 -->
         <view v-if="previewNext" class="pp-next">
           <view class="pp-next__banner"
-            ><text class="pp-next__label">下一分类</text
-            >{{ nextCategoryName }}</view
+            ><text>下一分类 · {{ nextCategoryName }}</text></view
           >
           <view v-if="!nextRows.length" class="pp-next__loading muted"
             >正在准备下一分类…</view
@@ -795,21 +833,10 @@ const currentName = () => {
   margin-top: 4rpx;
 }
 .pp-next__banner {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  padding: 20rpx 8rpx 16rpx;
-  font-size: 26rpx;
-  font-weight: 600;
-  color: #07883b;
-}
-.pp-next__label {
-  font-size: 20rpx;
-  font-weight: 600;
-  color: #fff;
-  background: $primary;
-  border-radius: 6rpx;
-  padding: 2rpx 10rpx;
+  text-align: center;
+  padding: 22rpx 0 18rpx;
+  font-size: 22rpx;
+  color: $muted;
 }
 .pp-next__loading {
   text-align: center;
