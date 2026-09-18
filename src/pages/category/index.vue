@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, getCurrentInstance, onMounted, ref } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { computed, nextTick, ref } from "vue";
+import { onPageScroll, onReachBottom, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
 import { useCartStore } from "../../stores/cart";
@@ -11,16 +11,12 @@ import type { Category, Product } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
 /**
- * 侧栏直接用 DB 分类字典（IK9VDJ）；active 初始 'all'，api.products('all') 后端已兼容。
- * 「全部」是 UI 概念（2026-08-21 数据清理）：原 id=all 的 DB 行随测试分类删除，
- * 接口列表无 all 时本地补齐，保证侧栏始终有「全部」入口可切回。
+ * 分类页（IKGQ6R 终版·页面级无限流）：
+ * - 左侧分类固定吸附，右侧所有分类商品按侧栏顺序拼成页面长列表
+ * - 滚到底自动 append 下一分类段（纯尾部插入，滚动零跳变）
+ * - 左侧高亮随滚动位置联动（节流量段边界）
+ * - 侧栏点击：已接续分类平滑滚到段头；未接续分类重建流
  */
-<<<<<<< Updated upstream
-/* IKGQ6R：H5 本地联调开关（VITE_CAT_MOCK=1 时注入假分类/假商品，
-   仅 dev 手动开启，生产构建不含此分支） */
-=======
-/* IKGQ6R：H5 联调开关（VITE_CAT_MOCK=1 注入假分类/假商品，绕过微信登录墙） */
->>>>>>> Stashed changes
 const MOCK = !!import.meta.env.VITE_CAT_MOCK;
 const MOCK_CATS: Category[] = Array.from({ length: 6 }, (_, i) => ({
   id: `cat${i + 1}`,
@@ -38,21 +34,18 @@ const mockRows = (catId: string): Product[] =>
     status: "on-sale",
     sales: 0,
   }));
-const active = ref("all"),
-  keyword = ref(""),
-  draft = ref(""),
-  categories = ref<Category[]>([]),
-  loading = ref(true),
-  error = ref(false),
-  cart = useCartStore(),
-  /** IKG1C 打烊停单：闭店态共享自 campus store（首页已随 /home 注入，这里只轻刷） */
-  campusStore = useCampusStore(),
-  /** 闭店时全部分类商品的加购/＋一并置灰禁用（服务端结算拦截的前端前置） */
-  closedNow = computed(() => campusStore.closedNow);
-<<<<<<< Updated upstream
-=======
-/** IKGQ6R 终版·页面级无限流：所有分类按侧栏顺序拼成页面长列表，
- *  滚到底自动 append 下一分类段（纯追加零跳变），左侧高亮随滚动位置联动。 */
+
+const active = ref("all");
+const keyword = ref("");
+const draft = ref("");
+const categories = ref<Category[]>([]);
+const loading = ref(true);
+const error = ref(false);
+const cart = useCartStore();
+const campusStore = useCampusStore();
+const closedNow = computed(() => campusStore.closedNow);
+
+/** 分段流：有序段列表（每段一个分类）；products 为展平渲染数组 */
 interface CatSeg {
   catId: string;
   catName: string;
@@ -60,43 +53,9 @@ interface CatSeg {
 }
 const sections = ref<CatSeg[]>([]);
 const appending = ref(false);
-// #ifdef H5
-/** H5 联调/验证：uni 的 onPageScroll 在 H5 依赖内部容器滚动，body 直滚
- *  不触发——补 window 监听驱动同一套接续逻辑（小程序端走 onReachBottom） */
-function h5ScrollDrive() {
-  const remaining =
-    document.body.scrollHeight - window.innerHeight - document.body.scrollTop;
-  if (remaining < 120) void onReachBottomFlow();
-}
-// #endif
-/** 展平渲染数组：商品卡模板与秒杀/加购逻辑零改动 */
-const products = computed<Product[]>(() => sections.value.flatMap((s2) => s2.items));
->>>>>>> Stashed changes
+const products = computed<Product[]>(() => sections.value.flatMap((s) => s.items));
+
 /** IKGNMV 一单一秒杀：购物车里已有**其他**秒杀品时，本秒杀品＋置灰 */
-// IKGQ6R 联调诊断句柄（仅 MOCK 模式挂载，供浏览器自动化验证）
-if (MOCK) {
-  (window as unknown as Record<string, unknown>).__cat = {
-    get active() {
-      return active.value;
-    },
-    get flow() {
-      return sections.value.map((f) => f.catId);
-    },
-    get cats() {
-      return categories.value.map((c) => c.id);
-    },
-    get loading() {
-      return loading.value;
-    },
-    get appending() {
-      return appending.value;
-    },
-    setTop(v: number) {
-      mainTop.value = v;
-    },
-    reach: () => void onReachBottomFlow(),
-  };
-}
 function seckillLocked(p: Product): boolean {
   return (
     p.promotion?.type === "seckill" &&
@@ -104,33 +63,22 @@ function seckillLocked(p: Product): boolean {
     cart.cart.seckillIdInCart !== p.id
   );
 }
-/** IKGQ6R 终版·拼接无限流：所有分类商品按侧栏顺序拼成一条连续列表，
- *  滚到底自动 append 下一分类段（纯追加零跳变），左侧高亮随滚动位置联动。
- *  flow = 有序段列表（每段一个分类）；products 为展平渲染数组，商品卡模板零改动。 */
-interface FlowSeg {
-  catId: string;
-  catName: string;
-  items: Product[];
-}
-const flow = ref<FlowSeg[]>([]);
-const products = computed<Product[]>(() => flow.value.flatMap((s) => s.items));
-const listEntering = ref(false);
-function fadeIn() {
-  listEntering.value = false;
-  setTimeout(() => (listEntering.value = true), 30);
-  setTimeout(() => (listEntering.value = false), 480);
+
+function nextCatOf(catId: string): Category | undefined {
+  const idx = categories.value.findIndex((c) => c.id === catId);
+  return categories.value[idx + 1];
 }
 function currentNameOf(catId: string): string {
   return categories.value.find((c) => c.id === catId)?.name ?? "全部";
 }
-async function fetchRows(catId: string): Promise<Product[]> {
-  // mock 模式走假数据源（与预取同一开关）
+async function fetchCategoryProducts(catId: string): Promise<Product[]> {
   return MOCK
     ? mockRows(catId)
     : catId === "seckill"
       ? await api.seckillProducts()
       : await api.products(catId, keyword.value);
 }
+
 /** 首段加载（骨架态）：首屏 / 搜索 / 侧栏跳转未接续场景 */
 async function load() {
   loading.value = true;
@@ -139,8 +87,9 @@ async function load() {
     const catId = categories.value.some((c) => c.id === active.value)
       ? active.value
       : "all";
-    flow.value = [
-      { catId, catName: currentNameOf(catId), items: await fetchRows(catId) },
+    const cat = categories.value.find((c) => c.id === catId);
+    sections.value = [
+      { catId, catName: cat?.name ?? "全部", items: await fetchCategoryProducts(catId) },
     ];
   } catch (e) {
     // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
@@ -150,55 +99,32 @@ async function load() {
   }
   void prefetchNeighbors();
 }
-/** IKG8PC 二轮（道哥 2026-09-16「不丝滑」反馈）：预取相邻分类——当前分类
- *  就绪后后台静默拉 idx±1（60s TTL），滚动续跳命中缓存即零等待直替换，
- *  不再闪骨架。预取失败静默，切换时回落正常 load。 */
+
+/** 预取相邻分类（IKG8PC 二轮）：接续时秒级呈现 */
 const prefetchCache = new Map<string, { rows: Product[]; at: number }>();
 const PREFETCH_TTL = 60_000;
-const fetchCategoryProducts = (id: string): Promise<Product[]> =>
-<<<<<<< Updated upstream
-  MOCK ? Promise.resolve(mockRows(id)) : id === "seckill" ? api.seckillProducts() : api.products(id, "");
-=======
-  MOCK
-    ? Promise.resolve(mockRows(id))
-    : id === "seckill"
-      ? api.seckillProducts()
-      : api.products(id, "");
-
-function nextCatOf(catId: string): Category | undefined {
-  const idx = categories.value.findIndex((c) => c.id === catId);
-  return categories.value[idx + 1];
-}
-function currentNameOf(catId: string): string {
-  return categories.value.find((c) => c.id === catId)?.name ?? "全部";
-}
->>>>>>> Stashed changes
 function prefetchNeighbors() {
-  // 搜索态预取无意义（续跳已停用，且结果与关键词耦合）
   if (keyword.value) return;
-  const idx = categories.value.findIndex((c) => c.id === active.value);
-  for (const n of [idx - 1, idx + 1]) {
-    const c = categories.value[n];
-    if (!c) continue;
-    const hit = prefetchCache.get(c.id);
-    if (hit && Date.now() - hit.at < PREFETCH_TTL) continue;
-    fetchCategoryProducts(c.id)
-      .then((rows) => prefetchCache.set(c.id, { rows, at: Date.now() }))
-      .catch(() => {});
-  }
+  const last = sections.value[sections.value.length - 1];
+  if (!last) return;
+  const next = nextCatOf(last.catId);
+  if (!next) return;
+  const hit = prefetchCache.get(next.id);
+  if (hit && Date.now() - hit.at < PREFETCH_TTL) return;
+  fetchCategoryProducts(next.id)
+    .then((rows) => prefetchCache.set(next.id, { rows, at: Date.now() }))
+    .catch(() => {});
 }
-/** 搜索即全品类（IKAHBJ）：任何搜索动作先把分类重置回「全部」再拉列表 */
+
+/** 搜索即全品类（IKAHBJ） */
 async function search() {
   keyword.value = draft.value.trim();
   active.value = "all";
   await load();
 }
+
 onShow(async () => {
-<<<<<<< Updated upstream
-  // IKGQ6R mock 联调：短路一切登录/购物车依赖，只渲染分类流
-=======
-  // IKGQ6R mock 联调（H5 端绕过微信登录墙）：假分类+假商品渲染无限流
->>>>>>> Stashed changes
+  // mock 联调短路：绕过微信登录墙，只渲染分类流
   if (MOCK) {
     categories.value = [
       ...MOCK_CATS,
@@ -209,10 +135,6 @@ onShow(async () => {
     await load();
     return;
   }
-  // 首页搜索关键词传递（IK9AWP）：switchTab 不支持 query，走 storage 携带。
-  // IKAHBJ：kw 非空 = 一次新的全品类搜索，无条件重置回「全部」——切分类
-  // 保留关键词（2026-08-23 优化）后同词重搜也必须落回全品类，不能卡在单分类；
-  // kw 空 = 普通往返切 Tab，保留关键词/分类现场
   const kw = (uni.getStorageSync("searchKeyword") as string) || "";
   if (kw) {
     keyword.value = kw;
@@ -220,148 +142,88 @@ onShow(async () => {
     active.value = "all";
   }
   uni.removeStorageSync("searchKeyword");
-  // 首页金刚区带分类 id 跳转（IK9SOB）：storage 传递，选中对应分类
-  const pick = (uni.getStorageSync("categoryPick") as string) || "";
+  const pickCat = (uni.getStorageSync("categoryPick") as string) || "";
   uni.removeStorageSync("categoryPick");
   await cart.load();
-  void campusStore.refresh(); // IKG1C：打烊态轻量刷新（静默，不阻塞列表）
-    try {
-      if (!MOCK) categories.value = await api.categories();
-    } catch {
-    // 分类接口失败先退 home 接口；再失败合成裸「全部」保底 tab，商品区由 load 三态兜底
+  void campusStore.refresh();
+  try {
+    categories.value = await api.categories();
+  } catch {
     try {
       categories.value = (await api.home()).categories;
     } catch {
       categories.value = [{ id: "all", name: "全部" }];
     }
   }
-  // IK9VD3：pick 校验存在性——类别被删/接口降级时回退「全部」，避免侧栏无高亮、标题与列表错位
   if (!categories.value.some((c) => c.id === "all"))
     categories.value = [{ id: "all", name: "全部" }, ...categories.value];
-  // IKBW0K：「限时秒杀」特殊分类插在「全部」之后（伪分类，不落 DB，
-  // 点入走 /promotions/seckill 专区数据）
   const allIdx = categories.value.findIndex((c) => c.id === "all");
   if (allIdx >= 0 && !categories.value.some((c) => c.id === "seckill"))
     categories.value.splice(allIdx + 1, 0, { id: "seckill", name: "限时秒杀" });
-  if (pick) {
-    active.value = categories.value.some((c) => c.id === pick) ? pick : "all";
-    // 金刚区带分类跳（IK9SOB）是「干净浏览该分类」意图，清掉残留搜索词
+  if (pickCat) {
+    active.value = categories.value.some((c) => c.id === pickCat) ? pickCat : "all";
     keyword.value = "";
     draft.value = "";
   }
   await load();
 });
-<<<<<<< Updated upstream
-/** 侧栏点击（IKGQ6R 终版）：已接续的分类→平滑滚到段首；未接续→重建流为该段 */
-async function pick(id: string) {
-  active.value = id;
-  const segIdx = flow.value.findIndex((s2) => s2.catId === id);
-  if (segIdx >= 0) {
-    await scrollToSeg(segIdx);
-=======
-/** 侧栏点击（IKGQ6R 终版·页面级无限流）：已渲染的分类→原生平滑滚到段头；
- *  未渲染的分类→补渲染该段再滚过去。active 由滚动位置联动（见 onPageScroll）。 */
-/** 滚到指定分类段头（IKGQ6R 终版）：量段顶相对视口偏移，叠加当前滚动位 */
-async function scrollToCat(id: string) {
-  console.log('[IKGQ6R-scrollToCat] enter', id);
-  console.log('[IKGQ6R-cat] querying', id);
-  const rect = await new Promise<UniApp.NodeInfo>((resolve) => {
-    uni
-      .createSelectorQuery()
-      .select(`#cat-${id}`)
-      .boundingClientRect((r) => {
-        console.log('[IKGQ6R-cat] callback', JSON.stringify(r));
-        resolve(r as UniApp.NodeInfo);
-      })
-      .exec(() => console.log('[IKGQ6R-cat] exec done'));
-  });
-  console.log('[IKGQ6R-cat] after await');
-  const top = (rect as UniApp.NodeInfo | null)?.top;
-  console.log('[IKGQ6R-cat]', JSON.stringify({ rectTop: top, lastTop: lastScrollTop }));
-  if (top == null) return;
-  const targetTop = lastScrollTop + top;
-  // H5 的 tabbar 页滚动层是 body（uni.pageScrollTo 滚 window 无效）；小程序原生
-  // #ifdef H5
-  document.body.scrollTop = targetTop;
-  // #endif
-  // #ifndef H5
-  uni.pageScrollTo({ scrollTop: targetTop, duration: 200 });
-  // #endif
-}
+
+/** 侧栏点击：已接续分类→平滑滚到段头；未接续→重建流为该分类单段 */
 async function pick(id: string) {
   active.value = id;
   if (sections.value.some((s) => s.catId === id)) {
     await scrollToCat(id);
->>>>>>> Stashed changes
     return;
   }
-  smoothScrollTop();
+  loading.value = true;
   try {
-<<<<<<< Updated upstream
-    flow.value = [
-      { catId: id, catName: currentNameOf(id), items: await fetchRows(id) },
+    const cat = categories.value.find((c) => c.id === id);
+    sections.value = [
+      { catId: id, catName: cat?.name ?? "全部", items: await fetchCategoryProducts(id) },
     ];
-    fadeIn();
-    void prefetchNeighbors();
-=======
-    sections.value.push({
-      catId: id,
-      catName: target.name,
-      items: await fetchCategoryProducts(id),
-    });
->>>>>>> Stashed changes
-  } catch {
-    /* request 层 toast，列表保留旧内容 */
+  } catch (e) {
+    if (isRetryable(e)) error.value = true;
+  } finally {
+    loading.value = false;
   }
-  // 定位必须在 loading 结束（骨架卸载、段列表渲染回 DOM）之后，否则量不到元素
   await nextTick();
   await scrollToCat(id);
 }
-<<<<<<< Updated upstream
-/** 平滑滚到指定段首（用 SelectorQuery 量段顶相对视口的偏移） */
-async function scrollToSeg(segIdx: number) {
-  const seg = flow.value[segIdx];
-  if (!seg) return;
+
+/** 平滑滚到分类段头：段顶相对视口偏移 + 当前滚动位 */
+async function scrollToCat(id: string) {
+  await nextTick();
   const rect = await new Promise<UniApp.NodeInfo>((resolve) => {
     uni
       .createSelectorQuery()
-      .select(`#flow-seg-${seg.catId}`)
+      .select(`#cat-${id}`)
       .boundingClientRect((r) => resolve(r as UniApp.NodeInfo))
       .exec();
   });
-  if (!rect) return;
-  smoothScrollTop(lastScrollTop + (rect.top ?? 0));
-  active.value = seg.catId;
+  const top = (rect as UniApp.NodeInfo | null)?.top;
+  if (top == null) return;
+  const target = lastScrollTop + top;
+  // #ifdef H5
+  document.body.scrollTop = target;
+  // #endif
+  // #ifndef H5
+  uni.pageScrollTo({ scrollTop: target, duration: 200 });
+  // #endif
 }
-/* ---------- 无限流接续（IKGQ6R 终版）：滚到底自动 append 下一分类段 ---------- */
-const appending = ref(false);
-// mock 联调：自动触发一次接续（H5 无真实滚动）
-onMounted(() => {
-  if (!MOCK) return;
-  // 等 onShow 的 mock load 就绪后周期触发接续（便于浏览器自动化验证）
-  const timer = setInterval(() => {
-    if (loading.value) return;
-    void onReachEnd();
-  }, 2000);
-});
-async function onReachEnd() {
-  console.log('[IKGQ6R-debug]', JSON.stringify({ appending: appending.value, kw: keyword.value, loading: loading.value, previewNext: previewNext.value, flowLen: flow.value.length, active: active.value, cats: categories.value.map((c) => c.id) }));
-  if (appending.value || keyword.value || loading.value) return;
-  const last = flow.value[flow.value.length - 1];
-=======
-/** 页面滚动联动（IKGQ6R）：节流量各段边界，落在视口上缘附近者为当前分类；
- *  页面接近底部时自动接续下一分类段（纯追加零跳变）。 */
+
+/** 滚动联动 + 近底接续（IKGQ6R 终版）：节流量段边界联动左侧高亮；
+ *  近底自动 append 下一分类段——段追加是「纯尾部插入」，滚动零跳变。 */
 let segSyncAt = 0;
-function updateFlowScroll(scrollTop: number) {
+let lastScrollTop = 0;
+function onFlowScroll(scrollTop: number) {
   lastScrollTop = scrollTop;
   const now = Date.now();
   if (now - segSyncAt < 150) return;
   segSyncAt = now;
   if (loading.value || !sections.value.length) return;
-  // 触底判定（IKGQ6R 终版）：滚动位+视口高 ≥ 总高-120px 即近底，接续下一分类段
   const viewport = uni.getSystemInfoSync().windowHeight;
   if (scrollTop + viewport >= document.body.scrollHeight - 120) {
-    void onReachBottomFlow();
+    void appendNextSeg();
   }
   const q = uni.createSelectorQuery();
   sections.value.forEach((s) => q.select(`#cat-${s.catId}`).boundingClientRect());
@@ -374,103 +236,24 @@ function updateFlowScroll(scrollTop: number) {
     if (hit && hit.catId !== active.value) active.value = hit.catId;
   });
 }
-onPageScroll((e) => updateFlowScroll(e.scrollTop));
+onPageScroll((e) => onFlowScroll(e.scrollTop));
+onReachBottom(() => void appendNextSeg());
 // #ifdef H5
-// uni-h5 的 onPageScroll 收不到 body 直滚（受控滚动），H5 联调用 window 监听驱动
-window.addEventListener(
-  "scroll",
-  () => updateFlowScroll(document.body.scrollTop),
-  { passive: true },
-);
-// #endif
-async function onReachBottomFlow() {
-  if (appending.value || loading.value) return;
-  const last = sections.value[sections.value.length - 1];
->>>>>>> Stashed changes
-  if (!last) return;
-  const next = nextCatOf(last.catId);
-  if (!next) return;
-  appending.value = true;
-  try {
-<<<<<<< Updated upstream
-    // 预取命中零等待；未命中现场拉取（段先以「接续中」呈现）
-=======
->>>>>>> Stashed changes
-    const hit = prefetchCache.get(next.id);
-    const rows =
-      hit && Date.now() - hit.at < PREFETCH_TTL
-        ? (prefetchCache.delete(next.id), hit.rows)
-        : await fetchCategoryProducts(next.id);
-<<<<<<< Updated upstream
-    // 用户可能已切走：仅当该段仍是末段时追加
-    const lastNow = flow.value[flow.value.length - 1];
-    if (lastNow && lastNow.catId === last.catId)
-      flow.value.push({ catId: next.id, catName: next.name, items: rows });
-=======
-    // 仍为末段才追加（防快速滚动时重复接续）
-    if (sections.value[sections.value.length - 1]?.catId === last.catId)
-      sections.value.push({ catId: next.id, catName: next.name, items: rows });
->>>>>>> Stashed changes
-  } catch {
-    /* 拉取失败静默：下次触底重试 */
-  } finally {
-    appending.value = false;
-  }
-}
-<<<<<<< Updated upstream
-/** 滚动联动左侧高亮：节流量各段顶，落在视口上缘附近者为当前分类 */
-let segSyncAt = 0;
-/** 平滑滚动（IKGQ6R）：逐帧缓动，供侧栏点击/段定位复用 */
-function smoothScrollTop(target = 0) {
-  if (scrollAnimTimer) clearTimeout(scrollAnimTimer);
-  const start = lastScrollTop;
-  if (Math.abs(start - target) < 2) return;
-  const t0 = Date.now();
-  const dur = 200;
-  const step = () => {
-    const t = Math.min(1, (Date.now() - t0) / dur);
-    const ease = 1 - Math.pow(1 - t, 3);
-    mainTop.value = Math.round(start + (target - start) * ease);
-    if (t < 1) scrollAnimTimer = setTimeout(step, 16);
-  };
-  step();
-}
-let lastScrollTop = 0;
-let scrollAnimTimer: ReturnType<typeof setTimeout> | null = null;
-function onMainScroll(e: { detail: { scrollTop: number } }) {
-  lastScrollTop = e.detail.scrollTop;
-  const now = Date.now();
-  if (now - segSyncAt < 150) return;
-  segSyncAt = now;
-  const q = uni.createSelectorQuery();
-  flow.value.forEach((seg) => {
-    q.select(`#flow-seg-${seg.catId}`).boundingClientRect();
-  });
-  q.exec((rects) => {
-    let cur = -1;
-    rects.forEach((r, i) => {
-      if (r && (r.top ?? 9999) <= 150) cur = i;
-    });
-    const hit = flow.value[cur >= 0 ? cur : 0];
-    if (hit && hit.catId !== active.value) active.value = hit.catId;
-  });
-}
-/** IKG8PC 二轮：边界预告——到底/到顶续跳前给预期，从"意外跳走"变"按预告翻页" */
-=======
-/** IKG8PC 二轮：边界预告——尾部显示下一个分类名，让续跳从"意外"变"预告" */
-const nextCategoryName = computed(() => {
-  const idx = categories.value.findIndex((c) => c.id === active.value);
-  return categories.value[idx + 1]?.name ?? "";
+document.body.addEventListener("scroll", () => onFlowScroll(document.body.scrollTop), {
+  passive: true,
 });
->>>>>>> Stashed changes
-/** IKDBFT：快捷分类横滑条（原首页分类条同款）——仅真实 DB 分类，
- *  「全部」「限时秒杀」伪分类留给左侧栏；点击 pick() 页内联动 */
+// #endif
+
+/** 边界预告 / 快捷分类 / 商品详情跳转 / 搜索态标题 */
+const nextCategoryName = computed(() => {
+  const last = sections.value[sections.value.length - 1];
+  return last ? (nextCatOf(last.catId)?.name ?? "") : "";
+});
 const quickCats = computed(() =>
   categories.value.filter((c) => c.id !== "all" && c.id !== "seckill"),
 );
 const open = (id: string) =>
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
-/** 搜索态标题（IKAHBJ）：关键词 + 当前分类联动，让筛选范围始终可见 */
 const currentName = () => {
   const base =
     active.value === "all"
@@ -478,14 +261,14 @@ const currentName = () => {
       : categories.value.find((c) => c.id === active.value)?.name || "全部商品";
   return keyword.value ? `“${keyword.value}” · ${base}` : base;
 };
-// IKGQ6R 联调诊断句柄（仅 MOCK）
+// IKGQ6R 联调诊断句柄（仅 MOCK 模式挂载）
 if (MOCK) {
   (window as unknown as Record<string, unknown>).__cat = {
     get active() {
       return active.value;
     },
     get flow() {
-      return flow.value.map((f) => f.catId);
+      return sections.value.map((s) => s.catId);
     },
     get cats() {
       return categories.value.map((c) => c.id);
@@ -493,7 +276,10 @@ if (MOCK) {
     get loading() {
       return loading.value;
     },
-    reach: () => void onReachEnd(),
+    get appending() {
+      return appending.value;
+    },
+    reach: () => void appendNextSeg(),
   };
 }
 </script>
@@ -507,7 +293,7 @@ if (MOCK) {
         @confirm="search"
       /><button @tap="search">搜索</button></view
     ><!-- IKDBFT：快捷分类横滑条（首页分类条同款下移），点击页内联动选中 -->
-    <!-- 2026-09-05 道哥决策暂时下线，此区域预留广告位（方案待定）；恢复 = 删除 v-if="false" --><scroll-view
+    <!-- 2026-09-05 道哥决策暂时下线，此区域预留广告位（方案待定）；恢复 = 删除 v-if="false" --><view
       v-if="false"
       scroll-x
       class="quick card"
@@ -524,9 +310,9 @@ if (MOCK) {
             ><image :src="categoryImage(c)" mode="aspectFit" /></view
           ><text class="quick__name">{{ c.name }}</text></view
         ></view
-      ></scroll-view
+      ></view
     ><view class="body"
-      ><scroll-view scroll-y class="side"
+      ><view scroll-y class="side"
         ><view
           v-for="c in categories"
           :key="c.id"
@@ -536,16 +322,10 @@ if (MOCK) {
           ><!-- 纯文字侧栏（2026-08-22）：图标挤压文字导致 5 字分类换行、行高不齐；
           图标识别职责交给首页横滑条，侧栏回归单行导航（美团式分类页形态） -->
           <text class="side__name">{{ c.name }}</text></view
-        ></scroll-view
-      ><scroll-view
-        scroll-y
+        ></view
+      ><view
         class="main"
-        :scroll-top="mainTop"
-        :upper-threshold="60"
-        :lower-threshold="120"
-        @scroll="onMainScroll"
-        @scrolltolower="onReachEnd"
-        ><!-- IKGQ6R：无限流——滚到底自动接续下一分类段，纯追加零跳变 -->
+        ><!-- IKGQ6R 终版：页面级滚动——滚到底自动接续下一分类段，纯追加零跳变 -->
         <view class="main__title">{{ currentName() }}</view
         ><view v-if="error" class="cat-retry card" @tap="load"
           ><text class="cat-retry__title">商品加载失败</text
@@ -670,7 +450,7 @@ if (MOCK) {
           ><text v-if="appending">正在接续下一分类…</text
           ><text v-else-if="!nextCategoryName">已经是最后一个分类啦</text
           ><text v-else>继续下滑 · 下一分类「{{ nextCategoryName }}」</text></view
-        ></scroll-view
+        ></view
       ></view
     ><TabBar :current="1" /><CartOverlay /></view
   >
@@ -770,9 +550,12 @@ if (MOCK) {
   padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
 }
 .side {
+  position: sticky;
+  top: 20rpx;
+  max-height: calc(100vh - 240rpx);
+  overflow-y: auto;
   width: 196rpx;
   flex-shrink: 0;
-  height: 100%;
   background: $surface;
   border-radius: 28rpx;
   border: 2rpx solid rgba(32, 74, 45, 0.07);
@@ -801,8 +584,9 @@ if (MOCK) {
 }
 .main {
   flex: 1;
-  height: 100%;
   min-width: 0;
+  /* IKGQ6R 终版：页面级滚动——内容随页面自然撑开 */
+  height: auto;
 }
 .main__title {
   font-size: 34rpx;
