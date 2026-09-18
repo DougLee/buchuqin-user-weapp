@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, getCurrentInstance, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
@@ -201,10 +201,68 @@ async function jump(step: 1 | -1) {
   await pick(target.id, true);
   topGuardUntil = Date.now() + 800;
 }
-const onReachEnd = () => void jump(1);
 const onReachTop = () => {
   if (Date.now() < topGuardUntil) return;
   void jump(-1);
+};
+/* ---------- IKGQ6R 三轮（道哥拍板「无缝续滑」）：到底不再立即切换——
+   列表尾部先追加「下一分类预览块」（分类横幅+预取商品卡），用户继续往
+   下滑、预览块顶部越过视口顶时才真正切换且 scroll 归零——预览块内容=
+   新列表开头，视觉零跳变，近似「同一份列表继续下滑」。左侧高亮同步。 */
+const previewNext = ref(false);
+const nextRows = ref<Product[]>([]);
+const nextCategory = computed(
+  () => categories.value[categories.value.findIndex((c) => c.id === active.value) + 1],
+);
+let nextIO: UniApp.IntersectionObserver | null = null;
+function disarmAdvance() {
+  nextIO?.disconnect();
+  nextIO = null;
+}
+function advance() {
+  disarmAdvance();
+  previewNext.value = false;
+  const target = nextCategory.value;
+  if (!target || !nextRows.value.length) return;
+  active.value = target.id;
+  products.value = nextRows.value;
+  nextRows.value = [];
+  // 预览块顶部恰在视口顶 → 新列表开头=刚看过的商品，归零即视觉接续
+  mainTop.value = 0;
+  topGuardUntil = Date.now() + 800;
+  jumpLocked.value = true;
+  setTimeout(() => (jumpLocked.value = false), 300);
+  fadeIn();
+  void prefetchNeighbors();
+}
+function armAdvanceObserver() {
+  disarmAdvance();
+  const inst = getCurrentInstance();
+  if (!inst) return;
+  nextIO = uni.createIntersectionObserver(inst.proxy as never, {
+    observeAll: false,
+  });
+  nextIO.relativeToViewport({ bottom: 0 }).observe(".pp-next", (res) => {
+    if (res.boundingClientRect.top <= 0) advance();
+  });
+}
+const onReachEnd = () => {
+  if (jumpLocked.value || keyword.value || loading.value || error.value) return;
+  if (!nextCategory.value || previewNext.value) return;
+  // 进入预览态：尾部追加下一分类预览块（数据就绪后武装无缝切换观察器）
+  previewNext.value = true;
+  const target = nextCategory.value;
+  const hit = prefetchCache.get(target.id);
+  const ready = hit && Date.now() - hit.at < PREFETCH_TTL;
+  const fill = async () => {
+    nextRows.value =
+      ready && hit ? hit.rows : await fetchCategoryProducts(target.id);
+    if (ready && hit) prefetchCache.delete(target.id);
+    armAdvanceObserver();
+  };
+  void fill().catch(() => {
+    previewNext.value = false;
+  });
 };
 /** IKG8PC 二轮：边界预告——尾部显示下一个分类名，让续跳从"意外"变"预告" */
 const nextCategoryName = computed(() => {
@@ -379,9 +437,39 @@ const currentName = () => {
             ></view
           ></view
         ></template
-        ><!-- IKG8PC 二轮：边界预告——到底/到顶续跳前给预期，从"意外跳走"变"按预告翻页" -->
+        ><!-- IKGQ6R 三轮：下一分类预览块——滑过即无缝切到下一分类，左侧高亮同步 -->
+        <view v-if="previewNext" class="pp-next">
+          <view class="pp-next__banner"
+            ><text class="pp-next__label">下一分类</text
+            >{{ nextCategoryName }}</view
+          >
+          <view v-if="!nextRows.length" class="pp-next__loading muted"
+            >正在准备下一分类…</view
+          >
+          <view
+            v-for="p in nextRows"
+            :key="p.id"
+            class="item card pp-next__item"
+            @tap="open(p.id)"
+            ><image
+              class="item__image"
+              :src="p.image"
+              mode="aspectFit"
+              :alt="p.name"
+            /><view class="item__main"
+              ><text class="item__name">{{ p.name }}</text
+              ><view class="item__pricegrp"
+                ><text class="price"
+                  ><text class="price__symbol">¥</text
+                  >{{ fenToYuan(p.price) }}</text
+                ></view
+              ></view
+            ></view
+          >
+        </view>
+        <!-- IKG8PC 二轮：边界预告——到底/到顶续跳前给预期，从"意外跳走"变"按预告翻页" -->
         <view
-          v-if="!loading && !error && !keyword && products.length"
+          v-if="!loading && !error && !keyword && products.length && !previewNext"
           class="next-hint"
           ><text v-if="nextCategoryName"
             >继续滚动 · 下一分类「{{ nextCategoryName }}」</text
@@ -700,5 +788,35 @@ const currentName = () => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ---------- IKGQ6R 三轮：下一分类预览块（无缝续滑） ---------- */
+.pp-next {
+  margin-top: 4rpx;
+}
+.pp-next__banner {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 20rpx 8rpx 16rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #07883b;
+}
+.pp-next__label {
+  font-size: 20rpx;
+  font-weight: 600;
+  color: #fff;
+  background: $primary;
+  border-radius: 6rpx;
+  padding: 2rpx 10rpx;
+}
+.pp-next__loading {
+  text-align: center;
+  padding: 30rpx 0;
+  font-size: 24rpx;
+}
+.pp-next__item {
+  opacity: 0.85;
 }
 </style>
