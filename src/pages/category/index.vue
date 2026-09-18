@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, getCurrentInstance, onMounted, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { isRetryable } from "../../api/request";
@@ -15,16 +15,35 @@ setupDefaultShare();
  * 「全部」是 UI 概念（2026-08-21 数据清理）：原 id=all 的 DB 行随测试分类删除，
  * 接口列表无 all 时本地补齐，保证侧栏始终有「全部」入口可切回。
  */
+/* IKGQ6R：H5 本地联调开关（VITE_CAT_MOCK=1 时注入假分类/假商品，
+   仅 dev 手动开启，生产构建不含此分支） */
+const MOCK = !!import.meta.env.VITE_CAT_MOCK;
+const MOCK_CATS: Category[] = Array.from({ length: 6 }, (_, i) => ({
+  id: `cat${i + 1}`,
+  name: ["零食饮料", "方便速食", "甜品烘焙", "日用百货", "酒水专区", "水果生鲜"][i],
+}));
+const mockRows = (catId: string): Product[] =>
+  Array.from({ length: 14 }, (_, i) => ({
+    id: `${catId}-p${i + 1}`,
+    name: `${MOCK_CATS.find((c) => c.id === catId)?.name ?? catId}·商品${i + 1}`,
+    subtitle: "",
+    price: 300 + ((i * 137) % 1500),
+    originalPrice: 0,
+    stock: 50,
+    image: "",
+    status: "on-sale",
+    sales: 0,
+  }));
 const active = ref("all"),
   keyword = ref(""),
   draft = ref(""),
   categories = ref<Category[]>([]),
-  products = ref<Product[]>([]),
   loading = ref(true),
   error = ref(false),
   cart = useCartStore(),
-  /** IKG1C 打烊停单：闭店态共享自 campus store（首页已随 /home 注入） */
+  /** IKG1C 打烊停单：闭店态共享自 campus store（首页已随 /home 注入，这里只轻刷） */
   campusStore = useCampusStore(),
+  /** 闭店时全部分类商品的加购/＋一并置灰禁用（服务端结算拦截的前端前置） */
   closedNow = computed(() => campusStore.closedNow);
 /** IKGNMV 一单一秒杀：购物车里已有**其他**秒杀品时，本秒杀品＋置灰 */
 function seckillLocked(p: Product): boolean {
@@ -34,16 +53,44 @@ function seckillLocked(p: Product): boolean {
     cart.cart.seckillIdInCart !== p.id
   );
 }
-/** 商品列表三态（IK9AWK）：加载骨架 / 失败重试 / 列表 */
+/** IKGQ6R 终版·拼接无限流：所有分类商品按侧栏顺序拼成一条连续列表，
+ *  滚到底自动 append 下一分类段（纯追加零跳变），左侧高亮随滚动位置联动。
+ *  flow = 有序段列表（每段一个分类）；products 为展平渲染数组，商品卡模板零改动。 */
+interface FlowSeg {
+  catId: string;
+  catName: string;
+  items: Product[];
+}
+const flow = ref<FlowSeg[]>([]);
+const products = computed<Product[]>(() => flow.value.flatMap((s) => s.items));
+const listEntering = ref(false);
+function fadeIn() {
+  listEntering.value = false;
+  setTimeout(() => (listEntering.value = true), 30);
+  setTimeout(() => (listEntering.value = false), 480);
+}
+function currentNameOf(catId: string): string {
+  return categories.value.find((c) => c.id === catId)?.name ?? "全部";
+}
+async function fetchRows(catId: string): Promise<Product[]> {
+  // mock 模式走假数据源（与预取同一开关）
+  return MOCK
+    ? mockRows(catId)
+    : catId === "seckill"
+      ? await api.seckillProducts()
+      : await api.products(catId, keyword.value);
+}
+/** 首段加载（骨架态）：首屏 / 搜索 / 侧栏跳转未接续场景 */
 async function load() {
   loading.value = true;
   error.value = false;
   try {
-    // IKBW0K：限时秒杀伪分类走专区接口（进行中活动带促销价），搜索词不生效
-    products.value =
-      active.value === "seckill"
-        ? await api.seckillProducts()
-        : await api.products(active.value, keyword.value);
+    const catId = categories.value.some((c) => c.id === active.value)
+      ? active.value
+      : "all";
+    flow.value = [
+      { catId, catName: currentNameOf(catId), items: await fetchRows(catId) },
+    ];
   } catch (e) {
     // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
     if (isRetryable(e)) error.value = true;
@@ -58,7 +105,7 @@ async function load() {
 const prefetchCache = new Map<string, { rows: Product[]; at: number }>();
 const PREFETCH_TTL = 60_000;
 const fetchCategoryProducts = (id: string): Promise<Product[]> =>
-  id === "seckill" ? api.seckillProducts() : api.products(id, "");
+  MOCK ? Promise.resolve(mockRows(id)) : id === "seckill" ? api.seckillProducts() : api.products(id, "");
 function prefetchNeighbors() {
   // 搜索态预取无意义（续跳已停用，且结果与关键词耦合）
   if (keyword.value) return;
@@ -80,6 +127,17 @@ async function search() {
   await load();
 }
 onShow(async () => {
+  // IKGQ6R mock 联调：短路一切登录/购物车依赖，只渲染分类流
+  if (MOCK) {
+    categories.value = [
+      ...MOCK_CATS,
+      { id: "all", name: "全部" },
+      { id: "seckill", name: "限时秒杀" },
+    ];
+    active.value = "all";
+    await load();
+    return;
+  }
   // 首页搜索关键词传递（IK9AWP）：switchTab 不支持 query，走 storage 携带。
   // IKAHBJ：kw 非空 = 一次新的全品类搜索，无条件重置回「全部」——切分类
   // 保留关键词（2026-08-23 优化）后同词重搜也必须落回全品类，不能卡在单分类；
@@ -95,9 +153,10 @@ onShow(async () => {
   const pick = (uni.getStorageSync("categoryPick") as string) || "";
   uni.removeStorageSync("categoryPick");
   await cart.load();
-  try {
-    categories.value = await api.categories();
-  } catch {
+  void campusStore.refresh(); // IKG1C：打烊态轻量刷新（静默，不阻塞列表）
+    try {
+      if (!MOCK) categories.value = await api.categories();
+    } catch {
     // 分类接口失败先退 home 接口；再失败合成裸「全部」保底 tab，商品区由 load 三态兜底
     try {
       categories.value = (await api.home()).categories;
@@ -121,53 +180,114 @@ onShow(async () => {
   }
   await load();
 });
-/** 切分类带着搜索条件（2026-08-23 道哥反馈，优化 IKAHBJ 决策）：关键词保留，
- *  在当前搜索结果内缩小到该分类；清空输入再点搜索 = 退出搜索回全品类。
- *  instant=滚动续跳快通道：预取命中零等待直替换（不闪骨架），侧栏点击走原体验 */
-async function pick(id: string, instant = false) {
+/** 侧栏点击（IKGQ6R 终版）：已接续的分类→平滑滚到段首；未接续→重建流为该段 */
+async function pick(id: string) {
   active.value = id;
-  // IKG8PC：切分类回顶（scroll-top 值变化才生效——续跳触发时位置必>0）
-  mainTop.value = 0;
-  const idx = categories.value.findIndex((c) => c.id === id);
-  const hit = prefetchCache.get(id);
-  if (instant && hit && Date.now() - hit.at < PREFETCH_TTL) {
-    prefetchCache.delete(id);
-    products.value = hit.rows;
-    error.value = false;
-    loading.value = false;
-    void prefetchNeighbors();
+  const segIdx = flow.value.findIndex((s2) => s2.catId === id);
+  if (segIdx >= 0) {
+    await scrollToSeg(segIdx);
     return;
   }
-  await load();
+  smoothScrollTop();
+  try {
+    flow.value = [
+      { catId: id, catName: currentNameOf(id), items: await fetchRows(id) },
+    ];
+    fadeIn();
+    void prefetchNeighbors();
+  } catch {
+    /* request 层 toast，列表保留旧内容 */
+  }
 }
-/** IKG8PC 到底自动续跳（道哥 2026-09-16）：严格按侧栏顺序（含「全部」「限时
- *  秒杀」伪分类），搜索态（关键词非空）停用——搜索是目标明确的行为；二轮
- *  扩双向：到底=下一个，到顶=上一个（道哥要求）。jumpLocked 换列节流防惯性
- *  连跳；程序置顶后 800ms 内忽略 scrolltoupper——scroll-top 置 0 的回弹会
- *  误触发反向跳形成抖动死循环。 */
-const mainTop = ref(0);
-const jumpLocked = ref(false);
-let topGuardUntil = 0;
-async function jump(step: 1 | -1) {
-  if (jumpLocked.value || keyword.value || loading.value || error.value) return;
-  const idx = categories.value.findIndex((c) => c.id === active.value);
-  const target = categories.value[idx + step];
-  if (!target) return;
-  jumpLocked.value = true;
-  setTimeout(() => (jumpLocked.value = false), 400);
-  await pick(target.id, true);
-  topGuardUntil = Date.now() + 800;
+/** 平滑滚到指定段首（用 SelectorQuery 量段顶相对视口的偏移） */
+async function scrollToSeg(segIdx: number) {
+  const seg = flow.value[segIdx];
+  if (!seg) return;
+  const rect = await new Promise<UniApp.NodeInfo>((resolve) => {
+    uni
+      .createSelectorQuery()
+      .select(`#flow-seg-${seg.catId}`)
+      .boundingClientRect((r) => resolve(r as UniApp.NodeInfo))
+      .exec();
+  });
+  if (!rect) return;
+  smoothScrollTop(lastScrollTop + (rect.top ?? 0));
+  active.value = seg.catId;
 }
-const onReachEnd = () => void jump(1);
-const onReachTop = () => {
-  if (Date.now() < topGuardUntil) return;
-  void jump(-1);
-};
-/** IKG8PC 二轮：边界预告——尾部显示下一个分类名，让续跳从"意外"变"预告" */
-const nextCategoryName = computed(() => {
-  const idx = categories.value.findIndex((c) => c.id === active.value);
-  return categories.value[idx + 1]?.name ?? "";
+/* ---------- 无限流接续（IKGQ6R 终版）：滚到底自动 append 下一分类段 ---------- */
+const appending = ref(false);
+// mock 联调：自动触发一次接续（H5 无真实滚动）
+onMounted(() => {
+  if (!MOCK) return;
+  // 等 onShow 的 mock load 就绪后周期触发接续（便于浏览器自动化验证）
+  const timer = setInterval(() => {
+    if (loading.value) return;
+    void onReachEnd();
+  }, 2000);
 });
+async function onReachEnd() {
+  console.log('[IKGQ6R-debug]', JSON.stringify({ appending: appending.value, kw: keyword.value, loading: loading.value, previewNext: previewNext.value, flowLen: flow.value.length, active: active.value, cats: categories.value.map((c) => c.id) }));
+  if (appending.value || keyword.value || loading.value) return;
+  const last = flow.value[flow.value.length - 1];
+  if (!last) return;
+  const next = nextCatOf(last.catId);
+  if (!next) return;
+  appending.value = true;
+  try {
+    // 预取命中零等待；未命中现场拉取（段先以「接续中」呈现）
+    const hit = prefetchCache.get(next.id);
+    const rows =
+      hit && Date.now() - hit.at < PREFETCH_TTL
+        ? (prefetchCache.delete(next.id), hit.rows)
+        : await fetchCategoryProducts(next.id);
+    // 用户可能已切走：仅当该段仍是末段时追加
+    const lastNow = flow.value[flow.value.length - 1];
+    if (lastNow && lastNow.catId === last.catId)
+      flow.value.push({ catId: next.id, catName: next.name, items: rows });
+  } catch {
+    /* 拉取失败静默：下次触底重试 */
+  } finally {
+    appending.value = false;
+  }
+}
+/** 滚动联动左侧高亮：节流量各段顶，落在视口上缘附近者为当前分类 */
+let segSyncAt = 0;
+/** 平滑滚动（IKGQ6R）：逐帧缓动，供侧栏点击/段定位复用 */
+function smoothScrollTop(target = 0) {
+  if (scrollAnimTimer) clearTimeout(scrollAnimTimer);
+  const start = lastScrollTop;
+  if (Math.abs(start - target) < 2) return;
+  const t0 = Date.now();
+  const dur = 200;
+  const step = () => {
+    const t = Math.min(1, (Date.now() - t0) / dur);
+    const ease = 1 - Math.pow(1 - t, 3);
+    mainTop.value = Math.round(start + (target - start) * ease);
+    if (t < 1) scrollAnimTimer = setTimeout(step, 16);
+  };
+  step();
+}
+let lastScrollTop = 0;
+let scrollAnimTimer: ReturnType<typeof setTimeout> | null = null;
+function onMainScroll(e: { detail: { scrollTop: number } }) {
+  lastScrollTop = e.detail.scrollTop;
+  const now = Date.now();
+  if (now - segSyncAt < 150) return;
+  segSyncAt = now;
+  const q = uni.createSelectorQuery();
+  flow.value.forEach((seg) => {
+    q.select(`#flow-seg-${seg.catId}`).boundingClientRect();
+  });
+  q.exec((rects) => {
+    let cur = -1;
+    rects.forEach((r, i) => {
+      if (r && (r.top ?? 9999) <= 150) cur = i;
+    });
+    const hit = flow.value[cur >= 0 ? cur : 0];
+    if (hit && hit.catId !== active.value) active.value = hit.catId;
+  });
+}
+/** IKG8PC 二轮：边界预告——到底/到顶续跳前给预期，从"意外跳走"变"按预告翻页" */
 /** IKDBFT：快捷分类横滑条（原首页分类条同款）——仅真实 DB 分类，
  *  「全部」「限时秒杀」伪分类留给左侧栏；点击 pick() 页内联动 */
 const quickCats = computed(() =>
@@ -183,6 +303,24 @@ const currentName = () => {
       : categories.value.find((c) => c.id === active.value)?.name || "全部商品";
   return keyword.value ? `“${keyword.value}” · ${base}` : base;
 };
+// IKGQ6R 联调诊断句柄（仅 MOCK）
+if (MOCK) {
+  (window as unknown as Record<string, unknown>).__cat = {
+    get active() {
+      return active.value;
+    },
+    get flow() {
+      return flow.value.map((f) => f.catId);
+    },
+    get cats() {
+      return categories.value.map((c) => c.id);
+    },
+    get loading() {
+      return loading.value;
+    },
+    reach: () => void onReachEnd(),
+  };
+}
 </script>
 <template>
   <view class="page"
@@ -230,19 +368,34 @@ const currentName = () => {
         :scroll-top="mainTop"
         :upper-threshold="60"
         :lower-threshold="120"
+        @scroll="onMainScroll"
         @scrolltolower="onReachEnd"
-        @scrolltoupper="onReachTop"
-        ><view class="main__title">{{ currentName() }}</view
+        ><!-- IKGQ6R：无限流——滚到底自动接续下一分类段，纯追加零跳变 -->
+        <view class="main__title">{{ currentName() }}</view
         ><view v-if="error" class="cat-retry card" @tap="load"
           ><text class="cat-retry__title">商品加载失败</text
           ><text class="muted">网络异常，点击重试</text></view
         ><view v-else-if="loading" class="cat-skeleton"
           ><view v-for="n in 4" :key="n" class="cat-skeleton__block" /></view
         ><template v-else
-          ><view v-if="!products.length" class="main__empty muted"
+          ><view
+            :class="{ 'list-fade': listEntering }"
+            class="list-wrap"
+          ><view v-if="!products.length && !appending" class="main__empty muted"
             >这个分类暂时没货，去看看别的吧</view
           ><view
-            v-for="p in products"
+            v-for="(seg, si) in flow"
+            :key="seg.catId"
+            :id="'flow-seg-' + seg.catId"
+            class="flow-seg"
+            ><view v-if="si > 0" class="flow-seg__head"
+              ><text class="flow-seg__label">{{ seg.catName }}</text></view
+            ><view
+              v-if="!seg.items.length"
+              class="main__empty muted"
+              >正在接续下一分类…</view
+            ><view
+            v-for="p in seg.items"
             :key="p.id"
             class="item card"
             @tap="open(p.id)"
@@ -280,10 +433,12 @@ const currentName = () => {
                       'counter__btn--cap':
                         p.seckillLimit &&
                         cart.quantity(p.id) >= p.seckillLimit.limit,
+                      'add--closed': closedNow,
                     }"
                     :disabled="
-                      !!p.seckillLimit &&
-                      cart.quantity(p.id) >= p.seckillLimit.limit
+                      closedNow ||
+                      (!!p.seckillLimit &&
+                        cart.quantity(p.id) >= p.seckillLimit.limit)
                     "
                     aria-label="增加一件"
                     @tap.stop="cart.set(p, cart.quantity(p.id) + 1)"
@@ -307,6 +462,15 @@ const currentName = () => {
                   aria-label="已抢购"
                 >
                   已抢
+                </button
+                ><!-- IKGNMV：购物车已有其他秒杀品——一单一秒杀置灰 -->
+                <button
+                  v-else-if="seckillLocked(p)"
+                  class="add add--bought"
+                  disabled
+                  aria-label="一单限一个"
+                >
+                  限一
                 </button><button
                   v-else
                   class="add"
@@ -317,14 +481,20 @@ const currentName = () => {
                 </button></view
               ></view
             ></view
-          ></template
-        ><!-- IKG8PC 二轮：边界预告——到底/到顶续跳前给预期，从"意外跳走"变"按预告翻页" -->
+          ></view
+        ></view
+      ></template
+        ><!-- IKGQ6R 联调按钮（仅 MOCK）：直触接续逻辑 -->
+        <view v-if="MOCK" style="text-align:center;padding:20rpx">
+          <button style="background:#07883b;color:#fff" @tap="onReachEnd">模拟滚到底</button>
+        </view>
+        <!-- IKG8PC 二轮：边界预告——到底/到顶续跳前给预期，从"意外跳走"变"按预告翻页" -->
         <view
           v-if="!loading && !error && !keyword && products.length"
           class="next-hint"
-          ><text v-if="nextCategoryName"
-            >继续滚动 · 下一分类「{{ nextCategoryName }}」</text
-          ><text v-else>已经是最后一个分类啦</text></view
+          ><text v-if="appending">正在接续下一分类…</text
+          ><text v-else-if="!nextCategoryName">已经是最后一个分类啦</text
+          ><text v-else>继续下滑 · 下一分类「{{ nextCategoryName }}」</text></view
         ></scroll-view
       ></view
     ><TabBar :current="1" /><CartOverlay /></view
@@ -475,6 +645,17 @@ const currentName = () => {
   font-size: 22rpx;
   color: $muted;
 }
+.flow-seg__head {
+  padding: 22rpx 8rpx 14rpx;
+}
+.flow-seg__label {
+  font-size: 20rpx;
+  font-weight: 600;
+  color: #fff;
+  background: $primary;
+  border-radius: 6rpx;
+  padding: 4rpx 14rpx;
+}
 .item {
   display: flex;
   padding: 18rpx;
@@ -560,10 +741,11 @@ const currentName = () => {
   background: $primary-soft;
   color: $primary-dark;
 }
-/* IKG8FF：秒杀限购达到上限的 ＋ 与已抢购按钮——灰化禁用态 */
+/* IKG8FF：秒杀限购达到上限的 ＋ 与已抢购按钮——灰化禁用态；
+   IKG1C：闭店态加购按钮同款灰化（.add--closed） */
 .counter__btn--cap,
-.add--closed,
-.add--bought {
+.add--bought,
+.add--closed {
   background: #e5e7e5;
   color: $muted;
 }
@@ -598,5 +780,64 @@ const currentName = () => {
   50% {
     opacity: 0.55;
   }
+}
+
+/* ---------- IKGQ6R 丝滑化：切换加载条 + 列表淡入 ---------- */
+.switch-bar {
+  height: 4rpx;
+  border-radius: 2rpx;
+  overflow: hidden;
+  background: $primary-soft;
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    left: -40%;
+    width: 40%;
+    height: 100%;
+    border-radius: 2rpx;
+    background: $primary;
+    animation: switch-slide 0.9s ease-in-out infinite;
+  }
+}
+@keyframes switch-slide {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+.list-wrap.list-fade {
+  animation: list-fade-in 0.22s ease-out;
+}
+@keyframes list-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- IKGQ6R 三轮：下一分类预览块（无缝续滑） ---------- */
+.pp-next {
+  margin-top: 4rpx;
+}
+.pp-next__banner {
+  text-align: center;
+  padding: 22rpx 0 18rpx;
+  font-size: 22rpx;
+  color: $muted;
+}
+.pp-next__loading {
+  text-align: center;
+  padding: 30rpx 0;
+  font-size: 24rpx;
+}
+.pp-next__item {
+  opacity: 0.85;
 }
 </style>
