@@ -22,3 +22,4 @@ dist
 # 本机开发覆盖（个人配置不入库；生产地址在 .env.production）
 .env.development
 .env.local
+.gstack/
