@@ -415,14 +415,6 @@ const quickCats = computed(() =>
 );
 const open = (id: string) =>
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
-const currentName = () => {
-  if (keyword.value) return `“${keyword.value}” · 搜索结果`;
-  // IKH0H9：无「全部」项——「all」哨兵兜底与顶部回落一致，取首段名（秒杀在时即秒杀）
-  if (active.value === "all") return sections.value[0]?.catName ?? "全部分类";
-  return (
-    categories.value.find((c) => c.id === active.value)?.name || "全部商品"
-  );
-};
 </script>
 <template>
   <view class="page"
@@ -466,9 +458,8 @@ const currentName = () => {
         ></view
       ><view
         class="main"
-        ><!-- IKG8PC 终版：吸顶标题——滚动时实时显示当前分类名（联动 active） -->
-        <view id="main-title" class="main__title">{{ currentName() }}</view
-        ><view v-if="error" class="cat-retry card" @tap="load"
+        ><!-- 2026-09-19 道哥验收：吸顶标题移除——当前分类指示只留左侧高亮 -->
+        <view v-if="error" class="cat-retry card" @tap="load"
           ><text class="cat-retry__title">商品加载失败</text
           ><text class="muted">网络异常，点击重试</text></view
         ><view v-else-if="loading" class="cat-skeleton"
@@ -723,18 +714,6 @@ const currentName = () => {
   min-width: 0;
   /* IKG8PC 终版：页面级滚动——内容随页面自然撑开 */
   height: auto;
-}
-.main__title {
-  /* IKG8PC 终版：吸顶标题（美团式）——滚动时实时显示当前分类名，
-     底色与页面底一致遮住下方滚过内容；联动锚线=标题下沿 */
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  background: $paper;
-  font-size: 34rpx;
-  font-weight: 900;
-  padding: 16rpx 4rpx;
-  margin: 0 0 12rpx;
 }
 .main__empty {
   text-align: center;
