@@ -11,11 +11,11 @@ import type { Category, Product } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
 /**
- * 分类页（IKG8PC 终版·美团式完整流，2026-09-19 对齐定稿）：
- * - 一次拉全量商品 → 按分类分组 → 完整长列表一次性渲染（零接续/零等待/零闪骨架）
+ * 分类页（IKG8PC 终版·美团式完整流；IKH0H9 去「全部」+秒杀进流首段）：
+ * - 全量商品与秒杀并行拉取 → [秒杀段, ...分类段] 一次性渲染（零接续/零等待/零闪骨架）
  * - 页面级原生滚动；标题吸顶实时显示当前分类名
- * - 左侧高亮随滚动联动（段头越过吸顶标题下沿即切换；顶部区域=「全部」）
- * - 点侧栏：已渲染分类平滑直达段头；「全部」回顶；「秒杀」独立视角不进流
+ * - 左侧高亮随滚动联动（段头越过吸顶标题下沿即切换；顶部回落=首段，侧栏无「全部」项）
+ * - 点侧栏直达段头（秒杀=流内首段同款直达）；侧栏秒杀项随秒杀段有无动态注入
  */
 const MOCK = !!import.meta.env.VITE_CAT_MOCK;
 const MOCK_CATS: Category[] = Array.from({ length: 6 }, (_, i) => ({
@@ -55,8 +55,6 @@ interface CatSeg {
   items: Product[];
 }
 const sections = ref<CatSeg[]>([]);
-/** 秒杀独立视角（IKG8PC 终版：跨分类促销集合不进流，避免商品重复） */
-const seckillItems = ref<Product[] | null>(null);
 
 /** 渐进渲染（2026-09-19 大目录实测）：数据仍一次拉全（丝滑本质=内容就位），
  *  但 setData 一次数千节点会卡死——渲染按配额渐进，滚近渲染尾本地扩批（零网络） */
@@ -75,16 +73,11 @@ function seckillLocked(p: Product): boolean {
   );
 }
 
-/** 渲染出口统一：完整流 / 搜索伪段 / 秒杀视角 / 空分类空态；
- *  完整流按 renderUpto 配额截断（渐进渲染，滚近扩批） */
+/** 渲染出口统一：完整流（秒杀段置顶）/ 搜索伪段 / 空分类空态；
+ *  完整流按 renderUpto 配额截断（渐进渲染，滚近扩批）——秒杀进流后同享 */
 const viewSecs = computed<CatSeg[]>(() => {
-  if (active.value === "seckill")
-    return [
-      { catId: "seckill", catName: "限时秒杀", items: seckillItems.value ?? [] },
-    ];
   if (
     active.value !== "all" &&
-    active.value !== "seckill" &&
     !sections.value.some((s) => s.catId === active.value)
   ) {
     const cat = categories.value.find((c) => c.id === active.value);
@@ -108,21 +101,27 @@ const products = computed<Product[]>(() =>
   viewSecs.value.flatMap((s) => s.items),
 );
 
-/** 首屏加载：一次拉全量 → 客户端按分类分组（IKGQ6R 数据核查：单校区 267 SKU 一次请求约 50KB） */
+/** 首屏加载：全量商品与秒杀并行拉取 → 客户端组装 [秒杀段, ...分类段]
+ *  （IKGQ6R 数据核查：单校区 267 SKU 一次请求约 50KB；
+ *  IKH0H9 秒杀失败/为空不插段不挡流——促销接口挂了不能连累分类页） */
 async function load() {
   loading.value = true;
   error.value = false;
   renderUpto.value = RENDER_BATCH * 2; // 渐进渲染配额随数据集重置
   try {
-    const rows = MOCK
-      ? mockAll()
-      : await api.products("all", keyword.value);
+    const rowsP = MOCK
+      ? Promise.resolve(mockAll())
+      : api.products("all", keyword.value);
     if (keyword.value) {
-      // 搜索态（IKAHBJ）：全品类结果平铺单段，不参与滚动联动
+      // 搜索态（IKAHBJ）：全品类结果平铺单段，不参与滚动联动、不插秒杀段（保持现状）
       sections.value = [
-        { catId: "search", catName: `“${keyword.value}”`, items: rows },
+        { catId: "search", catName: `“${keyword.value}”`, items: await rowsP },
       ];
     } else {
+      const secsP = MOCK
+        ? Promise.resolve(mockAll().slice(0, 2))
+        : api.seckillProducts().catch(() => [] as Product[]);
+      const [rows, secs] = await Promise.all([rowsP, secsP]);
       const order = categories.value.filter(
         (c) => c.id !== "all" && c.id !== "seckill",
       );
@@ -132,16 +131,30 @@ async function load() {
         if (!byCat.has(k)) byCat.set(k, []);
         byCat.get(k)!.push(p);
       });
-      sections.value = order
+      const catSegs = order
         .filter((c) => byCat.get(c.id)?.length)
         .map((c) => ({ catId: c.id, catName: c.name, items: byCat.get(c.id)! }));
+      sections.value = secs.length
+        ? [{ catId: "seckill", catName: "限时秒杀", items: secs }, ...catSegs]
+        : catSegs;
     }
   } catch (e) {
     // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
     if (isRetryable(e)) error.value = true;
   } finally {
+    syncSeckillSide();
     loading.value = false;
   }
+}
+
+/** IKH0H9：侧栏秒杀项跟流走——sections 含秒杀段才注入（unshift 头部），
+ *  无（无活动/搜索态）则移除；幂等，重复 load 不重复注入 */
+function syncSeckillSide() {
+  const has = sections.value.some((s) => s.catId === "seckill");
+  const idx = categories.value.findIndex((c) => c.id === "seckill");
+  if (has && idx < 0)
+    categories.value.unshift({ id: "seckill", name: "限时秒杀" });
+  else if (!has && idx >= 0) categories.value.splice(idx, 1);
 }
 
 /** 搜索即全品类（IKAHBJ） */
@@ -153,15 +166,12 @@ async function search() {
 }
 
 onShow(async () => {
-  // mock 联调短路：绕过微信登录墙，只渲染完整流
+  // mock 联调短路：绕过微信登录墙，只渲染完整流（mock 秒杀段=前两个商品验证流结构）
   if (MOCK) {
-    categories.value = [
-      ...MOCK_CATS,
-      { id: "all", name: "全部" },
-      { id: "seckill", name: "限时秒杀" },
-    ];
+    categories.value = [...MOCK_CATS];
     active.value = "all";
     await load();
+    if (sections.value.length) active.value = sections.value[0].catId;
     return;
   }
   const kw = (uni.getStorageSync("searchKeyword") as string) || "";
@@ -181,41 +191,27 @@ onShow(async () => {
     try {
       categories.value = (await api.home()).categories;
     } catch {
-      categories.value = [{ id: "all", name: "全部" }];
+      // IKH0H9：双败不再伪造「全部」项——侧栏空、流按 categoryId 分组，错误态另由 load 兜
+      categories.value = [];
     }
   }
-  if (!categories.value.some((c) => c.id === "all"))
-    categories.value = [{ id: "all", name: "全部" }, ...categories.value];
-  const allIdx = categories.value.findIndex((c) => c.id === "all");
-  if (allIdx >= 0 && !categories.value.some((c) => c.id === "seckill"))
-    categories.value.splice(allIdx + 1, 0, { id: "seckill", name: "限时秒杀" });
   if (pickCat) {
-    active.value = categories.value.some((c) => c.id === pickCat)
-      ? pickCat
-      : "all";
     keyword.value = "";
     draft.value = "";
   }
   await load();
+  // IKH0H9：深链在 load 后校验（侧栏秒杀项此时才随秒杀段注入，'seckill' 深链同款生效）；
+  // 无深链/深链失效时初始高亮=首段（秒杀段或首个分类），与顶部回落锚一致
+  if (pickCat && categories.value.some((c) => c.id === pickCat)) {
+    active.value = pickCat;
+  } else if (sections.value.length) {
+    active.value = sections.value[0].catId;
+  }
 });
 
-/** 侧栏点击：分类直达段头 / 「全部」回顶 / 「秒杀」独立视角（懒加载一次） */
+/** 侧栏点击：直达分类段头（秒杀=流内首段，同款直达/扩配额；「all」哨兵仅兜底回顶） */
 async function pick(id: string) {
   active.value = id;
-  if (id === "seckill") {
-    if (seckillItems.value) return;
-    loading.value = true;
-    try {
-      seckillItems.value = MOCK
-        ? mockAll().slice(0, 3)
-        : await api.seckillProducts();
-    } catch (e) {
-      if (isRetryable(e)) error.value = true;
-    } finally {
-      loading.value = false;
-    }
-    return;
-  }
   if (id === "all") {
     scrollTopTo(0);
     return;
@@ -285,7 +281,7 @@ async function scrollToCat(id: string) {
 }
 
 /** 滚动联动高亮（IKG8PC 终版）：段头越过锚线即切换；
- *  顶部区域（第一段头尚未越过）=「全部」。搜索态/秒杀视角/骨架态停用。
+ *  顶部区域（第一段头尚未越过）=首段（IKH0H9）。搜索态/空分类空态/骨架态停用。
  *  点击直达期间挂锁。H5 原生量取（SelectorQuery 失真坑见 scrollToCat）。 */
 let segSyncAt = 0;
 let lastScrollTop = 0;
@@ -350,7 +346,9 @@ function measureAndApply() {
   // #endif
 }
 function applyActive(cur: number) {
-  const hit = cur >= 0 ? sections.value[cur].catId : "all";
+  // IKH0H9：顶部回落（首段头尚未越过锚线）=首段——秒杀在时即秒杀，无「全部」
+  const hit =
+    cur >= 0 ? sections.value[cur].catId : (sections.value[0]?.catId ?? "all");
   if (hit !== active.value) active.value = hit;
 }
 onPageScroll((e) => onFlowScroll(e.scrollTop));
@@ -376,12 +374,11 @@ const open = (id: string) =>
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
 const currentName = () => {
   if (keyword.value) return `“${keyword.value}” · 搜索结果`;
-  const base =
-    active.value === "all"
-      ? "全部分类"
-      : categories.value.find((c) => c.id === active.value)?.name ||
-        "全部商品";
-  return base;
+  // IKH0H9：无「全部」项——「all」哨兵兜底与顶部回落一致，取首段名（秒杀在时即秒杀）
+  if (active.value === "all") return sections.value[0]?.catName ?? "全部分类";
+  return (
+    categories.value.find((c) => c.id === active.value)?.name || "全部商品"
+  );
 };
 </script>
 <template>
