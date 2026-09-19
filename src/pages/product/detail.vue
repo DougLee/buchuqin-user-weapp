@@ -76,6 +76,13 @@ const crossInfo = ref<Awaited<ReturnType<typeof api.localMatch>> | null>(null);
 const crossFrom = computed(
   () => crossInfo.value?.sourceCampusName || "其他校区",
 );
+/** 弹窗商品信息行：源商品名（local-match 回传）；按钮文案用去引号校区名 */
+const crossGoods = computed(
+  () => crossInfo.value?.sourceName?.trim() || "该商品",
+);
+const crossShort = computed(() =>
+  crossFrom.value.replace(/[「」]/g, "").slice(0, 8),
+);
 /** 二选一确认（道哥 2026-09-19 口径 + 品牌弹窗样式）：是否切换到分享校区 */
 const showCrossDlg = ref(false);
 const switching = ref(false);
@@ -336,24 +343,23 @@ const gallery = computed(() => {
       </button></view
     ></view
   >
-  <!-- IKGZSU 跨校区二选一品牌弹窗（复用楼长确认弹窗 tip-card 设计语言） -->
+  <!-- IKGZSU 跨校区二选一品牌弹窗（行动弹窗规范：商品信息头 + 通栏主 CTA + 文字次按钮） -->
   <view v-if="showCrossDlg" class="tip-mask" @tap="stayCross"
     ><view class="tip-card" @tap.stop
-      ><view class="tip-card__badge">校区</view
-      ><text class="tip-card__title">当前商品尚未在您所选校区售卖</text
-      ><view class="tip-card__body"
-        ><text class="tip-card__line">该商品属于「{{ crossFrom }}」，是否切换过去查看？</text
-        ><text class="tip-card__line tip-card__line--muted"
-          >切换后购物车将清空，收货地址需重新选择</text
+      ><text class="tip-card__title">商品不在当前校区</text
+      ><view class="tip-card__goods"
+        ><text class="tip-card__goods-name">{{ crossGoods }}</text
+        ><text class="tip-card__goods-from">来自「{{ crossFrom }}」</text
         ></view
-      ><view class="tip-card__actions"
-        ><button class="tip-btn tip-btn--ghost" @tap="stayCross">暂不</button
-        ><button
-          class="tip-btn tip-btn--primary"
-          :disabled="switching"
-          @tap="doSwitchCampus"
-          >{{ switching ? "切换中…" : "切换" }}</button
-        ></view
+      ><text class="tip-card__hint"
+        >切换后购物车将清空，收货地址需重新选择</text
+      ><button
+        class="tip-card__cta"
+        :disabled="switching"
+        @tap="doSwitchCampus"
+        >{{ switching ? "切换中…" : `切换到${crossShort}查看` }}</button
+      ><view class="tip-card__alt" @tap="stayCross"
+        >暂不，逛逛本校区</view
       ></view
     ></view
   >
@@ -573,7 +579,7 @@ const gallery = computed(() => {
 .bottom .primary-btn {
   flex: 1;
 }
-/* ---------- IKGZSU 跨校区二选一品牌弹窗（楼长确认弹窗同款设计语言） ---------- */
+/* ---------- IKGZSU 跨校区二选一品牌弹窗（行动弹窗规范：信息头+通栏CTA+文字次按钮） ---------- */
 .tip-mask {
   position: fixed;
   inset: 0;
@@ -588,74 +594,73 @@ const gallery = computed(() => {
   width: 100%;
   max-width: 560rpx;
   background: $surface;
-  border-radius: 28rpx;
-  padding: 48rpx 40rpx 36rpx;
+  border-radius: 32rpx;
+  padding: 56rpx 44rpx 36rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
-.tip-card__badge {
-  width: 104rpx;
-  height: 104rpx;
-  border-radius: 50%;
-  background: $primary-soft;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 52rpx;
-  margin-bottom: 26rpx;
-}
 .tip-card__title {
-  font-size: 32rpx;
+  font-size: 33rpx;
   font-weight: 800;
   color: $ink;
   text-align: center;
 }
-.tip-card__body {
-  margin-top: 20rpx;
+/* 商品信息头：浅绿底胶囊块——让弹窗有具体内容而非空壳图标 */
+.tip-card__goods {
+  margin-top: 26rpx;
+  width: 100%;
+  box-sizing: border-box;
+  background: $primary-soft;
+  border-radius: 20rpx;
+  padding: 22rpx 28rpx;
   display: flex;
   flex-direction: column;
-  gap: 6rpx;
   align-items: center;
+  gap: 6rpx;
 }
-.tip-card__line {
-  font-size: 27rpx;
-  line-height: 1.6;
-  color: rgba(30, 37, 32, 0.82);
-  text-align: center;
+.tip-card__goods-name {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: $primary-dark;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.tip-card__line--muted {
+.tip-card__goods-from {
   font-size: 24rpx;
   color: $muted;
 }
-.tip-card__actions {
-  margin-top: 44rpx;
-  display: flex;
-  gap: 20rpx;
-  width: 100%;
+.tip-card__hint {
+  margin-top: 22rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: $muted;
+  text-align: center;
 }
-.tip-btn {
-  flex: 1;
-  margin: 0;
-  min-height: 84rpx;
-  line-height: 84rpx;
-  border-radius: 42rpx;
-  font-size: 29rpx;
+.tip-card__cta {
+  margin: 40rpx 0 0;
+  width: 100%;
+  min-height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 44rpx;
+  background: $primary;
+  color: #fff;
+  font-size: 30rpx;
   font-weight: 700;
   padding: 0;
 }
-.tip-btn--ghost {
-  background: $paper;
-  color: $ink;
-  border: 2rpx solid $line;
-}
-.tip-btn--primary {
-  background: $primary;
-  color: #fff;
-}
-.tip-btn--primary[disabled] {
+.tip-card__cta[disabled] {
   opacity: 0.6;
   color: #fff;
+}
+.tip-card__alt {
+  margin-top: 20rpx;
+  padding: 8rpx 24rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: $muted;
 }
 /* ---------- IKGZSU 跨校区占位页 ---------- */
 .cross {
