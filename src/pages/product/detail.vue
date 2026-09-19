@@ -81,7 +81,7 @@ const showCrossDlg = ref(false);
 const switching = ref(false);
 async function offerSwitchCampus() {
   loading.value = false;
-  // 顺带预取同款匹配：拿来源校区名 + 占位页「找同款」零等待
+  // 取来源校区名（local-match 顺带回传；2026-09-19 道哥验收：找同款功能下线）
   try {
     crossInfo.value = await api.localMatch(productId.value);
   } catch {
@@ -107,17 +107,6 @@ async function doSwitchCampus() {
 function stayCross() {
   showCrossDlg.value = false;
   crossBlock.value = true; // 暂不 → 占位页
-}
-/** 占位页：找本校区同款（local-match 命中即替换渲染，加购用本校区商品 id） */
-async function matchLocal() {
-  const hit = crossInfo.value?.product;
-  if (hit) {
-    product.value = hit;
-    productId.value = hit.id;
-    crossBlock.value = false;
-    return;
-  }
-  uni.showToast({ title: "本校区暂未上架，去看看别的吧", icon: "none" });
 }
 const goHome = () => uni.switchTab({ url: "/pages/index/index" });
 const goCampusPick = () =>
@@ -219,8 +208,6 @@ const gallery = computed(() => {
     ><text class="cross__sub">该商品属于「{{ crossFrom }}」</text
     ><button class="cross__btn" @tap="goHome">去逛本校区商品</button
     ><view class="cross__links"
-      ><text @tap="matchLocal">找找本校区同款</text
-      ><text class="cross__divider">·</text
       ><text @tap="goCampusPick">换个校区看看</text
       ></view
     ></view
