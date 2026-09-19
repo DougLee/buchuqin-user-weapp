@@ -379,10 +379,11 @@ const currentName = () => {
         ><view v-else-if="loading" class="cat-skeleton"
           ><view v-for="n in 4" :key="n" class="cat-skeleton__block" /></view
         ><template v-else
-          ><view v-if="!products.length" class="main__empty muted"
-            >{{
-              keyword ? "没有找到相关商品，换个词试试吧" : "这个分类暂时没货，去看看别的吧"
-            }}</view
+          ><!-- 空态兜底：全校无货（viewSecs 恒至少一段，走不到这里属极端态）；
+              单分类/搜索的空态由段内统一渲染，避免双重提示（2026-09-19 验收修复） --><view
+            v-if="!viewSecs.length"
+            class="main__empty muted"
+            >这个分类暂时没货，去看看别的吧</view
           ><view
             v-for="seg in viewSecs"
             :key="seg.catId"
@@ -391,7 +392,11 @@ const currentName = () => {
             ><!-- 2026-09-19 道哥验收：去掉段间分类标签（当前区域由吸顶标题+左侧高亮指示） --><view
               v-if="!seg.items.length"
               class="main__empty muted"
-              >这个分类暂时没货，去看看别的吧</view
+              >{{
+                keyword
+                  ? "没有找到相关商品，换个词试试吧"
+                  : "这个分类暂时没货，去看看别的吧"
+              }}</view
             ><view
               v-for="p in seg.items"
               :key="p.id"
