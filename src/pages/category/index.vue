@@ -200,6 +200,12 @@ onShow(async () => {
     if (sections.value.length) active.value = sections.value[0].catId;
     return;
   }
+  // IKH0H9 体验：二次进入（tab 切回）时旧渲染流还挂在页面上，要等 cart.load
+  // 网络返回才进骨架——期间右侧露出旧的多段内容（观感「先全部再变秒杀」）。
+  // 一进来立即盖骨架并清旧流，onShow 全程只见骨架 → 新首段。
+  loading.value = true;
+  sections.value = [];
+  renderSegs.value = 1;
   const kw = (uni.getStorageSync("searchKeyword") as string) || "";
   if (kw) {
     keyword.value = kw;
