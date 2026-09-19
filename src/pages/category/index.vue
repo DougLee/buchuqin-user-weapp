@@ -58,6 +58,14 @@ const sections = ref<CatSeg[]>([]);
 /** 秒杀独立视角（IKG8PC 终版：跨分类促销集合不进流，避免商品重复） */
 const seckillItems = ref<Product[] | null>(null);
 
+/** 渐进渲染（2026-09-19 大目录实测）：数据仍一次拉全（丝滑本质=内容就位），
+ *  但 setData 一次数千节点会卡死——渲染按配额渐进，滚近渲染尾本地扩批（零网络） */
+const RENDER_BATCH = 240;
+const renderUpto = ref(RENDER_BATCH * 2);
+function extendRender() {
+  renderUpto.value += RENDER_BATCH;
+}
+
 /** IKGNMV 一单一秒杀：购物车里已有**其他**秒杀品时，本秒杀品＋置灰 */
 function seckillLocked(p: Product): boolean {
   return (
@@ -67,22 +75,35 @@ function seckillLocked(p: Product): boolean {
   );
 }
 
-/** 渲染出口统一：完整流 / 搜索伪段 / 秒杀视角 / 空分类空态 */
+/** 渲染出口统一：完整流 / 搜索伪段 / 秒杀视角 / 空分类空态；
+ *  完整流按 renderUpto 配额截断（渐进渲染，滚近扩批） */
 const viewSecs = computed<CatSeg[]>(() => {
-  if (keyword.value) return sections.value;
   if (active.value === "seckill")
     return [
       { catId: "seckill", catName: "限时秒杀", items: seckillItems.value ?? [] },
     ];
   if (
     active.value !== "all" &&
+    active.value !== "seckill" &&
     !sections.value.some((s) => s.catId === active.value)
   ) {
     const cat = categories.value.find((c) => c.id === active.value);
     return [{ catId: active.value, catName: cat?.name ?? "", items: [] }];
   }
-  return sections.value;
+  let left = renderUpto.value;
+  const out: CatSeg[] = [];
+  for (const s of sections.value) {
+    if (left <= 0) break;
+    out.push(
+      left >= s.items.length ? s : { ...s, items: s.items.slice(0, left) },
+    );
+    left -= s.items.length;
+  }
+  return out;
 });
+const totalProducts = computed(
+  () => sections.value.reduce((n, s) => n + s.items.length, 0),
+);
 const products = computed<Product[]>(() =>
   viewSecs.value.flatMap((s) => s.items),
 );
@@ -91,6 +112,7 @@ const products = computed<Product[]>(() =>
 async function load() {
   loading.value = true;
   error.value = false;
+  renderUpto.value = RENDER_BATCH * 2; // 渐进渲染配额随数据集重置
   try {
     const rows = MOCK
       ? mockAll()
@@ -199,13 +221,26 @@ async function pick(id: string) {
     return;
   }
   // 空分类：viewSecs 已切空态视图，无需滚动
-  if (sections.value.some((s) => s.catId === id)) await scrollToCat(id);
+  if (sections.value.some((s) => s.catId === id)) {
+    // 渐进渲染：目标段可能在配额外未渲染——先扩配额覆盖该段再定位
+    let acc = 0;
+    for (const s of sections.value) {
+      if (s.catId === id) {
+        renderUpto.value = Math.max(renderUpto.value, acc + s.items.length);
+        break;
+      }
+      acc += s.items.length;
+    }
+    await nextTick();
+    await scrollToCat(id);
+  }
 }
 
-/** 滚到目标位置（H5 滚动层在 documentElement，MP 页面滚动） */
+/** 滚到目标位置（H5 滚动层实测会漂移：documentElement 或 body——写双兼容；MP 页面滚动） */
 function scrollTopTo(target: number) {
   // #ifdef H5
   document.documentElement.scrollTop = target;
+  if (Math.abs(h5ScrollTop() - target) > 2) document.body.scrollTop = target;
   // #endif
   // #ifndef H5
   uni.pageScrollTo({ scrollTop: Math.max(0, target), duration: 200 });
@@ -226,11 +261,7 @@ async function scrollToCat(id: string) {
   clickLock = true;
   // #ifdef H5
   const el = document.querySelector(`#cat-${id}`);
-  if (el)
-    document.documentElement.scrollTop =
-      document.documentElement.scrollTop +
-      el.getBoundingClientRect().top -
-      ANCHOR;
+  if (el) scrollTopTo(h5ScrollTop() + el.getBoundingClientRect().top - ANCHOR);
   // #endif
   // #ifndef H5
   const rect = await new Promise<UniApp.NodeInfo | null>((resolve) => {
@@ -263,8 +294,28 @@ function onFlowScroll(scrollTop: number) {
   const now = Date.now();
   if (now - segSyncAt < 150) return;
   segSyncAt = now;
+  extendRenderIfNeeded();
   if (clickLock) return;
   measureAndApply();
+}
+/** 渐进渲染扩批：渲染尾（#render-tail）距视口底不足 2 屏 → 本地扩一批（零网络） */
+function extendRenderIfNeeded() {
+  if (renderUpto.value >= totalProducts.value) return;
+  const viewport = uni.getSystemInfoSync().windowHeight;
+  // #ifdef H5
+  const tail = document.querySelector("#render-tail");
+  if (tail && tail.getBoundingClientRect().top < viewport * 3) extendRender();
+  // #endif
+  // #ifndef H5
+  uni
+    .createSelectorQuery()
+    .select("#render-tail")
+    .boundingClientRect((r) => {
+      if (r && (r as UniApp.NodeInfo).top != null && (r as UniApp.NodeInfo).top! < viewport * 3)
+        extendRender();
+    })
+    .exec();
+  // #endif
 }
 /** 按当前各段头位置设定高亮（滚动联动与点击直达终点校准共用）。
  *  仅在「完整流视图」下运行：搜索态/秒杀视角/空分类空态下 DOM 里
@@ -304,9 +355,13 @@ function applyActive(cur: number) {
 }
 onPageScroll((e) => onFlowScroll(e.scrollTop));
 // #ifdef H5
-// H5 滚动层实测在 documentElement（body.scrollTop 赋值无效）；事件双挂确保触发
-const h5ScrollTop = () => document.documentElement.scrollTop;
+// H5 滚动层随渲染状态漂移（documentElement 或 body），读侧双兼容
+const h5ScrollTop = () =>
+  document.documentElement.scrollTop || document.body.scrollTop || 0;
 document.addEventListener("scroll", () => onFlowScroll(h5ScrollTop()), {
+  passive: true,
+});
+document.body.addEventListener("scroll", () => onFlowScroll(h5ScrollTop()), {
   passive: true,
 });
 // uni-h5 页面结构下 scroll 事件传递不可靠——短轮询兜底驱动（开销微小）
@@ -486,9 +541,10 @@ const currentName = () => {
                 ></view
               ></view
             ></view
-          ><!-- IKG8PC 终版：完整流滚到底是真到底，无预告条 -->
-          <view v-if="products.length" class="next-hint"
-            ><text>没有更多了</text></view
+          ><!-- IKG8PC 终版：完整流滚到底是真到底；#render-tail 是渐进渲染扩批锚点
+              （距视口 2 屏即本地扩批，用户无感；全渲染完才显示「没有更多了」） -->
+          <view v-if="products.length" id="render-tail" class="next-hint"
+            ><text v-if="renderUpto >= totalProducts">没有更多了</text></view
           ></template
         ></view
       ></view
