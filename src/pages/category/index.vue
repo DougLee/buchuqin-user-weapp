@@ -108,9 +108,11 @@ async function load() {
         { catId: "search", catName: `“${keyword.value}”`, items: await rowsP },
       ];
     } else {
+      // 秒杀复用 onShow 预取（分类接口并行时就拉，侧栏秒杀项与分类项同拍出现）；
+      // 预取缺席（异常路径）再自拉兜底
       const secsP = MOCK
         ? Promise.resolve(mockAll().slice(0, 2))
-        : api.seckillProducts().catch(() => [] as Product[]);
+        : seckillPrefetch ?? (seckillPrefetch = api.seckillProducts().catch(() => [] as Product[]));
       const [rows, secs] = await Promise.all([rowsP, secsP]);
       const order = categories.value.filter(
         (c) => c.id !== "all" && c.id !== "seckill",
@@ -177,6 +179,10 @@ async function ensureScrollable() {
   // #endif
 }
 
+/** 秒杀预取（IKH0H9 体验）：onShow 与分类接口并行拉，侧栏秒杀项与分类项同拍
+ *  出现（不再等商品全量+分组完成才注入）；load 复用此 Promise 不重拉 */
+let seckillPrefetch: Promise<Product[]> | null = null;
+
 /** 搜索即全品类（IKAHBJ） */
 async function search() {
   keyword.value = draft.value.trim();
@@ -205,6 +211,8 @@ onShow(async () => {
   uni.removeStorageSync("categoryPick");
   await cart.load();
   void campusStore.refresh();
+  // 秒杀与分类接口并行预取——侧栏秒杀项与分类项同拍出现（IKH0H9 体验修复）
+  seckillPrefetch = api.seckillProducts().catch(() => [] as Product[]);
   try {
     categories.value = await api.categories();
   } catch {
@@ -214,6 +222,14 @@ onShow(async () => {
       // IKH0H9：双败不再伪造「全部」项——侧栏空、流按 categoryId 分组，错误态另由 load 兜
       categories.value = [];
     }
+  }
+  // 预取已到则秒杀项即刻注入（与分类项同帧渲染）；未到则等 load 尾部 syncSeckillSide 兜
+  const secsEarly = seckillPrefetch;
+  if (secsEarly) {
+    void secsEarly.then((rows) => {
+      if (rows.length && !categories.value.some((c) => c.id === "seckill"))
+        categories.value.unshift({ id: "seckill", name: "限时秒杀" });
+    });
   }
   if (pickCat) {
     keyword.value = "";
