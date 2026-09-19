@@ -384,13 +384,13 @@ const currentName = () => {
               keyword ? "没有找到相关商品，换个词试试吧" : "这个分类暂时没货，去看看别的吧"
             }}</view
           ><view
-            v-for="(seg, si) in viewSecs"
+            v-for="seg in viewSecs"
             :key="seg.catId"
             :id="'cat-' + seg.catId"
             class="flow-seg"
-            ><view v-if="si > 0 && seg.items.length" class="flow-seg__head"
-              ><text class="flow-seg__label">{{ seg.catName }}</text></view
-            ><view v-if="!seg.items.length" class="main__empty muted"
+            ><!-- 2026-09-19 道哥验收：去掉段间分类标签（当前区域由吸顶标题+左侧高亮指示） --><view
+              v-if="!seg.items.length"
+              class="main__empty muted"
               >这个分类暂时没货，去看看别的吧</view
             ><view
               v-for="p in seg.items"
@@ -646,17 +646,6 @@ const currentName = () => {
   padding: 26rpx 0 34rpx;
   font-size: 22rpx;
   color: $muted;
-}
-.flow-seg__head {
-  padding: 22rpx 8rpx 14rpx;
-}
-.flow-seg__label {
-  font-size: 20rpx;
-  font-weight: 600;
-  color: #fff;
-  background: $primary;
-  border-radius: 6rpx;
-  padding: 4rpx 14rpx;
 }
 .item {
   display: flex;
