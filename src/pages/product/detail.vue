@@ -76,7 +76,9 @@ const crossInfo = ref<Awaited<ReturnType<typeof api.localMatch>> | null>(null);
 const crossFrom = computed(
   () => crossInfo.value?.sourceCampusName || "其他校区",
 );
-/** 二选一确认（道哥 2026-09-19 口径）：是否切换到分享校区 */
+/** 二选一确认（道哥 2026-09-19 口径 + 品牌弹窗样式）：是否切换到分享校区 */
+const showCrossDlg = ref(false);
+const switching = ref(false);
 async function offerSwitchCampus() {
   loading.value = false;
   // 顺带预取同款匹配：拿来源校区名 + 占位页「找同款」零等待
@@ -85,23 +87,26 @@ async function offerSwitchCampus() {
   } catch {
     crossInfo.value = null;
   }
-  const res = await uni.showModal({
-    title: "当前商品尚未在您所选校区售卖",
-    content: `该商品属于「${crossFrom.value}」，是否切换过去查看？切换后购物车将清空，收货地址需重新选择。`,
-    confirmText: "切换",
-    cancelText: "暂不",
-  });
-  if (res.confirm) {
-    try {
-      await session.switchCampus(shareCampus.value);
-      uni.showToast({ title: "已切换校区", icon: "success" });
-      await load();
-      return;
-    } catch {
-      uni.showToast({ title: "切换失败，请稍后再试", icon: "none" });
-    }
+  showCrossDlg.value = true;
+}
+async function doSwitchCampus() {
+  if (switching.value) return;
+  switching.value = true;
+  try {
+    await session.switchCampus(shareCampus.value);
+    showCrossDlg.value = false;
+    uni.showToast({ title: "已切换校区", icon: "success" });
+    await load();
+    return;
+  } catch {
+    uni.showToast({ title: "切换失败，请稍后再试", icon: "none" });
+  } finally {
+    switching.value = false;
   }
-  crossBlock.value = true; // 暂不 / 切换失败 → 占位页
+}
+function stayCross() {
+  showCrossDlg.value = false;
+  crossBlock.value = true; // 暂不 → 占位页
 }
 /** 占位页：找本校区同款（local-match 命中即替换渲染，加购用本校区商品 id） */
 async function matchLocal() {
@@ -207,14 +212,17 @@ const gallery = computed(() => {
 });
 </script>
 <template>
-  <!-- IKGZSU 跨校区占位页：暂不切换后的落地（主出口回本校区 + 找同款/换校区文字链） -->
+  <!-- IKGZSU 跨校区占位页：暂不切换后的落地（三态链头） -->
   <view v-if="crossBlock" class="cross card"
+    ><view class="cross__badge">校区</view
     ><text class="cross__title">当前商品尚未在您所选校区售卖</text
-    ><text class="muted">该商品属于「{{ crossFrom }}」</text
+    ><text class="cross__sub">该商品属于「{{ crossFrom }}」</text
     ><button class="cross__btn" @tap="goHome">去逛本校区商品</button
-    ><view class="cross__link" @tap="matchLocal"
-      >找找本校区同款（同款同价直达）</view
-    ><view class="cross__link" @tap="goCampusPick">换个校区看看</view
+    ><view class="cross__links"
+      ><text @tap="matchLocal">找找本校区同款</text
+      ><text class="cross__divider">·</text
+      ><text @tap="goCampusPick">换个校区看看</text
+      ></view
     ></view
   >
   <view v-else-if="error" class="detail-error card" @tap="load"
@@ -339,6 +347,27 @@ const gallery = computed(() => {
                   : "加入购物车"
         }}
       </button></view
+    ></view
+  >
+  <!-- IKGZSU 跨校区二选一品牌弹窗（复用楼长确认弹窗 tip-card 设计语言） -->
+  <view v-if="showCrossDlg" class="tip-mask" @tap="stayCross"
+    ><view class="tip-card" @tap.stop
+      ><view class="tip-card__badge">校区</view
+      ><text class="tip-card__title">当前商品尚未在您所选校区售卖</text
+      ><view class="tip-card__body"
+        ><text class="tip-card__line">该商品属于「{{ crossFrom }}」，是否切换过去查看？</text
+        ><text class="tip-card__line tip-card__line--muted"
+          >切换后购物车将清空，收货地址需重新选择</text
+        ></view
+      ><view class="tip-card__actions"
+        ><button class="tip-btn tip-btn--ghost" @tap="stayCross">暂不</button
+        ><button
+          class="tip-btn tip-btn--primary"
+          :disabled="switching"
+          @tap="doSwitchCampus"
+          >{{ switching ? "切换中…" : "切换" }}</button
+        ></view
+      ></view
     ></view
   >
   <!-- IKE3HT 加购收网：未绑手机号点「＋」弹授权（拍板A 不可跳过），绑定成功补执行 -->
@@ -557,34 +586,141 @@ const gallery = computed(() => {
 .bottom .primary-btn {
   flex: 1;
 }
-/* IKGZSU 跨校区占位页：暂不切换后的落地 */
+/* ---------- IKGZSU 跨校区二选一品牌弹窗（楼长确认弹窗同款设计语言） ---------- */
+.tip-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(18, 30, 24, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 72rpx;
+}
+.tip-card {
+  width: 100%;
+  max-width: 560rpx;
+  background: $surface;
+  border-radius: 28rpx;
+  padding: 48rpx 40rpx 36rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.tip-card__badge {
+  width: 104rpx;
+  height: 104rpx;
+  border-radius: 50%;
+  background: $primary-soft;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 52rpx;
+  margin-bottom: 26rpx;
+}
+.tip-card__title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: $ink;
+  text-align: center;
+}
+.tip-card__body {
+  margin-top: 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  align-items: center;
+}
+.tip-card__line {
+  font-size: 27rpx;
+  line-height: 1.6;
+  color: rgba(30, 37, 32, 0.82);
+  text-align: center;
+}
+.tip-card__line--muted {
+  font-size: 24rpx;
+  color: $muted;
+}
+.tip-card__actions {
+  margin-top: 44rpx;
+  display: flex;
+  gap: 20rpx;
+  width: 100%;
+}
+.tip-btn {
+  flex: 1;
+  margin: 0;
+  min-height: 84rpx;
+  line-height: 84rpx;
+  border-radius: 42rpx;
+  font-size: 29rpx;
+  font-weight: 700;
+  padding: 0;
+}
+.tip-btn--ghost {
+  background: $paper;
+  color: $ink;
+  border: 2rpx solid $line;
+}
+.tip-btn--primary {
+  background: $primary;
+  color: #fff;
+}
+.tip-btn--primary[disabled] {
+  opacity: 0.6;
+  color: #fff;
+}
+/* ---------- IKGZSU 跨校区占位页 ---------- */
 .cross {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14rpx;
-  padding: 110rpx 40rpx;
+  padding: 130rpx 48rpx 90rpx;
   text-align: center;
+}
+.cross__badge {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 50%;
+  background: $primary-soft;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64rpx;
+  margin-bottom: 34rpx;
 }
 .cross__title {
   font-size: 32rpx;
   font-weight: 900;
+  color: $ink;
+}
+.cross__sub {
+  margin-top: 14rpx;
+  font-size: 26rpx;
+  color: $muted;
 }
 .cross__btn {
-  margin: 26rpx 0 8rpx;
-  background: #25b95a;
+  margin: 44rpx 0 6rpx;
+  background: $primary;
   color: #fff;
   border-radius: 44rpx;
-  font-size: 28rpx;
-  padding: 0 60rpx;
-  line-height: 84rpx;
-  min-height: 84rpx;
-}
-.cross__link {
-  font-size: 26rpx;
-  color: #07883b;
+  font-size: 29rpx;
   font-weight: 700;
-  padding: 10rpx 0;
+  padding: 0 76rpx;
+  line-height: 88rpx;
+  min-height: 88rpx;
+}
+.cross__links {
+  margin-top: 26rpx;
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: $primary-dark;
+}
+.cross__divider {
+  color: $line;
 }
 .detail-error {
   margin: 28rpx;
