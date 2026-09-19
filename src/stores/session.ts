@@ -33,6 +33,8 @@ export const useSessionStore = defineStore("session", {
     justSignedUp: false,
     /** IKDETO 红点：存在未使用的新人（signup）券，「我的」tab 常亮 */
     hasUsableSignupCoupon: false,
+    /** IKGZSU 跨校区分享：分享链接带来的校区 id，首登时采用（详情页/首页 onLoad 写入） */
+    pendingCampus: "",
   }),
   getters: {
     nickname: (state) => readLocalNickname() || state.user?.nickname || "",
@@ -57,7 +59,11 @@ export const useSessionStore = defineStore("session", {
       // #endif
       // IKC7WB：登录主体挂到 loginInFlight，并发调用复用同一请求
       loginInFlight = (async () => {
-        const result = await api.wechatLogin(await wxLoginCode());
+        // IKGZSU 跨校区分享：新用户首登优先落分享链接带来的校区（后端校验，
+        // 非法值静默忽略）；仅无 token 的首登路径有意义，消费后即清
+        const sharedCampus = this.pendingCampus;
+        const result = await api.wechatLogin(await wxLoginCode(), sharedCampus || undefined);
+        this.pendingCampus = "";
         uni.setStorageSync("token", result.token);
         this.applyUser(result.user);
         // IKDETO：注册当次置位（首页 onShow 消费后自清，只弹一次）

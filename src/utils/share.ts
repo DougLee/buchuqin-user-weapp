@@ -1,4 +1,5 @@
 import { onShareAppMessage } from "@dcloudio/uni-app";
+import { useSessionStore } from "../stores/session";
 
 /**
  * 通用兜底分享（IKC7V6）：非核心页面声明转发能力，避免胶囊菜单
@@ -7,10 +8,16 @@ import { onShareAppMessage } from "@dcloudio/uni-app";
  * 落地统一回首页（个人页/结算页等不作为传播入口）。
  * 朋友圈 onShareTimeline 仅首页/商品详情声明（单页模式落地当前页，
  * 个人页进朋友圈无意义）。
+ * IKGZSU 跨校区分享：path 带分享者校区，新用户点开静默落同校区。
  */
 export function setupDefaultShare() {
-  onShareAppMessage(() => ({
-    title: "不出寝，零食送到寝室",
-    path: "/pages/index/index",
-  }));
+  onShareAppMessage(() => {
+    const campusId = useSessionStore().user?.campusId;
+    return {
+      title: "不出寝，零食送到寝室",
+      path: campusId
+        ? `/pages/index/index?campus=${campusId}`
+        : "/pages/index/index",
+    };
+  });
 }

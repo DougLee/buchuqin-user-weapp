@@ -25,7 +25,20 @@ const promoTicker = setInterval(() => (now.value = Date.now()), 1000);
 onUnmounted(() => clearInterval(promoTicker));
 onLoad(async (q) => {
   productId.value = String(q?.id || "");
+  shareCampus.value = String(q?.campus || "");
+  // IKGZSU 跨校区分享：新用户首登落分享校区（后端校验采用，老用户忽略）
+  if (shareCampus.value) session.pendingCampus = shareCampus.value;
   await cart.load();
+  // IKGZSU：老用户校区与分享校区不一致 → 二选一确认（2026-09-19 道哥定版：
+  // 「当前商品尚未在您所选校区售卖，属于xx校区，是否切换？」）
+  if (
+    shareCampus.value &&
+    session.user?.campusId &&
+    shareCampus.value !== session.user.campusId
+  ) {
+    await offerSwitchCampus();
+    return;
+  }
   void campusStore.refresh(); // IKG1C：打烊态轻量刷新，不阻塞商品加载
   await load();
 });
@@ -34,23 +47,76 @@ onLoad(async (q) => {
  *  商品未加载/缺头图时 imageUrl 缺省——微信自动截当前页兜底 */
 onShareAppMessage(() => {
   const p = product.value;
+  const c = session.user?.campusId;
   if (!p)
-    return { title: "不出寝，零食送到寝室", path: "/pages/index/index" };
+    return {
+      title: "不出寝，零食送到寝室",
+      path: c ? `/pages/index/index?campus=${c}` : "/pages/index/index",
+    };
   return {
     title: `¥${fenToYuan(p.price)} ${p.name} 点击抢购>>`,
-    path: `/pages/product/detail?id=${p.id}`,
+    // IKGZSU：带分享者校区——B 校区打开走同款/切换引导，新用户静默落本校区
+    path: `/pages/product/detail?id=${p.id}${c ? `&campus=${c}` : ""}`,
     imageUrl: p.image || undefined,
   };
 });
 onShareTimeline(() => {
   const p = product.value;
+  const c = session.user?.campusId;
   if (!p) return { title: "不出寝，零食送到寝室" };
   return {
     title: `¥${fenToYuan(p.price)} ${p.name} 点击抢购>>`,
-    query: `id=${p.id}`,
+    query: `id=${p.id}${c ? `&campus=${c}` : ""}`,
   };
 });
-/** 详情三态（IK9AWK）：加载骨架 / 失败重试 / 内容；无 id 视为链接无效 */
+/** IKGZSU 跨校区分享：外校区商品在本校区的落地处理 */
+const shareCampus = ref("");
+const crossBlock = ref(false);
+const crossInfo = ref<Awaited<ReturnType<typeof api.localMatch>> | null>(null);
+const crossFrom = computed(
+  () => crossInfo.value?.sourceCampusName || "其他校区",
+);
+/** 二选一确认（道哥 2026-09-19 口径）：是否切换到分享校区 */
+async function offerSwitchCampus() {
+  loading.value = false;
+  // 顺带预取同款匹配：拿来源校区名 + 占位页「找同款」零等待
+  try {
+    crossInfo.value = await api.localMatch(productId.value);
+  } catch {
+    crossInfo.value = null;
+  }
+  const res = await uni.showModal({
+    title: "当前商品尚未在您所选校区售卖",
+    content: `该商品属于「${crossFrom.value}」，是否切换过去查看？切换后购物车将清空，收货地址需重新选择。`,
+    confirmText: "切换",
+    cancelText: "暂不",
+  });
+  if (res.confirm) {
+    try {
+      await session.switchCampus(shareCampus.value);
+      uni.showToast({ title: "已切换校区", icon: "success" });
+      await load();
+      return;
+    } catch {
+      uni.showToast({ title: "切换失败，请稍后再试", icon: "none" });
+    }
+  }
+  crossBlock.value = true; // 暂不 / 切换失败 → 占位页
+}
+/** 占位页：找本校区同款（local-match 命中即替换渲染，加购用本校区商品 id） */
+async function matchLocal() {
+  const hit = crossInfo.value?.product;
+  if (hit) {
+    product.value = hit;
+    productId.value = hit.id;
+    crossBlock.value = false;
+    return;
+  }
+  uni.showToast({ title: "本校区暂未上架，去看看别的吧", icon: "none" });
+}
+const goHome = () => uni.switchTab({ url: "/pages/index/index" });
+const goCampusPick = () =>
+  uni.navigateTo({ url: "/pages/campus/index" });
 async function load() {
   if (!productId.value) {
     error.value = true;
@@ -141,7 +207,17 @@ const gallery = computed(() => {
 });
 </script>
 <template>
-  <view v-if="error" class="detail-error card" @tap="load"
+  <!-- IKGZSU 跨校区占位页：暂不切换后的落地（主出口回本校区 + 找同款/换校区文字链） -->
+  <view v-if="crossBlock" class="cross card"
+    ><text class="cross__title">当前商品尚未在您所选校区售卖</text
+    ><text class="muted">该商品属于「{{ crossFrom }}」</text
+    ><button class="cross__btn" @tap="goHome">去逛本校区商品</button
+    ><view class="cross__link" @tap="matchLocal"
+      >找找本校区同款（同款同价直达）</view
+    ><view class="cross__link" @tap="goCampusPick">换个校区看看</view
+    ></view
+  >
+  <view v-else-if="error" class="detail-error card" @tap="load"
     ><text class="detail-error__title">商品加载失败</text
     ><text class="muted">网络异常或商品已下架，点击重试</text></view
   >
@@ -480,6 +556,35 @@ const gallery = computed(() => {
 }
 .bottom .primary-btn {
   flex: 1;
+}
+/* IKGZSU 跨校区占位页：暂不切换后的落地 */
+.cross {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14rpx;
+  padding: 110rpx 40rpx;
+  text-align: center;
+}
+.cross__title {
+  font-size: 32rpx;
+  font-weight: 900;
+}
+.cross__btn {
+  margin: 26rpx 0 8rpx;
+  background: #25b95a;
+  color: #fff;
+  border-radius: 44rpx;
+  font-size: 28rpx;
+  padding: 0 60rpx;
+  line-height: 84rpx;
+  min-height: 84rpx;
+}
+.cross__link {
+  font-size: 26rpx;
+  color: #07883b;
+  font-weight: 700;
+  padding: 10rpx 0;
 }
 .detail-error {
   margin: 28rpx;

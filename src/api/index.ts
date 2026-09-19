@@ -31,12 +31,25 @@ interface PageResult<T> {
 }
 export const api = {
   /** 微信小程序登录（唯一通道；后端未配置 WX_*_USER 时 501 报"登录服务未配置"）。
-   *  appid 用于双小程序凭证路由（IK8W5Q），与 manifest 一致。 */
-  wechatLogin: (code: string) =>
+   *  appid 用于双小程序凭证路由（IK8W5Q），与 manifest 一致。
+   *  campusId（IKGZSU 跨校区分享）：新用户首登落分享校区，老用户后端忽略。 */
+  wechatLogin: (code: string, campusId?: string) =>
     request<LoginResult>("/auth/wechat-login", {
       method: "POST",
-      data: { code, appid: "wxc814687e5ae26924" },
+      data: {
+        code,
+        appid: "wxc814687e5ae26924",
+        ...(campusId ? { campusId } : {}),
+      },
     }),
+  /** 同款匹配（IKGZSU 跨校区分享）：外校区商品按条码找本校区在售同款；
+   *  sourceName/sourceCampusName 供弹窗与占位页展示来源。 */
+  localMatch: (id: string) =>
+    request<{
+      product: Product | null;
+      sourceName: string;
+      sourceCampusName: string;
+    }>(`/products/${id}/local-match`),
   /** 当前登录用户信息：已有 token 时静默换取，避免每次刷新都打登录接口（限流 10 次/分/IP） */
   profile: () => request<SessionUser>("/auth/profile"),
   /** 资料自助修改（IK9ROG）：昵称/头像落库，DB 为准 */

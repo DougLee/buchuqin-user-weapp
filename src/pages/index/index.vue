@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance, onUnmounted, ref } from "vue";
-import { onShareAppMessage, onShareTimeline, onShow } from "@dcloudio/uni-app";
+import {
+  onLoad,
+  onShareAppMessage,
+  onShareTimeline,
+  onShow,
+} from "@dcloudio/uni-app";
 import { api } from "../../api";
 import ProductCard from "../../components/ProductCard.vue";
 import WheelPanel from "../../components/WheelPanel.vue";
@@ -44,6 +49,12 @@ const addressText = computed(() =>
     ? `${defaultAddress.value.buildingName} ${defaultAddress.value.room}`
     : "请选择地址",
 );
+/** IKGZSU：带校区的分享落地（tabbar 页冷启动 onLoad 可拿 query）——
+ *  新用户首登落分享校区（session.pendingCampus 消费），老用户忽略 */
+onLoad((q) => {
+  const c = String(q?.campus || "");
+  if (c) session.pendingCampus = c;
+});
 onShow(async () => {
   await useSessionStore().ensureLogin();
   const [home, addresses] = await Promise.all([api.home(), api.addresses()]);
@@ -228,11 +239,15 @@ const onPhoneBound = () => {
     cart.set(p, cart.quantity(p.id) + 1);
   }
 };
-/** 分享（IKC7V6）：默认分享——微信自动截当前页为分享图，落地首页 */
-onShareAppMessage(() => ({
-  title: "不出寝，零食送到寝室",
-  path: "/pages/index/index",
-}));
+/** 分享（IKC7V6）：默认分享——微信自动截当前页为分享图，落地首页；
+ *  IKGZSU：path 带分享者校区，新用户点开静默落同校区 */
+onShareAppMessage(() => {
+  const c = session.user?.campusId;
+  return {
+    title: "不出寝，零食送到寝室",
+    path: c ? `/pages/index/index?campus=${c}` : "/pages/index/index",
+  };
+});
 onShareTimeline(() => ({ title: "不出寝，零食送到寝室" }));
 /** 首页分类横滑条：与商品页侧栏同源同序，含「全部」（DB 配图）；
  *  横滑一行浏览全部分类（2026-08-22 需求），不再按 6 列折行，仅留防御上限 */
