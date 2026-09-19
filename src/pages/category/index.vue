@@ -56,12 +56,12 @@ interface CatSeg {
 }
 const sections = ref<CatSeg[]>([]);
 
-/** 渐进渲染（2026-09-19 大目录实测）：数据仍一次拉全（丝滑本质=内容就位），
- *  但 setData 一次数千节点会卡死——渲染按配额渐进，滚近渲染尾本地扩批（零网络） */
-const RENDER_BATCH = 240;
-const renderUpto = ref(RENDER_BATCH * 2);
+/** 渐进渲染（2026-09-19 道哥验收纠偏）：**以段为单位生长**——进页面只渲染
+ *  首段（身处首分类，不是全目录摊开），滚近尾部续下一段（「滚到分类底部继续
+ *  下一分类」的原始体验）；数据仍一次拉全（续段零网络等待，零跳变） */
+const renderSegs = ref(1);
 function extendRender() {
-  renderUpto.value += RENDER_BATCH;
+  renderSegs.value += 1;
 }
 
 /** IKGNMV 一单一秒杀：购物车里已有**其他**秒杀品时，本秒杀品＋置灰 */
@@ -74,7 +74,7 @@ function seckillLocked(p: Product): boolean {
 }
 
 /** 渲染出口统一：完整流（秒杀段置顶）/ 搜索伪段 / 空分类空态；
- *  完整流按 renderUpto 配额截断（渐进渲染，滚近扩批）——秒杀进流后同享 */
+ *  完整流按段制渐进渲染（首段起步，滚近尾部续下一段）——秒杀进流后同享 */
 const viewSecs = computed<CatSeg[]>(() => {
   if (
     active.value !== "all" &&
@@ -83,20 +83,10 @@ const viewSecs = computed<CatSeg[]>(() => {
     const cat = categories.value.find((c) => c.id === active.value);
     return [{ catId: active.value, catName: cat?.name ?? "", items: [] }];
   }
-  let left = renderUpto.value;
-  const out: CatSeg[] = [];
-  for (const s of sections.value) {
-    if (left <= 0) break;
-    out.push(
-      left >= s.items.length ? s : { ...s, items: s.items.slice(0, left) },
-    );
-    left -= s.items.length;
-  }
-  return out;
+  return sections.value.slice(0, renderSegs.value);
 });
-const totalProducts = computed(
-  () => sections.value.reduce((n, s) => n + s.items.length, 0),
-);
+/** 是否已全量渲染（流尾「没有更多了」判定） */
+const allRendered = computed(() => renderSegs.value >= sections.value.length);
 const products = computed<Product[]>(() =>
   viewSecs.value.flatMap((s) => s.items),
 );
@@ -107,7 +97,7 @@ const products = computed<Product[]>(() =>
 async function load() {
   loading.value = true;
   error.value = false;
-  renderUpto.value = RENDER_BATCH * 2; // 渐进渲染配额随数据集重置
+  renderSegs.value = 1; // 段制渐进：随数据集重置为首段
   try {
     const rowsP = MOCK
       ? Promise.resolve(mockAll())
@@ -144,6 +134,7 @@ async function load() {
   } finally {
     syncSeckillSide();
     loading.value = false;
+    void ensureScrollable();
   }
 }
 
@@ -155,6 +146,35 @@ function syncSeckillSide() {
   if (has && idx < 0)
     categories.value.unshift({ id: "seckill", name: "限时秒杀" });
   else if (!has && idx >= 0) categories.value.splice(idx, 1);
+}
+
+/** 严格段制的物理兜底：首段太短（<1.2 屏）时页面滚不动、续段永远触发不了——
+ *  静默续段到刚好超出 1.2 屏（下一段只露头，滚动功能可用，初始视觉仍以首段为主） */
+async function ensureScrollable() {
+  // #ifdef H5
+  for (let i = 0; i < sections.value.length; i++) {
+    if (allRendered.value) return;
+    if (document.body.scrollHeight > window.innerHeight * 1.2) return;
+    extendRender();
+    await nextTick();
+  }
+  // #endif
+  // #ifndef H5
+  const viewport = uni.getSystemInfoSync().windowHeight;
+  for (let i = 0; i < sections.value.length; i++) {
+    if (allRendered.value) return;
+    const h = await new Promise<number>((resolve) => {
+      uni
+        .createSelectorQuery()
+        .select(".page")
+        .boundingClientRect((r) => resolve((r as UniApp.NodeInfo)?.height ?? 0))
+        .exec();
+    });
+    if (h > viewport * 1.2) return;
+    extendRender();
+    await nextTick();
+  }
+  // #endif
 }
 
 /** 搜索即全品类（IKAHBJ） */
@@ -218,15 +238,9 @@ async function pick(id: string) {
   }
   // 空分类：viewSecs 已切空态视图，无需滚动
   if (sections.value.some((s) => s.catId === id)) {
-    // 渐进渲染：目标段可能在配额外未渲染——先扩配额覆盖该段再定位
-    let acc = 0;
-    for (const s of sections.value) {
-      if (s.catId === id) {
-        renderUpto.value = Math.max(renderUpto.value, acc + s.items.length);
-        break;
-      }
-      acc += s.items.length;
-    }
+    // 段制渐进：目标段可能未渲染——先扩渲染覆盖到该段再定位
+    const idx = sections.value.findIndex((s) => s.catId === id);
+    renderSegs.value = Math.max(renderSegs.value, idx + 1);
     await nextTick();
     await scrollToCat(id);
   }
@@ -294,20 +308,27 @@ function onFlowScroll(scrollTop: number) {
   if (clickLock) return;
   measureAndApply();
 }
-/** 渐进渲染扩批：渲染尾（#render-tail）距视口底不足 2 屏 → 本地扩一批（零网络） */
+/** 渐进渲染扩段：渲染尾（#render-tail）进入视口（滚到当前分类底部）即续下一段
+ *  ——严格段制（2026-09-19 道哥验收纠偏：初始只显示首分类，滚到底续下一段，
+ *  本地瞬时渲染零网络）。注意尾后有底部补偿 padding，滚到极限尾也不贴顶，
+ *  阈值必须用「进入视口」而非贴顶，否则物理不可达。 */
 function extendRenderIfNeeded() {
-  if (renderUpto.value >= totalProducts.value) return;
+  if (allRendered.value) return;
   const viewport = uni.getSystemInfoSync().windowHeight;
   // #ifdef H5
   const tail = document.querySelector("#render-tail");
-  if (tail && tail.getBoundingClientRect().top < viewport * 3) extendRender();
+  if (tail && tail.getBoundingClientRect().top < viewport) extendRender();
   // #endif
   // #ifndef H5
   uni
     .createSelectorQuery()
     .select("#render-tail")
     .boundingClientRect((r) => {
-      if (r && (r as UniApp.NodeInfo).top != null && (r as UniApp.NodeInfo).top! < viewport * 3)
+      if (
+        r &&
+        (r as UniApp.NodeInfo).top != null &&
+        (r as UniApp.NodeInfo).top! < viewport
+      )
         extendRender();
     })
     .exec();
@@ -541,7 +562,7 @@ const currentName = () => {
           ><!-- IKG8PC 终版：完整流滚到底是真到底；#render-tail 是渐进渲染扩批锚点
               （距视口 2 屏即本地扩批，用户无感；全渲染完才显示「没有更多了」） -->
           <view v-if="products.length" id="render-tail" class="next-hint"
-            ><text v-if="renderUpto >= totalProducts">没有更多了</text></view
+            ><text v-if="allRendered">没有更多了</text></view
           ></template
         ></view
       ></view
