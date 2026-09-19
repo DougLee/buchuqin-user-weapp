@@ -170,10 +170,8 @@ const add = async () => {
     return;
   }
   if (seckillLocked.value) {
-    uni.showToast({
-      title: "购物车已有秒杀商品，一个订单限一个",
-      icon: "none",
-    });
+    // 2026-09-19 道哥：文案统一「秒杀商品只可选购一件」（按钮不再置灰，点击提示）
+    uni.showToast({ title: "秒杀商品只可选购一件", icon: "none" });
     return;
   }
   // IKE3HT 加购收网（拍板A 不可跳过）：未绑手机号先授权，绑定成功补执行
@@ -326,7 +324,7 @@ const gallery = computed(() => {
            IKGNMV 购物车已有其他秒杀品同样置灰；
            IKG1C 闭店态优先展示（整店买不了，单品售罄/限购文案让位） --><button
         class="primary-btn"
-        :disabled="soldOut || seckilled || closedNow || seckillLocked"
+        :disabled="soldOut || seckilled || closedNow"
         @tap="add"
       >
         {{
@@ -337,7 +335,7 @@ const gallery = computed(() => {
               : seckilled
                 ? "已抢购"
                 : seckillLocked
-                  ? "一单限一个"
+                  ? "加入购物车"
                   : "加入购物车"
         }}
       </button></view

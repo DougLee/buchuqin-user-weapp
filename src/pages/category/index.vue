@@ -64,7 +64,7 @@ function extendRender() {
   renderSegs.value += 1;
 }
 
-/** IKGNMV 一单一秒杀：购物车里已有**其他**秒杀品时，本秒杀品＋置灰 */
+/** IKGNMV 一单一秒杀：购物车里已有**其他**秒杀品时，本秒杀品不可再加 */
 function seckillLocked(p: Product): boolean {
   return (
     p.promotion?.type === "seckill" &&
@@ -72,6 +72,9 @@ function seckillLocked(p: Product): boolean {
     cart.cart.seckillIdInCart !== p.id
   );
 }
+/** 2026-09-19 道哥：限制改为点击提示（原置灰禁用） */
+const toastSeckillOnly = () =>
+  uni.showToast({ title: "秒杀商品只可选购一件", icon: "none" });
 
 /** 渲染出口统一：完整流（秒杀段置顶）/ 搜索伪段 / 空分类空态；
  *  完整流按段制渐进渲染（首段起步，滚近尾部续下一段）——秒杀进流后同享 */
@@ -553,12 +556,12 @@ const open = (id: string) =>
                   >
                     已抢
                   </button
-                  ><!-- IKGNMV：购物车已有其他秒杀品——一单一秒杀置灰 -->
+                  ><!-- IKGNMV：一单一秒杀——置灰改为可点 toast（2026-09-19 道哥） -->
                   <button
                     v-else-if="seckillLocked(p)"
                     class="add add--bought"
-                    disabled
                     aria-label="一单限一个"
+                    @tap.stop="toastSeckillOnly"
                   >
                     限一
                   </button><button
