@@ -515,7 +515,7 @@ const open = (id: string) =>
                     ><button
                       class="counter__btn counter__btn--minus"
                       aria-label="减少一件"
-                      @tap.stop="cart.set(p, cart.quantity(p.id) - 1)"
+                      @tap.stop="cart.set(p, cart.quantity(p.id) - 1, seg.catId === 'seckill')"
                     >
                       −
                     </button
@@ -534,7 +534,7 @@ const open = (id: string) =>
                           cart.quantity(p.id) >= p.seckillLimit.limit)
                       "
                       aria-label="增加一件"
-                      @tap.stop="cart.set(p, cart.quantity(p.id) + 1)"
+                      @tap.stop="cart.set(p, cart.quantity(p.id) + 1, seg.catId === 'seckill')"
                     >
                       ＋
                     </button></view
@@ -568,7 +568,7 @@ const open = (id: string) =>
                     v-else
                     class="add"
                     aria-label="加入购物车"
-                    @tap.stop="cart.set(p, cart.quantity(p.id) + 1)"
+                    @tap.stop="cart.set(p, cart.quantity(p.id) + 1, seg.catId === 'seckill')"
                   >
                     ＋
                   </button></view

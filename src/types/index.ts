@@ -65,6 +65,8 @@ export interface Banner {
 export interface CartLine {
   product: Product;
   quantity: number;
+  /** IKHL6Y 秒杀双渠道：秒杀身份行（限购 1+一单一秒杀只数它）；缺省原价行 */
+  asSeckill?: boolean;
 }
 export interface Cart {
   items: CartLine[];

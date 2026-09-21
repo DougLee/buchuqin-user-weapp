@@ -155,8 +155,10 @@ export const api = {
   /** 限时秒杀商品（IKBW0K）：进行中 seckill 活动带促销价（分类页伪分类用）。 */
   seckillProducts: () => request<Product[]>("/promotions/seckill"),
   cart: () => request<Cart>("/cart"),
-  updateCart: (items: Array<{ productId: string; quantity: number }>) =>
-    request<Cart>("/cart", { method: "PUT", data: { items } }),
+  /** IKHL6Y 秒杀双渠道：行身份 asSeckill——秒杀专区 true，正常入口缺省 false */
+  updateCart: (
+    items: Array<{ productId: string; quantity: number; asSeckill?: boolean }>,
+  ) => request<Cart>("/cart", { method: "PUT", data: { items } }),
   /** 后端 /addresses 返回 {items,page,pageSize,total} 分页信封，这里解包成数组供页面直接用 */
   addresses: async () =>
     (await request<PageResult<Address>>("/addresses")).items,

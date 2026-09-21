@@ -65,20 +65,29 @@ export const useCartStore = defineStore("cart", {
      * 意图先记 pending（UI 即时反馈）→ 请求挂串行链，构建时合并当前全部
      * pending（后写覆盖先写）→ 成功只清未被覆盖的意图，失败回滚并 toast。
      * 返回是否写入成功，调用方决定是否给成功提示。
+     * IKHL6Y 秒杀双渠道：asSeckill 行身份——秒杀专区加购传 true（秒杀行，
+     * 限购 1）；其余入口不传，已有行延续原身份、新行按原价（正常渠道）。
      */
-    set(product: Product, quantity: number): Promise<boolean> {
+    set(product: Product, quantity: number, asSeckill?: boolean): Promise<boolean> {
       this.pending[product.id] = Math.max(0, quantity);
       const run = this._chain.then(async () => {
         if (!Object.keys(this.pending).length) return;
         const snapshot = { ...this.pending };
         const map = new Map(
-          this.cart.items.map((i) => [i.product.id, i.quantity]),
+          this.cart.items.map((i) => [
+            i.product.id,
+            { quantity: i.quantity, asSeckill: !!i.asSeckill },
+          ]),
         );
-        for (const [id, q] of Object.entries(snapshot)) map.set(id, q);
+        for (const [id, q] of Object.entries(snapshot))
+          map.set(id, {
+            quantity: q,
+            asSeckill: asSeckill ?? map.get(id)?.asSeckill ?? false,
+          });
         try {
-          this.cart = await api.updateCart(
-            [...map].map(([productId, q]) => ({ productId, quantity: q })),
-          );
+          this.cart = await api.updateCart([...map.entries()].map(
+            ([productId, line]) => ({ productId, ...line }),
+          ));
           // IKA08U 重开：加购成功即脱离"刚清空"状态，load() 恢复与服务端同步
           if (this.cart.items.length) this.clearedAt = 0;
           for (const [id, q] of Object.entries(snapshot))
