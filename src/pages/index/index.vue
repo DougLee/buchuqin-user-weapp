@@ -41,7 +41,11 @@ const cart = useCartStore(),
   banners = ref<Banner[]>([]),
   /** 促销分组（IKAHFG/ADR-0006）：进行中活动，空 = 不渲染模块卡 */
   promotions = ref<HomePromotion[]>([]),
+  /** IKHM1P 公告：生效窗内多条「｜」拼接；空串整条隐藏 */
+  notice = ref(""),
   loading = ref(true);
+/** IKHM1P：文字超宽才滚动（约 20 字超出单行视口；短文本静态展示） */
+const noticeScrolls = computed(() => notice.value.length > 20);
 /** 分类图标：共享 categoryImage（IK9VD3），商品页侧栏同款回退，两边恒一致 */
 /** 地址栏：默认地址的楼栋+寝室；无地址时引导去选择 */
 const addressText = computed(() =>
@@ -61,6 +65,7 @@ onShow(async () => {
   // 当前地址统一走 pickCurrentAddress（道哥 2026-09-09：切地址后首页跟随）
   defaultAddress.value = pickCurrentAddress(addresses);
   campus.value = home.campus.name;
+  notice.value = home.notice ?? "";
   // IKG1C：闭店五字段并入共享 campus 状态（详情/分类页从这里取，避免各自再拉）
   campusStore.apply(home.campus);
   categories.value = home.categories;
@@ -329,7 +334,24 @@ function search() {
       ><text class="closed-banner__text">{{
         campusStore.closedBanner
       }}</text></view
-    >
+    ><!-- IKHM1P 公告条：小喇叭+文字，超宽滚动（双份文本无缝循环），空=隐藏 -->
+    <view v-if="notice" class="notice-bar"
+      ><text class="notice-bar__icon">📢</text
+      ><view class="notice-bar__viewport"
+        ><view
+          class="notice-bar__track"
+          :class="{ 'notice-bar__track--roll': noticeScrolls }"
+          :style="
+            noticeScrolls
+              ? { animationDuration: `${Math.max(8, notice.length * 0.45)}s` }
+              : undefined
+          "
+          ><text class="notice-bar__text">{{ notice }}</text
+          ><text v-if="noticeScrolls" class="notice-bar__text notice-bar__gap"
+            >{{ notice }}</text
+          ></view
+        ></view
+    ></view>
     <view class="search"
       ><text class="search__glass">⌕</text
       ><input
@@ -665,6 +687,54 @@ function search() {
   border-radius: 20rpx;
   background: $cream;
   border: 2rpx solid rgba(230, 162, 60, 0.35);
+}
+/* IKHM1P 公告条：喇叭+跑马灯——双份文本 translateX(-50%) 无缝循环；
+   短文本不开动画静态展示；动效仅 transform（低端机不掉帧） */
+.notice-bar {
+  margin-top: 16rpx;
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  padding: 14rpx 24rpx;
+  border-radius: 18rpx;
+  background: rgba(7, 136, 59, 0.06);
+  border: 2rpx solid rgba(7, 136, 59, 0.18);
+}
+.notice-bar__icon {
+  font-size: 28rpx;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.notice-bar__viewport {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.notice-bar__track {
+  display: inline-flex;
+  align-items: center;
+}
+.notice-bar__track--roll {
+  animation-name: notice-roll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  /* 时长按文本量由内联 style 下发（小程序 CSS 变量在动效上不可靠） */
+}
+.notice-bar__text {
+  font-size: 26rpx;
+  color: #1f7a3f;
+  white-space: nowrap;
+}
+.notice-bar__gap {
+  padding-right: 64rpx;
+}
+@keyframes notice-roll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }
 .closed-banner__dot {
   color: $orange;

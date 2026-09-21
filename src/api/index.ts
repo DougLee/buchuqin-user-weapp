@@ -77,6 +77,8 @@ export const api = {
       hotProducts: Product[];
       /** 促销分组（IKAHFG/ADR-0006）：进行中活动，空数组 = 首页不渲染模块卡 */
       promotions?: HomePromotion[];
+      /** IKHM1P 公告：生效窗内多条「｜」拼接；空串 = 整条隐藏 */
+      notice?: string;
     }>("/home"),
   /** 支付成功页广告位（IKA57E→IKB87P）：大卡列表，sort 升序最多 2 条；空数组不占位 */
   paySuccessBanners: () =>
