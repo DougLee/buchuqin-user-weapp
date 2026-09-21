@@ -1,19 +1,25 @@
 import { defineStore } from "pinia";
 import { api } from "../api";
+import { SERVICE_PHONE } from "../utils/service";
 import type { CampusCloseState } from "../types";
 
 /**
  * 校区打烊状态（IKGI1C）：闭店五字段随校区视图下发——首页走 /home 的 campus
  * （不加请求），分类页/详情页 onShow/onLoad 走 /campus/current 轻量自刷新。
  * closedNow 由服务端实时判定（客户端时钟不可信），前端只消费不自算。
+ * IKHMF1 客服电话：servicePhone 随校区视图同批落库，未下发回落本地常量
+ * （冷启动首屏不闪空号）。
  */
 export const useCampusStore = defineStore("campus", {
   state: () => ({
     close: { closedNow: false } as CampusCloseState,
+    servicePhone: "",
   }),
   getters: {
     closedNow: (state) => !!state.close.closedNow,
     closedReason: (state) => state.close.closedReason ?? null,
+    /** 客服电话（IKHMF1）：校区自定义，无值回落本地默认常量 */
+    phone: (state) => state.servicePhone || SERVICE_PHONE,
     /** 置灰主按钮短文案（详情页 disabled 态用） */
     closedLabel(): string {
       return this.closedReason === "manual" ? "商家已休息" : "已打烊";
@@ -41,6 +47,9 @@ export const useCampusStore = defineStore("campus", {
     apply(campus?: CampusCloseState | null) {
       if (!campus) return;
       this.close = { ...campus };
+      // IKHMF1：客服电话同批落（campus 行字段，两来源都有）
+      const phone = (campus as { servicePhone?: string }).servicePhone;
+      if (phone) this.servicePhone = phone;
     },
     /** 轻量自刷新：失败静默沿用旧态，不拦页面主流程 */
     async refresh() {

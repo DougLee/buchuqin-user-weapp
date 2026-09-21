@@ -9,7 +9,6 @@ import { useCampusStore } from "../../stores/campus";
 import { useSessionStore } from "../../stores/session";
 import { fenToYuan } from "../../utils/money";
 import { countdownText, PROMO_TAG } from "../../utils/promotion";
-import { SERVICE_PHONE } from "../../utils/service";
 import type { Product } from "../../types";
 const product = ref<Product>(),
   cart = useCartStore(),
@@ -197,8 +196,8 @@ const onPhoneBound = () => {
 };
 // 跨工位契约：购物车悬浮窗由工位 B 全局挂载，emit open-cart 唤起，不 import 组件
 const openCart = () => uni.$emit("open-cart");
-// H5 端无 contact 能力，直接拨客服电话（IK9AWJ）
-const onService = () => uni.makePhoneCall({ phoneNumber: SERVICE_PHONE });
+// H5 端无 contact 能力，直接拨客服电话（IK9AWJ；IKHMF1 校区自定义）
+const onService = () => uni.makePhoneCall({ phoneNumber: campusStore.phone });
 /** 详情多图（IK9SNR）：后台 images[] 优先，无则退单图；至少一张保证轮播结构 */
 const gallery = computed(() => {
   const images = (product.value?.images ?? []).filter(Boolean);

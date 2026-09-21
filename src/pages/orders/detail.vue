@@ -3,14 +3,15 @@ import { ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { useCartStore } from "../../stores/cart";
+import { useCampusStore } from "../../stores/campus";
 import { isRetryable } from "../../api/request";
 import { fenToYuan } from "../../utils/money";
 import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
-import { SERVICE_PHONE } from "../../utils/service";
 import type { Order } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
-const orderId = ref(""),
+const campusStore = useCampusStore(),
+  orderId = ref(""),
   order = ref<Order>(),
   confirming = ref(false),
   paying = ref(false),
@@ -99,7 +100,7 @@ function backHome() {
       ><text class="status__title">{{ order.statusText }}</text
       ><text class="status__sub">{{
         order.status === "exception"
-          ? `别担心，客服正在跟进处理，可来电 ${SERVICE_PHONE}`
+          ? `别担心，客服正在跟进处理，可来电 ${campusStore.phone}`
           : order.status === "pending-payment"
             ? "15 分钟内完成支付，超时订单将自动关闭"
             : "你的这一袋，正在校园里接力"
@@ -165,7 +166,7 @@ function backHome() {
     ><!-- ADR-0004：试点期售后入口关闭，统一客服处理 --><button
       v-if="order.status === 'exception'"
       class="cancel"
-      @tap="uni.makePhoneCall({ phoneNumber: SERVICE_PHONE })"
+      @tap="uni.makePhoneCall({ phoneNumber: campusStore.phone })"
     >
       电话客服处理
     </button

@@ -4,11 +4,13 @@ import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { pickCurrentAddress } from "../../utils/currentAddress";
 import { useSessionStore } from "../../stores/session";
-import { SERVICE_HOURS, SERVICE_PHONE } from "../../utils/service";
+import { useCampusStore } from "../../stores/campus";
+import { SERVICE_HOURS } from "../../utils/service";
 import type { Address } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
 const session = useSessionStore(),
+  campusStore = useCampusStore(),
   addresses = ref<Address[]>([]),
   usableCouponCount = ref(0),
   // 2026-09-08 道哥：券中心待领取数
@@ -77,9 +79,9 @@ const goOrders = () => uni.navigateTo({ url: "/pages/orders/index" });
 /** 优惠券/售后列表入口（IK9AWH：原为无入口孤儿页） */
 const goCoupons = () => go("/pages/coupons/index");
 const goSettings = () => go("/pages/profile/settings");
-/** 客服电话统一常量（IK9AWJ，原 400-100-1000 为演示号） */
+/** 客服电话（IK9AWJ→IKHMF1）：校区自定义，store 无值回落本地常量 */
 const callService = () =>
-  uni.makePhoneCall({ phoneNumber: SERVICE_PHONE });
+  uni.makePhoneCall({ phoneNumber: campusStore.phone });
 /** 在线客服 H5 降级：button open-type="contact" 仅小程序端可用 */
 const onlineServiceFallback = () =>
   uni.showToast({ title: "请在小程序中使用在线客服", icon: "none" });
