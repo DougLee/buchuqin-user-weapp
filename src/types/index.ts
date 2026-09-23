@@ -243,7 +243,14 @@ export interface Refund {
   amount: number;
   reason: string;
   status: string;
+  /** IKHZKA：待审核/已批准/退款中/已退款/已拒绝/失败/已撤销 的中文文案 */
+  statusText?: string;
+  /** 来源：after-sale=送达后售后；pre-delivery=未发货悔单 */
+  source?: string;
+  auditRemark?: string;
+  rejectCount?: number;
   createdAt: string;
+  updatedAt?: string;
 }
 export interface Settlement extends Cart {
   /** 以下金额字段单位均为：分 */

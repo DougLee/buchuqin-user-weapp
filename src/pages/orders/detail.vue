@@ -47,6 +47,39 @@ async function cancel() {
   });
   if (res.confirm) order.value = await api.cancelOrder(order.value.id);
 }
+/** 悔单退款（IKHZKA）：已支付未出库可申请，原因选填，后台审核通过后原路退回 */
+async function applyRefund() {
+  if (!order.value) return;
+  const res = await uni.showModal({
+    title: "申请退款",
+    content:
+      "退款金额为商品实付（配送费不退），审核通过后原路退回。可填写原因（选填）",
+    editable: true,
+    placeholderText: "例如：下错单了／不想要了",
+  });
+  if (!res.confirm) return;
+  await api.applyRefund(order.value.id, res.content?.trim() || undefined);
+  uni.showToast({ title: "已提交，等待审核", icon: "success" });
+  await refresh();
+}
+/** 撤销退款申请（审核前可撤，订单回到原状态） */
+async function cancelRefund() {
+  if (!order.value) return;
+  const res = await uni.showModal({
+    title: "撤销退款申请？",
+    content: "撤销后订单将继续正常履约",
+  });
+  if (!res.confirm) return;
+  const list = await api.refunds();
+  const mine = list.find((r) => r.orderId === order.value!.id);
+  if (!mine) {
+    uni.showToast({ title: "未找到退款申请", icon: "none" });
+    return;
+  }
+  await api.cancelAfterSale(mine.id);
+  uni.showToast({ title: "已撤销", icon: "success" });
+  await refresh();
+}
 async function payAgain() {
   if (!order.value || paying.value) return;
   paying.value = true;
@@ -163,6 +196,18 @@ function backHome() {
       @tap="cancel"
     >
       取消订单</button
+    ><!-- 悔单退款（IKHZKA）：已支付未出库可申请 --><button
+      v-if="order.status === 'paid'"
+      class="cancel"
+      @tap="applyRefund"
+    >
+      申请退款</button
+    ><!-- 审核中可撤销 --><button
+      v-if="order.status === 'after-sales'"
+      class="cancel"
+      @tap="cancelRefund"
+    >
+      撤销退款申请</button
     ><!-- ADR-0004：试点期售后入口关闭，统一客服处理 --><button
       v-if="order.status === 'exception'"
       class="cancel"

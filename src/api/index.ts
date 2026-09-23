@@ -245,6 +245,14 @@ export const api = {
     request<Order>(`/orders/${id}/confirm-receipt`, { method: "POST" }),
   createAfterSale: (id: string, data: Record<string, unknown>) =>
     request<AfterSale>(`/orders/${id}/after-sales`, { method: "POST", data }),
+  /** 悔单退款（IKHZKA）：已支付未出库可申请，人工审核通过后原路退回 */
+  applyRefund: (id: string, reason?: string) =>
+    request<Refund>(`/orders/${id}/refund`, {
+      method: "POST",
+      data: { reason },
+    }),
+  cancelAfterSale: (id: string) =>
+    request<unknown>(`/after-sales/${id}/cancel`, { method: "POST" }),
   afterSales: () => request<AfterSale[]>("/after-sales"),
   refunds: () => request<Refund[]>("/refunds"),
   /** 同 /addresses：解包分页信封 */
