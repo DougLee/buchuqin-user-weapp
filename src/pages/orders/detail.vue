@@ -47,20 +47,30 @@ async function cancel() {
   });
   if (res.confirm) order.value = await api.cancelOrder(order.value.id);
 }
-/** 悔单退款（IKHZKA）：已支付未出库可申请，原因选填，后台审核通过后原路退回 */
-async function applyRefund() {
-  if (!order.value) return;
-  const res = await uni.showModal({
-    title: "申请退款",
-    content:
-      "退款金额为商品实付（配送费不退），审核通过后原路退回。可填写原因（选填）",
-    editable: true,
-    placeholderText: "例如：下错单了／不想要了",
-  });
-  if (!res.confirm) return;
-  await api.applyRefund(order.value.id, res.content?.trim() || undefined);
-  uni.showToast({ title: "已提交，等待审核", icon: "success" });
-  await refresh();
+/** 悔单退款（IKHZKA）：已支付未出库可申请；原因必填（道哥 2026-09-23 改），弹层表单校验 */
+const refundSheet = ref(false),
+  refundReason = ref(""),
+  refundSubmitting = ref(false);
+function openRefundSheet() {
+  refundReason.value = "";
+  refundSheet.value = true;
+}
+async function submitRefund() {
+  if (!order.value || refundSubmitting.value) return;
+  const reason = refundReason.value.trim();
+  if (!reason) {
+    uni.showToast({ title: "请填写退款原因", icon: "none" });
+    return;
+  }
+  refundSubmitting.value = true;
+  try {
+    await api.applyRefund(order.value.id, reason);
+    refundSheet.value = false;
+    uni.showToast({ title: "已提交，等待审核", icon: "success" });
+    await refresh();
+  } finally {
+    refundSubmitting.value = false;
+  }
 }
 /** 撤销退款申请（审核前可撤，订单回到原状态） */
 async function cancelRefund() {
@@ -199,7 +209,7 @@ function backHome() {
     ><!-- 悔单退款（IKHZKA）：已支付未出库可申请 --><button
       v-if="order.status === 'paid'"
       class="cancel"
-      @tap="applyRefund"
+      @tap="openRefundSheet"
     >
       申请退款</button
     ><!-- 审核中可撤销 --><button
@@ -220,6 +230,28 @@ function backHome() {
     <!-- #endif --><button class="cancel" @tap="backHome"> 返回首页 </button
     ></view
   >
+  <!-- 悔单退款弹层（IKHZKA）：原因必填 -->
+  <view v-if="refundSheet" class="sheet-mask" @tap="refundSheet = false">
+    <view class="sheet" @tap.stop>
+      <text class="sheet__title">申请退款</text>
+      <text class="sheet__sub"
+        >退款金额为商品实付（配送费不退），审核通过后原路退回</text
+      >
+      <textarea
+        v-model="refundReason"
+        class="sheet__textarea"
+        :maxlength="120"
+        placeholder="请填写退款原因（必填），例如：下错单了／不想要了"
+      />
+      <button
+        class="primary-btn sheet__submit"
+        :disabled="refundSubmitting || !refundReason.trim()"
+        @tap="submitRefund"
+      >
+        {{ refundSubmitting ? "提交中…" : "提交申请" }}
+      </button>
+    </view>
+  </view>
   <CartOverlay />
 </template>
 <style scoped lang="scss">
