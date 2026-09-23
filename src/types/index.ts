@@ -245,7 +245,7 @@ export interface Refund {
   status: string;
   /** IKHZKA：待审核/已批准/退款中/已退款/已拒绝/失败/已撤销 的中文文案 */
   statusText?: string;
-  /** 来源：after-sale=送达后售后；pre-delivery=未发货悔单 */
+  /** 来源：after-sale=送达后售后；pre-delivery=未发货 */
   source?: string;
   auditRemark?: string;
   rejectCount?: number;

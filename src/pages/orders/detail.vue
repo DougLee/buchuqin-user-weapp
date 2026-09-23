@@ -47,7 +47,7 @@ async function cancel() {
   });
   if (res.confirm) order.value = await api.cancelOrder(order.value.id);
 }
-/** 悔单退款（IKHZKA）：已支付未出库可申请；原因必填（道哥 2026-09-23 改），弹层表单校验 */
+/** 未发货退款（IKHZKA）：已支付未出库可申请；原因必填（道哥 2026-09-23 改），弹层表单校验 */
 const refundSheet = ref(false),
   refundReason = ref(""),
   refundSubmitting = ref(false);
@@ -206,7 +206,7 @@ function backHome() {
       @tap="cancel"
     >
       取消订单</button
-    ><!-- 悔单退款（IKHZKA）：已支付未出库可申请 --><button
+    ><!-- 未发货退款（IKHZKA）：已支付未出库可申请 --><button
       v-if="order.status === 'paid'"
       class="cancel"
       @tap="openRefundSheet"
@@ -230,7 +230,7 @@ function backHome() {
     <!-- #endif --><button class="cancel" @tap="backHome"> 返回首页 </button
     ></view
   >
-  <!-- 悔单退款弹层（IKHZKA）：原因必填 -->
+  <!-- 未发货退款弹层（IKHZKA）：原因必填 -->
   <view v-if="refundSheet" class="sheet-mask" @tap="refundSheet = false">
     <view class="sheet" @tap.stop>
       <text class="sheet__title">申请退款</text>
