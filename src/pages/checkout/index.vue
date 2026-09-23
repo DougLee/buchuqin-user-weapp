@@ -90,10 +90,13 @@ async function load() {
   }
   if (c.status === "fulfilled") cart.value = c.value;
   if (s.status === "fulfilled") {
+    // IKI7LZ：expired=今日已过/临近截止的时段，自动选与默认选中都要跳过，
+    // 否则晚间下单会自动挂上当天已过去的时段（3521N89J 案例根因）
     slots.value = s.value;
-    // 默认选中第一个可用时段，不再硬编码 label（IK9AWN）
-    if (!slot.value || !s.value.some((x) => x.label === slot.value && x.available))
-      slot.value = s.value.find((x) => x.available)?.label ?? "";
+    const selectable = (x: { available: boolean; expired?: boolean }) =>
+      x.available && !x.expired;
+    if (!slot.value || !s.value.some((x) => x.label === slot.value && selectable(x)))
+      slot.value = s.value.find(selectable)?.label ?? "";
   }
   if (b.status === "fulfilled") {
     const now = Date.now();
