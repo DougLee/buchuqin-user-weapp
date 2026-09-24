@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { AFTER_SALE_TYPES } from "../../utils/afterSale";
 import { setupDefaultShare } from "../../utils/share";
@@ -8,6 +8,9 @@ setupDefaultShare();
 const orderId = ref(""),
   submitting = ref(false),
   uploading = ref(false),
+  /** IKHZKA v2：订单商品行（部分退款勾选用） */
+  lines = ref<Array<{ id: string; name: string; price: number; quantity: number }>>([]),
+  selected = ref<string[]>([]),
   form = reactive({
     type: "quality",
     description: "",
@@ -16,6 +19,24 @@ const orderId = ref(""),
 onLoad((q) => {
   orderId.value = String(q?.orderId || "");
 });
+onShow(async () => {
+  try {
+    const order = await api.order(orderId.value);
+    lines.value = (order.items ?? []).map((l) => ({
+      id: l.product.id,
+      name: l.product.name,
+      price: l.product.price,
+      quantity: l.quantity,
+    }));
+  } catch {
+    /* 商品行拉不到时不阻塞表单（不勾=整单退） */
+  }
+});
+function toggleLine(id: string) {
+  const i = selected.value.indexOf(id);
+  if (i >= 0) selected.value.splice(i, 1);
+  else selected.value.push(id);
+}
 async function chooseProof() {
   if (uploading.value) return;
   const result = await uni.chooseImage({
@@ -50,7 +71,11 @@ async function submit() {
   }
   submitting.value = true;
   try {
-    await api.createAfterSale(orderId.value, { ...form });
+    await api.createAfterSale(orderId.value, {
+      ...form,
+      // v2 部分退款：勾选商品行则按行退，不勾=整单退
+      productIds: selected.value.length ? selected.value : undefined,
+    });
     uni.showToast({ title: "售后申请已提交", icon: "success" });
     setTimeout(() => uni.redirectTo({ url: "/pages/after-sales/index" }), 600);
   } finally {
@@ -61,6 +86,21 @@ async function submit() {
 <template>
   <view class="page"
     ><view class="tip">请在送达后 24 小时内提交，平台审核后处理退款。</view
+    ><!-- v2 部分退款：勾选问题商品（不勾=整单退） -->
+    <view v-if="lines.length" class="form card"
+      ><text class="label">退款商品</text
+      ><text class="lines-tip">勾选要退的商品；不勾选则默认整单退款</text
+      ><view
+        v-for="line in lines"
+        :key="line.id"
+        class="line"
+        :class="{ 'line--active': selected.includes(line.id) }"
+        @tap="toggleLine(line.id)"
+        ><text class="line__name">{{ line.name }} × {{ line.quantity }}</text
+        ><text class="line__price">¥{{ (line.price * line.quantity / 100).toFixed(2) }}</text
+        ><view class="line__check" :class="{ 'line__check--on': selected.includes(line.id) }"
+          >{{ selected.includes(line.id) ? "✓" : "" }}</view></view
+      ></view
     ><view class="form card"
       ><text class="label">问题类型</text
       ><view class="types"
@@ -108,6 +148,49 @@ async function submit() {
 }
 .form {
   padding: 30rpx;
+}
+.lines-tip {
+  display: block;
+  font-size: 21rpx;
+  color: #667069;
+  margin: -6rpx 0 4rpx;
+}
+.line {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  padding: 18rpx 16rpx;
+  border: 2rpx solid $line;
+  border-radius: 18rpx;
+  margin-bottom: 12rpx;
+}
+.line--active {
+  border-color: $primary;
+  background: rgba(37, 185, 90, 0.06);
+}
+.line__name {
+  flex: 1;
+  font-size: 24rpx;
+}
+.line__price {
+  font-size: 23rpx;
+  color: $primary-dark;
+  font-weight: 800;
+}
+.line__check {
+  width: 40rpx;
+  height: 40rpx;
+  border: 2rpx solid $line;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  color: #fff;
+}
+.line__check--on {
+  background: $primary;
+  border-color: $primary;
 }
 .label {
   display: block;
