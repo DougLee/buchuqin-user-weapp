@@ -116,7 +116,12 @@ async function load() {
       const secsP = MOCK
         ? Promise.resolve(mockAll().slice(0, 2))
         : seckillPrefetch ?? (seckillPrefetch = api.seckillProducts().catch(() => [] as Product[]));
-      const [rows, secs] = await Promise.all([rowsP, secsP]);
+      // 推荐专区（道哥 2026-09-24）：仅运营勾选的 featured 商品，并行拉取同秒杀模式；
+      // 拉不到不插段不挡流（同秒杀容错口径）
+      const featP = MOCK
+        ? Promise.resolve([])
+        : featuredPrefetch ?? (featuredPrefetch = api.featuredProducts().catch(() => [] as Product[]));
+      const [rows, secs, feats] = await Promise.all([rowsP, secsP, featP]);
       const order = categories.value.filter(
         (c) => c.id !== "all" && c.id !== "seckill",
       );
@@ -129,9 +134,16 @@ async function load() {
       const catSegs = order
         .filter((c) => byCat.get(c.id)?.length)
         .map((c) => ({ catId: c.id, catName: c.name, items: byCat.get(c.id)! }));
-      sections.value = secs.length
-        ? [{ catId: "seckill", catName: "限时秒杀", items: secs }, ...catSegs]
-        : catSegs;
+      // 段顺序：秒杀（限时）→ 推荐（勾选）→ 分类段；空段不插
+      const specialSegs = [
+        ...(secs.length
+          ? [{ catId: "seckill", catName: "限时秒杀", items: secs }]
+          : []),
+        ...(feats.length
+          ? [{ catId: "featured", catName: "推荐", items: feats }]
+          : []),
+      ];
+      sections.value = [...specialSegs, ...catSegs];
     }
   } catch (e) {
     // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
@@ -151,6 +163,16 @@ function syncSeckillSide() {
   if (has && idx < 0)
     categories.value.unshift({ id: "seckill", name: "限时秒杀" });
   else if (!has && idx >= 0) categories.value.splice(idx, 1);
+  // 推荐专区（道哥 2026-09-24）：同秒杀模式——有段才注入侧栏（排秒杀项后）
+  const hasFeat = sections.value.some((s) => s.catId === "featured");
+  const fIdx = categories.value.findIndex((c) => c.id === "featured");
+  if (hasFeat && fIdx < 0) {
+    const at = categories.value.findIndex((c) => c.id === "seckill");
+    categories.value.splice(at >= 0 ? at + 1 : 0, 0, {
+      id: "featured",
+      name: "推荐",
+    });
+  } else if (!hasFeat && fIdx >= 0) categories.value.splice(fIdx, 1);
 }
 
 /** 严格段制的物理兜底：首段太短（<1.2 屏）时页面滚不动、续段永远触发不了——
@@ -185,6 +207,8 @@ async function ensureScrollable() {
 /** 秒杀预取（IKH0H9 体验）：onShow 与分类接口并行拉，侧栏秒杀项与分类项同拍
  *  出现（不再等商品全量+分组完成才注入）；load 复用此 Promise 不重拉 */
 let seckillPrefetch: Promise<Product[]> | null = null;
+/** 推荐专区预取（IKI 道哥 2026-09-24）：仅勾选 featured 商品，空=不插段 */
+let featuredPrefetch: Promise<Product[]> | null = null;
 
 /** 搜索即全品类（IKAHBJ） */
 async function search() {
@@ -222,6 +246,8 @@ onShow(async () => {
   void campusStore.refresh();
   // 秒杀与分类接口并行预取——侧栏秒杀项与分类项同拍出现（IKH0H9 体验修复）
   seckillPrefetch = api.seckillProducts().catch(() => [] as Product[]);
+  // 推荐专区预取（同秒杀模式，道哥 2026-09-24）：拉不到不插段
+  featuredPrefetch = api.featuredProducts().catch(() => [] as Product[]);
   try {
     categories.value = await api.categories();
   } catch {
@@ -238,6 +264,18 @@ onShow(async () => {
     void secsEarly.then((rows) => {
       if (rows.length && !categories.value.some((c) => c.id === "seckill"))
         categories.value.unshift({ id: "seckill", name: "限时秒杀" });
+    });
+  }
+  const featEarly = featuredPrefetch;
+  if (featEarly) {
+    void featEarly.then((rows) => {
+      if (rows.length && !categories.value.some((c) => c.id === "featured")) {
+        const at = categories.value.findIndex((c) => c.id === "seckill");
+        categories.value.splice(at >= 0 ? at + 1 : 0, 0, {
+          id: "featured",
+          name: "推荐",
+        });
+      }
     });
   }
   if (pickCat) {

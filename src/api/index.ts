@@ -156,6 +156,8 @@ export const api = {
   product: (id: string) => request<Product>(`/products/${id}`),
   /** 限时秒杀商品（IKBW0K）：进行中 seckill 活动带促销价（分类页伪分类用）。 */
   seckillProducts: () => request<Product[]>("/promotions/seckill"),
+  /** 推荐专区商品（道哥 2026-09-24）：运营勾选的 featured 商品，分类页「推荐」分类用 */
+  featuredProducts: () => request<Product[]>("/featured-products"),
   cart: () => request<Cart>("/cart"),
   /** IKHL6Y 秒杀双渠道：行身份 asSeckill——秒杀专区 true，正常入口缺省 false */
   updateCart: (
