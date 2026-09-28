@@ -225,6 +225,12 @@ function backHome() {
       @tap="cancelRefund"
     >
       撤销退款申请</button
+    ><!-- 售后申请（IKHZKA v2）：送达后 24h 内可申请，勾商品支持部分退款 --><button
+      v-if="order.status === 'delivered' || order.status === 'completed'"
+      class="cancel"
+      @tap="applyAfterSale"
+    >
+      申请售后</button
     ><!-- ADR-0004：试点期售后入口关闭，统一客服处理 --><button
       v-if="order.status === 'exception'"
       class="cancel"
