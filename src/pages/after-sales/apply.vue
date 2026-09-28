@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from "vue";
+import { computed, reactive, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { AFTER_SALE_TYPES } from "../../utils/afterSale";
@@ -11,6 +11,8 @@ const orderId = ref(""),
   /** IKHZKA v2：订单商品行（部分退款勾选用） */
   lines = ref<Array<{ id: string; name: string; price: number; quantity: number }>>([]),
   selected = ref<string[]>([]),
+  /** 道哥 2026-09-28：默认整单退，点商品行切单品退 */
+  refundAll = ref(true),
   form = reactive({
     type: "quality",
     description: "",
@@ -33,10 +35,23 @@ onShow(async () => {
   }
 });
 function toggleLine(id: string) {
+  if (refundAll.value) {
+    // 整单退状态下点商品行 = 切到单品退并勾上该行
+    refundAll.value = false;
+    selected.value = [id];
+    return;
+  }
   const i = selected.value.indexOf(id);
   if (i >= 0) selected.value.splice(i, 1);
   else selected.value.push(id);
+  if (!selected.value.length) refundAll.value = true; // 全取消回到整单退
 }
+/** 部分退合计（分） */
+const partTotal = computed(() =>
+  lines.value
+    .filter((l) => selected.value.includes(l.id))
+    .reduce((sum, l) => sum + l.price * l.quantity, 0),
+);
 async function chooseProof() {
   if (uploading.value) return;
   const result = await uni.chooseImage({
@@ -73,8 +88,8 @@ async function submit() {
   try {
     await api.createAfterSale(orderId.value, {
       ...form,
-      // v2 部分退款：勾选商品行则按行退，不勾=整单退
-      productIds: selected.value.length ? selected.value : undefined,
+      // v2 部分退款：单品退传勾选行；整单退不传（兼容 v1 口径）
+      productIds: refundAll.value ? undefined : [...selected.value],
     });
     uni.showToast({ title: "售后申请已提交", icon: "success" });
     setTimeout(() => uni.redirectTo({ url: "/pages/after-sales/index" }), 600);
@@ -86,20 +101,51 @@ async function submit() {
 <template>
   <view class="page"
     ><view class="tip">请在送达后 24 小时内提交，平台审核后处理退款。</view
-    ><!-- v2 部分退款：勾选问题商品（不勾=整单退） -->
+    ><!-- v2 退款商品：默认整单退，点商品行切单品退（道哥 2026-09-28） -->
     <view v-if="lines.length" class="form card"
       ><text class="label">退款商品</text
-      ><text class="lines-tip">勾选要退的商品；不勾选则默认整单退款</text
+      ><view class="mode-row"
+        ><view
+          class="mode-pill"
+          :class="{ 'mode-pill--active': refundAll }"
+          @tap="
+            refundAll = true;
+            selected = [];
+          "
+          >全部退款</view
+        ><view
+          class="mode-pill"
+          :class="{ 'mode-pill--active': !refundAll }"
+          @tap="
+            refundAll = false;
+            selected = lines.length ? [lines[0].id] : [];
+          "
+          >单品退款</view
+        ></view
       ><view
         v-for="line in lines"
         :key="line.id"
         class="line"
-        :class="{ 'line--active': selected.includes(line.id) }"
+        :class="{
+          'line--active': !refundAll && selected.includes(line.id),
+          'line--muted': refundAll,
+        }"
         @tap="toggleLine(line.id)"
         ><text class="line__name">{{ line.name }} × {{ line.quantity }}</text
         ><text class="line__price">¥{{ (line.price * line.quantity / 100).toFixed(2) }}</text
-        ><view class="line__check" :class="{ 'line__check--on': selected.includes(line.id) }"
-          >{{ selected.includes(line.id) ? "✓" : "" }}</view></view
+        ><view
+          v-if="!refundAll"
+          class="line__check"
+          :class="{ 'line__check--on': selected.includes(line.id) }"
+          >{{ selected.includes(line.id) ? "✓" : "" }}</view
+        ></view
+      ><view class="lines-total"
+        ><text>退款金额</text
+        ><text class="lines-total__num">{{
+          refundAll
+            ? "整单退款（实付金额，配送费不退）"
+            : `¥${(partTotal / 100).toFixed(2)}`
+        }}</text></view
       ></view
     ><view class="form card"
       ><text class="label">问题类型</text
@@ -149,11 +195,42 @@ async function submit() {
 .form {
   padding: 30rpx;
 }
-.lines-tip {
-  display: block;
-  font-size: 21rpx;
+.mode-row {
+  display: flex;
+  gap: 14rpx;
+  margin: -6rpx 0 14rpx;
+}
+.mode-pill {
+  min-height: 68rpx;
+  padding: 12rpx 28rpx;
+  border: 2rpx solid $line;
+  border-radius: 34rpx;
+  font-size: 24rpx;
+  display: flex;
+  align-items: center;
+}
+.mode-pill--active {
+  background: $primary;
+  color: #fff;
+  border-color: $primary;
+  font-weight: 800;
+}
+.line--muted {
+  opacity: 0.55;
+}
+.lines-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 2rpx dashed $line;
+  margin-top: 6rpx;
+  padding-top: 16rpx;
+  font-size: 24rpx;
   color: #667069;
-  margin: -6rpx 0 4rpx;
+}
+.lines-total__num {
+  font-weight: 900;
+  color: $primary-dark;
 }
 .line {
   display: flex;
