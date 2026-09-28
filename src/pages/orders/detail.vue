@@ -72,6 +72,13 @@ async function submitRefund() {
     refundSubmitting.value = false;
   }
 }
+/** 售后申请入口（IKHZKA v2）：送达后 24h 内可申请，勾选商品支持部分退款 */
+function applyAfterSale() {
+  if (!order.value) return;
+  uni.navigateTo({
+    url: `/pages/after-sales/apply?orderId=${order.value.id}`,
+  });
+}
 /** 撤销退款申请（审核前可撤，订单回到原状态） */
 async function cancelRefund() {
   if (!order.value) return;
