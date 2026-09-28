@@ -30,10 +30,31 @@ onShow(async () => {
       price: l.product.price,
       quantity: l.quantity,
     }));
+    // 可退上限 = 实付 − 配送费 − 已退（IKHZKA v2 硬上限口径）
+    refundableMax.value = Math.max(
+      0,
+      order.payableAmount - (order.deliveryFee ?? 0) - (await refundedSum()),
+    );
   } catch {
     /* 商品行拉不到时不阻塞表单（不勾=整单退） */
   }
 });
+/** 本单已退金额（历史部分退/整单退合计，分） */
+async function refundedSum(): Promise<number> {
+  try {
+    const list = await api.refunds();
+    return list
+      .filter((r) => r.orderId === orderId.value && r.status === "refunded")
+      .reduce((sum, r) => sum + r.amount, 0);
+  } catch {
+    return 0;
+  }
+}
+const refundableMax = ref(0);
+/** 勾选金额是否超可退上限（超限禁止提交，道哥 2026-09-28） */
+const overLimit = computed(
+  () => !refundAll.value && partTotal.value > refundableMax.value,
+);
 function toggleLine(id: string) {
   if (refundAll.value) {
     // 整单退状态下点商品行 = 切到单品退并勾上该行
@@ -86,6 +107,13 @@ async function submit() {
   }
   submitting.value = true;
   try {
+    if (overLimit.value) {
+      uni.showToast({
+        title: `退款金额超过可退上限 ¥${(refundableMax.value / 100).toFixed(2)}`,
+        icon: "none",
+      });
+      return;
+    }
     await api.createAfterSale(orderId.value, {
       ...form,
       // v2 部分退款：单品退传勾选行；整单退不传（兼容 v1 口径）
@@ -146,6 +174,16 @@ async function submit() {
             ? "整单退款（实付金额，配送费不退）"
             : `¥${(partTotal / 100).toFixed(2)}`
         }}</text></view
+      ><view
+        v-if="!refundAll"
+        class="lines-total"
+        :class="{ 'lines-total--over': overLimit }"
+        ><text>可退上限</text
+        ><text class="lines-total__num">¥{{ (refundableMax / 100).toFixed(2) }}</text></view
+      ><text
+        v-if="overLimit"
+        class="over-tip"
+        >勾选金额超过可退上限，请调整后再提交</text
       ></view
     ><view class="form card"
       ><text class="label">问题类型</text
@@ -231,6 +269,15 @@ async function submit() {
 .lines-total__num {
   font-weight: 900;
   color: $primary-dark;
+}
+.lines-total--over .lines-total__num {
+  color: #c0392b;
+}
+.over-tip {
+  display: block;
+  color: #c0392b;
+  font-size: 22rpx;
+  margin-top: 8rpx;
 }
 .line {
   display: flex;
