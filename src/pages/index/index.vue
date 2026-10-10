@@ -347,11 +347,14 @@ function search() {
               : undefined
           "
           ><text class="notice-bar__text">{{ notice }}</text
-          ><text v-if="noticeScrolls" class="notice-bar__text notice-bar__gap"
+          ><text
+            v-if="noticeScrolls"
+            class="notice-bar__text notice-bar__gap"
             >{{ notice }}</text
           ></view
         ></view
-    ></view>
+      ></view
+    >
     <view class="search"
       ><text class="search__glass">⌕</text
       ><input
@@ -440,14 +443,15 @@ function search() {
         @tap="groupOpen = true"
         ><view v-if="group" class="homeblocks__dot" /><text
           class="homeblocks__title"
-          >楼栋福利群</text
+          >售后福利群</text
         ><text class="homeblocks__sub">{{
           group ? "进群领福利 · 优惠早知道" : "福利群筹备中 · 敬请期待"
         }}</text
         ><view class="homeblocks__cta">{{
           group ? "一键加入 ›" : "先逛逛福利 ›"
         }}</view></view
-    ></view>
+      ></view
+    >
     <!-- 分类横滑条（2026-08-22）：单行展示，左右滑动看更多。
          IKCNRB：可滑动感知——右缘渐隐+「›」指示，滑到最右淡出
          IKDBFT（2026-09-04）：首页分类条下线（道哥），同款移至商品页搜索框下方；
@@ -592,13 +596,11 @@ function search() {
         </button></template
       ><!-- 未配置态（IKDERY）：CSS 对话气泡占位 -->
       <template v-else
-        ><text class="group-pop__title">楼栋福利群</text
+        ><text class="group-pop__title">售后福利群</text
         ><view class="group-pop__placeholder"
           ><view class="group-pop__bubble"
             ><view class="group-pop__bubble-dots"
-              ><view /><view /><view /></view
-            ></view
-          ></view
+              ><view /><view /><view /></view></view></view
         ><text class="group-pop__empty-title">福利群筹备中</text
         ><text class="group-pop__tip"
           >楼栋专属福利与优惠早知道，群码上线后第一时间开放</text
@@ -606,10 +608,7 @@ function search() {
           ><button class="group-pop__close" @tap="groupOpen = false">
             我知道了
           </button>
-          <button
-            class="group-pop__primary"
-            @tap="goBrowseFromGroup"
-          >
+          <button class="group-pop__primary" @tap="goBrowseFromGroup">
             先去逛逛
           </button></view
         ></template
@@ -1429,8 +1428,8 @@ function search() {
       rgba(230, 58, 23, 0) 82%,
       rgba(230, 58, 23, 0.85) 100%
     ),
-    url("https://static.buchuqin.com/app/public/wheel-bg-festive-v2.webp") center
-      top / 100% auto no-repeat,
+    url("https://static.buchuqin.com/app/public/wheel-bg-festive-v2.webp")
+      center top / 100% auto no-repeat,
     #e63a17;
   padding-bottom: 28rpx;
 }
