@@ -14,12 +14,16 @@ export const useCampusStore = defineStore("campus", {
   state: () => ({
     close: { closedNow: false } as CampusCloseState,
     servicePhone: "",
+    /** IKKTWM 校区客服微信二维码（COS 图；空=未配置回落拨号） */
+    serviceQrcode: "",
   }),
   getters: {
     closedNow: (state) => !!state.close.closedNow,
     closedReason: (state) => state.close.closedReason ?? null,
     /** 客服电话（IKHMF1）：校区自定义，无值回落本地默认常量 */
     phone: (state) => state.servicePhone || SERVICE_PHONE,
+    /** IKKTWM 客服二维码（未配置返回空串，入口据此回落拨号） */
+    qrcode: (state) => state.serviceQrcode || "",
     /** 置灰主按钮短文案（详情页 disabled 态用） */
     closedLabel(): string {
       return this.closedReason === "manual" ? "商家已休息" : "已打烊";
@@ -50,6 +54,8 @@ export const useCampusStore = defineStore("campus", {
       // IKHMF1：客服电话同批落（campus 行字段，两来源都有）
       const phone = (campus as { servicePhone?: string }).servicePhone;
       if (phone) this.servicePhone = phone;
+      const qrcode = (campus as { serviceQrcode?: string }).serviceQrcode;
+      if (qrcode !== undefined) this.serviceQrcode = qrcode || "";
     },
     /** 轻量自刷新：失败静默沿用旧态，不拦页面主流程 */
     async refresh() {

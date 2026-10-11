@@ -7,10 +7,13 @@ import { useCampusStore } from "../../stores/campus";
 import { isRetryable } from "../../api/request";
 import { fenToYuan } from "../../utils/money";
 import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
+import ServiceSheet from "../../components/ServiceSheet.vue";
 import type { Order } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
 const campusStore = useCampusStore(),
+  /** IKKTWM 客服弹层（替代 open-type=contact） */
+  serviceOpen = ref(false),
   orderId = ref(""),
   order = ref<Order>(),
   confirming = ref(false),
@@ -225,24 +228,23 @@ function backHome() {
       @tap="cancelRefund"
     >
       撤销退款申请</button
-    ><!-- 售后申请（IKHZKA v2）：送达后 24h 内可申请，勾商品支持部分退款 --><button
-      v-if="order.status === 'delivered' || order.status === 'completed'"
-      class="cancel"
-      @tap="applyAfterSale"
-    >
-      申请售后</button
-    ><!-- ADR-0004：试点期售后入口关闭，统一客服处理 --><button
+    ><!-- IKKTWM：售后/客服弱化为文字链（道哥：弱化存在感），主操作返回首页突出 --><button
       v-if="order.status === 'exception'"
-      class="cancel"
-      @tap="uni.makePhoneCall({ phoneNumber: campusStore.phone })"
+      class="primary-btn pay-again"
+      @tap="serviceOpen = true"
     >
-      电话客服处理
+      联系客服处理
     </button
-    ><!-- #ifdef MP-WEIXIN -->
-    <button class="cancel" open-type="contact">在线客服</button>
-    <!-- #endif --><button class="cancel" @tap="backHome"> 返回首页 </button
+    ><button class="primary-btn pay-again" @tap="backHome">返回首页</button
     ></view
   >
+  <view
+    v-if="order.status === 'delivered' || order.status === 'completed'"
+    class="footer-links"
+    ><text @tap="applyAfterSale">申请售后</text><text class="sep">·</text
+    ><text @tap="serviceOpen = true">联系客服</text></view
+  >
+  <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />
   <!-- 未发货退款弹层（IKHZKA）：原因必填 -->
   <view v-if="refundSheet" class="sheet-mask" @tap="refundSheet = false">
     <view class="sheet" @tap.stop>
@@ -486,5 +488,20 @@ function backHome() {
 }
 .sheet__submit {
   margin-top: 28rpx;
+}
+.footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 16rpx;
+  margin: 20rpx 0 8rpx;
+  font-size: 24rpx;
+  color: #8a978f;
+}
+.footer-links text {
+  padding: 8rpx 12rpx;
+}
+.footer-links .sep {
+  color: #d5ded8;
+  padding: 8rpx 0;
 }
 </style>

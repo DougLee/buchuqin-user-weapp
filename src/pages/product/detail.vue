@@ -6,6 +6,7 @@ import { isRetryable } from "../../api/request";
 import PhoneGate from "../../components/PhoneGate.vue";
 import { useCartStore } from "../../stores/cart";
 import { useCampusStore } from "../../stores/campus";
+import ServiceSheet from "../../components/ServiceSheet.vue";
 import { useSessionStore } from "../../stores/session";
 import { fenToYuan } from "../../utils/money";
 import { countdownText, PROMO_TAG } from "../../utils/promotion";
@@ -197,7 +198,9 @@ const onPhoneBound = () => {
 // 跨工位契约：购物车悬浮窗由工位 B 全局挂载，emit open-cart 唤起，不 import 组件
 const openCart = () => uni.$emit("open-cart");
 // H5 端无 contact 能力，直接拨客服电话（IK9AWJ；IKHMF1 校区自定义）
-const onService = () => uni.makePhoneCall({ phoneNumber: campusStore.phone });
+/** IKKTWM：客服入口统一弹层（二维码主、电话辅） */
+const serviceOpen = ref(false);
+const onService = () => (serviceOpen.value = true);
 /** 详情多图（IK9SNR）：后台 images[] 优先，无则退单图；至少一张保证轮播结构 */
 const gallery = computed(() => {
   const images = (product.value?.images ?? []).filter(Boolean);
@@ -304,7 +307,7 @@ const gallery = computed(() => {
     ><view class="bottom safe-bottom"
       ><!-- 客服入口移至购物车左侧（IK9SNU）：小图标弱化，不抢「加入购物车」焦点 -->
       <!-- #ifdef MP-WEIXIN -->
-      <button class="service-mini" open-type="contact" aria-label="客服">
+      <button class="service-mini" aria-label="客服" @tap="serviceOpen = true">
         客服
       </button>
       <!-- 分享入口（IKC7V6）：open-type=share 唤起转发面板，走页面 onShareAppMessage -->
@@ -739,3 +742,4 @@ const gallery = computed(() => {
   }
 }
 </style>
+  <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />

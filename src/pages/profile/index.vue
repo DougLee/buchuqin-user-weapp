@@ -5,12 +5,15 @@ import { api } from "../../api";
 import { pickCurrentAddress } from "../../utils/currentAddress";
 import { useSessionStore } from "../../stores/session";
 import { useCampusStore } from "../../stores/campus";
+import ServiceSheet from "../../components/ServiceSheet.vue";
 import { SERVICE_HOURS } from "../../utils/service";
 import type { Address } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
 const session = useSessionStore(),
   campusStore = useCampusStore(),
+  /** IKKTWM 客服弹层 */
+  serviceOpen = ref(false),
   addresses = ref<Address[]>([]),
   usableCouponCount = ref(0),
   // 2026-09-08 道哥：券中心待领取数
@@ -81,7 +84,7 @@ const goCoupons = () => go("/pages/coupons/index");
 const goSettings = () => go("/pages/profile/settings");
 /** 客服电话（IK9AWJ→IKHMF1）：校区自定义，store 无值回落本地常量 */
 const callService = () =>
-  uni.makePhoneCall({ phoneNumber: campusStore.phone });
+  serviceOpen.value = true;
 /** 在线客服 H5 降级：button open-type="contact" 仅小程序端可用 */
 const onlineServiceFallback = () =>
   uni.showToast({ title: "请在小程序中使用在线客服", icon: "none" });
@@ -202,7 +205,7 @@ async function onGetPhone(e: { detail: { code?: string } }) {
           ><text>{{ SERVICE_HOURS }}</text></view
         ></view
       ><!-- #ifdef MP-WEIXIN -->
-      <button class="menu__service" open-type="contact">
+      <button class="menu__service" @tap="serviceOpen = true">
         <text>在线客服</text>
         <view class="menu__cell"
           ><text>微信内会话</text></view
@@ -445,3 +448,4 @@ async function onGetPhone(e: { detail: { code?: string } }) {
   border: none;
 }
 </style>
+  <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />
