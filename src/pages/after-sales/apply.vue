@@ -3,9 +3,12 @@ import { computed, reactive, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { AFTER_SALE_TYPES } from "../../utils/afterSale";
+import ServiceSheet from "../../components/ServiceSheet.vue";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
 const orderId = ref(""),
+  /** IKKTWM 售后页浮动客服入口（道哥 2026-10-11） */
+  serviceOpen = ref(false),
   submitting = ref(false),
   uploading = ref(false),
   /** IKHZKA v2：订单商品行（部分退款勾选用） */
@@ -217,8 +220,20 @@ async function submit() {
       @tap="submit"
     >
       {{ submitting ? "正在提交…" : uploading ? "凭证上传中…" : "提交售后申请" }}
-    </button></view
+    </button
+    ><!-- 浮动客服球（道哥 2026-10-11）：填售后遇到疑问随时召唤校区客服，
+        图标纯 CSS 耳机（不依赖 emoji/位图，老内核稳） --><view
+      class="service-fab"
+      hover-class="service-fab--hover"
+      aria-label="联系客服"
+      @tap="serviceOpen = true"
+      ><view class="service-fab__icon"
+        ><view class="ic-band"></view><view class="ic-pad ic-pad--l"></view
+        ><view class="ic-pad ic-pad--r"></view></view
+      ></view
+    ></view
   >
+  <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
@@ -368,5 +383,62 @@ async function submit() {
 }
 .primary-btn {
   margin-top: 30rpx;
+}
+/* 浮动客服球（道哥 2026-10-11）：底部留白加大，防悬浮球压到提交按钮 */
+.page {
+  padding-bottom: calc(340rpx + env(safe-area-inset-bottom));
+}
+.service-fab {
+  position: fixed;
+  right: 28rpx;
+  bottom: calc(48rpx + env(safe-area-inset-bottom));
+  width: 108rpx;
+  height: 108rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, $primary-dark, $primary);
+  box-shadow: 0 12rpx 30rpx rgba(7, 136, 59, 0.32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* ServiceSheet 弹层 60 之下 */
+  z-index: 50;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.service-fab--hover {
+  transform: scale(0.94);
+  box-shadow: 0 6rpx 18rpx rgba(7, 136, 59, 0.28);
+}
+/* 纯 CSS 耳机图标：头梁 + 双耳罩 */
+.service-fab__icon {
+  position: relative;
+  width: 52rpx;
+  height: 48rpx;
+}
+.ic-band {
+  position: absolute;
+  left: 7rpx;
+  right: 7rpx;
+  top: 6rpx;
+  height: 24rpx;
+  border: 5rpx solid #fff;
+  border-bottom: none;
+  border-radius: 26rpx 26rpx 0 0;
+  box-sizing: border-box;
+}
+.ic-pad {
+  position: absolute;
+  top: 26rpx;
+  width: 11rpx;
+  height: 17rpx;
+  background: #fff;
+  border-radius: 6rpx;
+}
+.ic-pad--l {
+  left: 4rpx;
+}
+.ic-pad--r {
+  right: 4rpx;
 }
 </style>
