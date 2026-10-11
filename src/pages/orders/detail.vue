@@ -236,13 +236,22 @@ function backHome() {
       联系客服处理
     </button
     ><button class="primary-btn pay-again" @tap="backHome">返回首页</button
+    ><!-- IKKTWM 售后/客服文字链：必须在 .page 流内渲染（曾游离在
+        min-height:100vh 容器外，恒被顶到首屏之下不可见）；联系客服
+        全状态在线（等价原 contact 按钮），申请售后仅送达/完成态；
+        异常单已有「联系客服处理」主按钮，不重复出文字链 --><view
+      v-if="order.status !== 'exception'"
+      class="footer-links"
+      ><text
+        v-if="order.status === 'delivered' || order.status === 'completed'"
+        @tap="applyAfterSale"
+        >申请售后</text
+      ><text
+        v-if="order.status === 'delivered' || order.status === 'completed'"
+        class="sep"
+        >·</text
+      ><text @tap="serviceOpen = true">联系客服</text></view
     ></view
-  >
-  <view
-    v-if="order.status === 'delivered' || order.status === 'completed'"
-    class="footer-links"
-    ><text @tap="applyAfterSale">申请售后</text><text class="sep">·</text
-    ><text @tap="serviceOpen = true">联系客服</text></view
   >
   <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />
   <!-- 未发货退款弹层（IKHZKA）：原因必填 -->
@@ -498,7 +507,8 @@ function backHome() {
   color: #8a978f;
 }
 .footer-links text {
-  padding: 8rpx 12rpx;
+  /* 触达面积（ui-ux-pro-max touch-target）：弱化视觉但不弱化可点性 */
+  padding: 12rpx 16rpx;
 }
 .footer-links .sep {
   color: #d5ded8;
