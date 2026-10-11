@@ -194,63 +194,69 @@ function backHome() {
         ><text>实付</text
         ><text>¥{{ fenToYuan(order.payableAmount) }}</text></view
       ></view
-    ><button
-      v-if="order.status === 'pending-payment'"
-      class="primary-btn pay-again"
-      :disabled="paying"
-      @tap="payAgain"
-    >
-      {{ paying ? "正在拉起支付…" : "继续支付" }}
-    </button
-    ><button
-      v-if="order.status === 'delivered'"
-      class="primary-btn pay-again"
-      :disabled="confirming"
-      @tap="confirmReceipt"
-    >
-      {{ confirming ? "正在确认…" : "确认收货" }}
-    </button
-    ><button
-      v-if="order.status === 'pending-payment'"
-      class="cancel"
-      @tap="cancel"
-    >
-      取消订单</button
-    ><!-- 未发货退款（IKHZKA）：已支付未出库可申请 --><button
-      v-if="order.status === 'paid'"
-      class="cancel"
-      @tap="openRefundSheet"
-    >
-      申请退款</button
-    ><!-- 审核中可撤销 --><button
-      v-if="order.status === 'after-sales'"
-      class="cancel"
-      @tap="cancelRefund"
-    >
-      撤销退款申请</button
-    ><!-- IKKTWM：售后/客服弱化为文字链（道哥：弱化存在感），主操作返回首页突出 --><button
-      v-if="order.status === 'exception'"
-      class="primary-btn pay-again"
-      @tap="serviceOpen = true"
-    >
-      联系客服处理
-    </button
-    ><button class="primary-btn pay-again" @tap="backHome">返回首页</button
-    ><!-- IKKTWM 售后/客服文字链：必须在 .page 流内渲染（曾游离在
-        min-height:100vh 容器外，恒被顶到首屏之下不可见）；联系客服
-        全状态在线（等价原 contact 按钮），申请售后仅送达/完成态；
-        异常单已有「联系客服处理」主按钮，不重复出文字链 --><view
-      v-if="order.status !== 'exception'"
-      class="footer-links"
-      ><text
-        v-if="order.status === 'delivered' || order.status === 'completed'"
-        @tap="applyAfterSale"
-        >申请售后</text
-      ><text
-        v-if="order.status === 'delivered' || order.status === 'completed'"
-        class="sep"
-        >·</text
-      ><text @tap="serviceOpen = true">联系客服</text></view
+    ><!-- 操作区吸底（道哥 2026-10-11）：按钮按语义配色——绿=推进/资金
+        （继续支付/确认收货）、橙=需人工介入（异常单联系客服）、白底描边=
+        逆向操作（取消/退款类）、浅绿=导航（返回首页，待支付态让位取消）；
+        售后/客服文字链收进吸底条上排，弱化但不埋没；异常单不重复出
+        文字链（已有「联系客服处理」主按钮） -->
+    <view class="action-bar"
+      ><view v-if="order.status !== 'exception'" class="action-bar__links"
+        ><text
+          v-if="order.status === 'delivered' || order.status === 'completed'"
+          @tap="applyAfterSale"
+          >申请售后</text
+        ><text
+          v-if="order.status === 'delivered' || order.status === 'completed'"
+          class="sep"
+          >·</text
+        ><text @tap="serviceOpen = true">联系客服</text></view
+      ><view class="action-bar__row"
+        ><button
+          v-if="order.status === 'pending-payment'"
+          class="bar-btn bar-btn--ghost"
+          @tap="cancel"
+        >
+          取消订单</button
+        ><!-- 未发货退款（IKHZKA）：已支付未出库可申请 --><button
+          v-if="order.status === 'paid'"
+          class="bar-btn bar-btn--ghost"
+          @tap="openRefundSheet"
+        >
+          申请退款</button
+        ><!-- 审核中可撤销 --><button
+          v-if="order.status === 'after-sales'"
+          class="bar-btn bar-btn--ghost"
+          @tap="cancelRefund"
+        >
+          撤销退款申请</button
+        ><button
+          v-if="order.status !== 'pending-payment'"
+          class="bar-btn bar-btn--soft"
+          @tap="backHome"
+        >
+          返回首页</button
+        ><button
+          v-if="order.status === 'pending-payment'"
+          class="bar-btn bar-btn--primary"
+          :disabled="paying"
+          @tap="payAgain"
+        >
+          {{ paying ? "正在拉起支付…" : "继续支付" }}</button
+        ><button
+          v-if="order.status === 'delivered'"
+          class="bar-btn bar-btn--primary"
+          :disabled="confirming"
+          @tap="confirmReceipt"
+        >
+          {{ confirming ? "正在确认…" : "确认收货" }}</button
+        ><!-- 异常单：警示橙，人工介入优先 --><button
+          v-if="order.status === 'exception'"
+          class="bar-btn bar-btn--warn"
+          @tap="serviceOpen = true"
+        >
+          联系客服处理</button
+        ></view
+      ></view
     ></view
   >
   <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />
@@ -400,8 +406,86 @@ function backHome() {
   font-weight: 900;
   color: $primary-dark;
 }
-.pay-again {
-  margin: 24rpx 0 0;
+/* 吸底操作条（道哥 2026-10-11）：条体最高约 230rpx（文字链排+按钮排+安全区），
+   底部留白多打余量防内容贴条 */
+.page.detail {
+  padding-bottom: calc(320rpx + env(safe-area-inset-bottom));
+}
+.action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  background: #fff;
+  border-top: 2rpx solid rgba(32, 74, 45, 0.08);
+  box-shadow: 0 -6rpx 24rpx rgba(21, 75, 38, 0.06);
+  padding: 12rpx 28rpx calc(12rpx + env(safe-area-inset-bottom));
+}
+.action-bar__links {
+  display: flex;
+  justify-content: center;
+  gap: 16rpx;
+  font-size: 24rpx;
+  color: #8a978f;
+  margin-bottom: 2rpx;
+}
+/* 触达面积（ui-ux-pro-max touch-target）：弱化视觉但不弱化可点性 */
+.action-bar__links text {
+  padding: 10rpx 14rpx;
+}
+.action-bar__links .sep {
+  color: #d5ded8;
+  padding: 10rpx 0;
+}
+.action-bar__row {
+  display: flex;
+  gap: 18rpx;
+}
+/* 吸底条按钮语义四色：绿=推进/资金、橙=人工介入、白底描边=逆向、浅绿=导航 */
+.bar-btn {
+  flex: 1;
+  min-height: 88rpx;
+  margin: 0;
+  padding: 0 20rpx;
+  border: 0;
+  border-radius: 44rpx;
+  font-size: 29rpx;
+  font-weight: 700;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: transparent;
+}
+.bar-btn::after {
+  border: none;
+}
+.bar-btn--primary {
+  flex: 1.5;
+  background: linear-gradient(135deg, $primary-dark, $primary);
+  color: #fff;
+  box-shadow: 0 10rpx 24rpx rgba(7, 136, 59, 0.18);
+}
+/* 异常单客服：与 .status--exception 橙同系 */
+.bar-btn--warn {
+  flex: 1.5;
+  background: linear-gradient(135deg, #c85a22, $orange);
+  color: #fff;
+  box-shadow: 0 10rpx 24rpx rgba(208, 92, 34, 0.2);
+}
+.bar-btn--ghost {
+  background: #fff;
+  border: 2rpx solid $line;
+  color: #566159;
+}
+.bar-btn--soft {
+  background: $primary-soft;
+  color: $primary-dark;
+}
+.bar-btn[disabled] {
+  opacity: 0.65;
 }
 /* 三态（IK9AWK） */
 .detail-retry {
@@ -428,15 +512,6 @@ function backHome() {
   50% {
     opacity: 0.55;
   }
-}
-.cancel {
-  min-height: 88rpx;
-  width: 100%;
-  margin-top: 24rpx;
-  background: #fff;
-  color: #566159;
-  border: 2rpx solid $line;
-  border-radius: 44rpx;
 }
 /* 履约中快捷售后弹窗（IK97FI）：底部弹出层 */
 .sheet-mask {
@@ -497,21 +572,5 @@ function backHome() {
 }
 .sheet__submit {
   margin-top: 28rpx;
-}
-.footer-links {
-  display: flex;
-  justify-content: center;
-  gap: 16rpx;
-  margin: 20rpx 0 8rpx;
-  font-size: 24rpx;
-  color: #8a978f;
-}
-.footer-links text {
-  /* 触达面积（ui-ux-pro-max touch-target）：弱化视觉但不弱化可点性 */
-  padding: 12rpx 16rpx;
-}
-.footer-links .sep {
-  color: #d5ded8;
-  padding: 8rpx 0;
 }
 </style>
