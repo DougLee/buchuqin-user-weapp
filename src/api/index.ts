@@ -1,4 +1,5 @@
 import { request, toAbsoluteUrl, uploadImage } from "./request";
+import { WECHAT_APP_ID } from "../config/app";
 import type {
   Address,
   AfterSale,
@@ -38,7 +39,7 @@ export const api = {
       method: "POST",
       data: {
         code,
-        appid: "wxc814687e5ae26924",
+        appid: WECHAT_APP_ID,
         ...(campusId ? { campusId } : {}),
       },
     }),

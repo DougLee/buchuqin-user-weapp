@@ -1,4 +1,5 @@
 import type { ApiResult, LoginResult } from "../types";
+import { WECHAT_APP_ID } from "../config/app";
 export const BASE_URL =
   // 本机 API 固定 3100（3000 被占），dev 裸跑不再需要前置 VITE_API_BASE_URL；生产构建同源相对路径 /api/v1
   import.meta.env.VITE_API_BASE_URL || "http://localhost:3100/api/v1";
@@ -84,7 +85,7 @@ async function wechatLogin(): Promise<string> {
   // 双小程序凭证路由（IK8W5Q）：带上本端 appid，后端挑对应 secret
   const { status, body } = await post("/auth/wechat-login", {
     code,
-    appid: "wxc814687e5ae26924",
+    appid: WECHAT_APP_ID,
   });
   if (status === 501) throw new WechatLoginNotConfigured();
   if (status >= 300) throw new Error("微信登录失败");

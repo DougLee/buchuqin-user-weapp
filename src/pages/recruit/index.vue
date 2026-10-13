@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { APP_NAME } from "../../config/app";
 import { useSessionStore } from "../../stores/session";
 import type { Building, RecruitingApplication } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
@@ -317,7 +318,7 @@ async function submit() {
         <text class="pass-card__no-value">{{ app.staffNo || "见短信" }}</text>
       </view>
       <view class="pass-card__guide">
-        <text>1. 打开微信，搜索「不出寝食社配送」小程序</text>
+        <text>1. 打开微信，搜索「{{ APP_NAME }}配送」小程序</text>
         <text>2. 使用工号 + 姓名 登录</text>
         <text>3. 开始接单，收入实时可查</text>
       </view>

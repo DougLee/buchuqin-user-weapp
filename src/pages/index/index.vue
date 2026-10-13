@@ -7,6 +7,7 @@ import {
   onShow,
 } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { APP_NAME } from "../../config/app";
 import ProductCard from "../../components/ProductCard.vue";
 import WheelPanel from "../../components/WheelPanel.vue";
 import WelcomeGift from "../../components/WelcomeGift.vue";
@@ -317,7 +318,7 @@ function search() {
 <template>
   <view class="page home">
     <view class="brand-row"
-      ><text class="brand">不出寝食社</text><view class="brand-dot"
+      ><text class="brand">{{ APP_NAME }}</text><view class="brand-dot"
     /></view>
     <view class="location"
       ><!-- IKAJT2：校区/地址双入口——点校区名换校区（商品价格随之刷新），点地址去选寝室 -->
