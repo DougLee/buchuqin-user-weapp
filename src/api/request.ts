@@ -112,13 +112,23 @@ function loginFlow(): Promise<string> {
 /** 真正的登录通道：401 不能靠"重登"自愈（会死循环）；profile 等带鉴权接口允许自动重登 */
 const LOGIN_CHANNELS = ["/auth/wechat-login"];
 let loginPromise: Promise<string> | undefined;
+/** IKLE1K：登录失败冷却——防 token 失效后多请求连环触发重登撞限流 */
+let loginFailedAt = 0;
+const LOGIN_COOLDOWN_MS = 5000;
 async function ensureToken(path: string, force = false) {
   const cached = uni.getStorageSync("token") as string;
   if (!force && (cached || path.startsWith("/auth/"))) return cached;
+  if (force && Date.now() - loginFailedAt < LOGIN_COOLDOWN_MS) {
+    uni.showToast({ title: "登录失败，请稍后重试", icon: "none" });
+    throw new ApiError("登录失败，请稍后重试", "network");
+  }
   if (force) uni.removeStorageSync("token");
   loginPromise ??= loginFlow().then((token) => {
     uni.setStorageSync("token", token);
     return token;
+  }).catch((error) => {
+    loginFailedAt = Date.now();
+    throw error;
   }).finally(() => (loginPromise = undefined));
   return loginPromise;
 }
@@ -174,7 +184,9 @@ export async function request<T>(
           );
           let apiError: ApiError;
           if (res.statusCode === 401) {
-            apiError = new ApiError("登录已过期，请重试", "business", 401);
+            // IKLE1K：自动重登失败后的二次 401——归为可重试（错误态/重试卡有出路），
+            // 不再静默 business（假死：页面停在陈旧数据，点任何按钮无反应无提示）
+            apiError = new ApiError("登录已过期，请重试", "network", 401);
           } else if (res.statusCode === 429) {
             apiError = new ApiError(
               "操作太频繁，请 1 分钟后再试",
@@ -194,7 +206,8 @@ export async function request<T>(
               res.statusCode,
             );
           }
-          if (res.statusCode !== 401 && !silent)
+          // IKLE1K：401 也 toast（保留 silent 约定）——自动重登失败不再静默
+          if (!silent)
             uni.showToast({ title: apiError.message, icon: "none" });
           reject(apiError);
         },
