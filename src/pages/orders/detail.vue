@@ -194,22 +194,14 @@ function backHome() {
         ><text>实付</text
         ><text>¥{{ fenToYuan(order.payableAmount) }}</text></view
       ></view
-    ><!-- 操作区吸底（道哥 2026-10-11）：按钮按语义配色——绿=推进/资金
-        （继续支付/确认收货）、橙=需人工介入（异常单联系客服）、白底描边=
-        逆向操作（取消/退款类）、浅绿=导航（返回首页，待支付态让位取消）；
-        售后/客服文字链收进吸底条上排，弱化但不埋没；异常单不重复出
-        文字链（已有「联系客服处理」主按钮） -->
+    ><!-- 操作区吸底（道哥 2026-10-11；2026-10-15 道哥反馈售后/客服文字链
+        太不显眼）：按钮按语义配色——绿=推进/资金（继续支付/确认收货）、
+        橙=需人工介入（异常单联系客服）、白底描边=逆向操作（取消/退款类）、
+        浅绿=导航（返回首页，待支付态让位取消）；售后/客服由文字链升级为
+        白底描边次级胶囊按钮，紧邻主按钮组下方，高度/字号降档维持
+        「主操作 > 服务动作」层级；异常单不重复出服务入口（已有
+        「联系客服处理」主按钮） -->
     <view class="action-bar"
-      ><view v-if="order.status !== 'exception'" class="action-bar__links"
-        ><text
-          v-if="order.status === 'delivered' || order.status === 'completed'"
-          @tap="applyAfterSale"
-          >申请售后</text
-        ><text
-          v-if="order.status === 'delivered' || order.status === 'completed'"
-          class="sep"
-          >·</text
-        ><text @tap="serviceOpen = true">联系客服</text></view
       ><view class="action-bar__row"
         ><button
           v-if="order.status === 'pending-payment'"
@@ -255,6 +247,18 @@ function backHome() {
           @tap="serviceOpen = true"
         >
           联系客服处理</button
+        ></view
+      ><!-- 售后/客服次级按钮（道哥 2026-10-15）：白底绿描边胶囊+纯 CSS
+          图标，紧邻主按钮组下方；申请售后仅送达/完成态出（24h 窗口在
+          after-sales 页校验），联系客服开 ServiceSheet 弹层 -->
+      <view v-if="order.status !== 'exception'" class="action-bar__svc"
+        ><button
+          v-if="order.status === 'delivered' || order.status === 'completed'"
+          class="svc-btn"
+          @tap="applyAfterSale"
+          ><view class="svc-icon svc-icon--shield" /><text>申请售后</text></button
+        ><button class="svc-btn" @tap="serviceOpen = true"
+          ><view class="svc-icon svc-icon--chat" /><text>联系客服</text></button
         ></view
       ></view
     ></view
@@ -406,8 +410,8 @@ function backHome() {
   font-weight: 900;
   color: $primary-dark;
 }
-/* 吸底操作条（道哥 2026-10-11）：条体最高约 230rpx（文字链排+按钮排+安全区），
-   底部留白多打余量防内容贴条 */
+/* 吸底操作条（道哥 2026-10-11；2026-10-15 服务入口升级为按钮排）：条体最高
+   约 210rpx（主按钮排+服务按钮排+安全区），底部留白多打余量防内容贴条 */
 .page.detail {
   padding-bottom: calc(320rpx + env(safe-area-inset-bottom));
 }
@@ -422,21 +426,67 @@ function backHome() {
   box-shadow: 0 -6rpx 24rpx rgba(21, 75, 38, 0.06);
   padding: 12rpx 28rpx calc(12rpx + env(safe-area-inset-bottom));
 }
-.action-bar__links {
+/* 售后/客服次级按钮（道哥 2026-10-15）：白底绿描边胶囊居中排在主按钮组
+   下方，高度/字号比主按钮降一档维持层级；可点高度 76rpx ≥72rpx、字号
+   26rpx ≥26rpx（ui-ux-pro-max touch-target/legibility） */
+.action-bar__svc {
   display: flex;
   justify-content: center;
-  gap: 16rpx;
-  font-size: 24rpx;
-  color: #8a978f;
-  margin-bottom: 2rpx;
+  gap: 18rpx;
+  margin-top: 14rpx;
 }
-/* 触达面积（ui-ux-pro-max touch-target）：弱化视觉但不弱化可点性 */
-.action-bar__links text {
-  padding: 10rpx 14rpx;
+.svc-btn {
+  flex: 0 0 auto;
+  min-width: 220rpx;
+  min-height: 76rpx;
+  margin: 0;
+  padding: 0 26rpx;
+  border: 2rpx solid rgba(7, 136, 59, 0.35);
+  border-radius: 40rpx;
+  background: #fff;
+  color: $primary-dark;
+  font-size: 26rpx;
+  font-weight: 700;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  box-sizing: border-box;
 }
-.action-bar__links .sep {
-  color: #d5ded8;
-  padding: 10rpx 0;
+.svc-btn::after {
+  border: none;
+}
+/* 纯 CSS 图标（不用 emoji/图片）：盾牌=售后保障 */
+.svc-icon {
+  flex: 0 0 auto;
+}
+.svc-icon--shield {
+  width: 22rpx;
+  height: 26rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 5rpx 5rpx 11rpx 11rpx;
+}
+/* 对话气泡=联系客服：圆角矩形+左下小尾巴（白底盖住气泡底边形成缺口） */
+.svc-icon--chat {
+  position: relative;
+  width: 26rpx;
+  height: 20rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 6rpx;
+  background: #fff;
+}
+.svc-icon--chat::after {
+  content: "";
+  position: absolute;
+  left: 6rpx;
+  bottom: -6rpx;
+  width: 10rpx;
+  height: 10rpx;
+  background: #fff;
+  border-left: 3rpx solid currentColor;
+  border-bottom: 3rpx solid currentColor;
+  transform: rotate(45deg);
 }
 .action-bar__row {
   display: flex;
