@@ -409,15 +409,8 @@ function search() {
         ></swiper-item
       ></swiper
     >
-    <!-- 空 Banner 降级（IK9RX2）：后台未配置时给一个品牌占位帧，不让轮播区塌掉；
-         2026-09-05 骨架屏：loading 期间不闪空占位帧，改渲染同构 shimmer -->
-    <view v-else-if="!loading" class="hero hero--empty"
-      ><view class="hero__slide hero__slide--green"
-        ><text class="hero__title">今天不出寝</text
-        ><text class="hero__sub">想吃的照样有</text></view
-      ></view
-    >
-    <view v-else class="hero hero--skeleton" />
+    <!-- 未配置 Banner 时不渲染营销内容；loading 期间保留同构骨架。 -->
+    <view v-else-if="loading" class="hero hero--skeleton" />
     <!-- 首页双版块（IKD6FA）：左天天抽奖（进转盘页）+ 右楼栋福利群（弹二维码）。
          左卡转盘未配置/已下线时隐藏，右卡群码未配置时隐藏，都无则整块不渲染；
          卡片背景图走 COS（static.buchuqin.com，图自带右侧装饰，不再叠加 CSS 装饰） -->
@@ -855,17 +848,6 @@ function search() {
 }
 .hero__slide--dark {
   background: linear-gradient(120deg, #1e2520 0%, #2f4436 60%, #159447 100%);
-}
-/* 空 Banner 占位（IK9RX2）：与轮播同高圆角，承载单帧品牌文案；
-   IKDEUR 五修：宽度同 .hero 视口锚定 */
-.hero--empty {
-  aspect-ratio: 2.55/1;
-  width: calc(100vw - 56rpx);
-  max-width: calc(100vw - 56rpx);
-  border-radius: 28rpx;
-  overflow: hidden;
-  margin-top: 24rpx;
-  box-shadow: 0 12rpx 32rpx rgba(21, 117, 54, 0.1);
 }
 .hero__tag {
   align-self: flex-start;
