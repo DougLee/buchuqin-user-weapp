@@ -248,9 +248,10 @@ function backHome() {
         >
           联系客服处理</button
         ></view
-      ><!-- 售后/客服次级按钮（道哥 2026-10-15）：白底绿描边胶囊+纯 CSS
-          图标，紧邻主按钮组下方；申请售后仅送达/完成态出（24h 窗口在
-          after-sales 页校验），联系客服开 ServiceSheet 弹层 -->
+      ><!-- 售后/客服次级按钮（道哥 2026-10-15 加，2026-10-16 配色回归
+          品牌绿）：浅绿底深绿描边胶囊+纯 CSS 图标，紧邻主按钮组下方；
+          申请售后仅送达/完成态出（24h 窗口在 after-sales 页校验），
+          联系客服开 ServiceSheet 弹层 -->
       <view v-if="order.status !== 'exception'" class="action-bar__svc"
         ><button
           v-if="order.status === 'delivered' || order.status === 'completed'"
@@ -426,9 +427,10 @@ function backHome() {
   box-shadow: 0 -6rpx 24rpx rgba(21, 75, 38, 0.06);
   padding: 12rpx 28rpx calc(12rpx + env(safe-area-inset-bottom));
 }
-/* 售后/客服次级按钮（道哥 2026-10-15）：白底绿描边胶囊居中排在主按钮组
-   下方，高度/字号比主按钮降一档维持层级；可点高度 76rpx ≥72rpx、字号
-   26rpx ≥26rpx（ui-ux-pro-max touch-target/legibility） */
+/* 售后/客服次级按钮（道哥 2026-10-15 加，2026-10-16 回归品牌绿）：
+   浅绿底深绿描边胶囊居中排在主按钮组下方，高度/字号比主按钮降一档
+   维持层级；可点高度 76rpx ≥72rpx、字号 26rpx ≥26rpx
+   （ui-ux-pro-max touch-target/legibility） */
 .action-bar__svc {
   display: flex;
   justify-content: center;
@@ -441,30 +443,30 @@ function backHome() {
   min-height: 76rpx;
   margin: 0;
   padding: 0 26rpx;
-  border: 2rpx solid rgba(28, 22, 12, 0.22);
+  border: 2rpx solid rgba(7, 136, 59, 0.35);
   border-radius: 40rpx;
-  /* 墨金质感（道哥 2026-10-16：要显眼+高端大气）：深墨底+鎏金字，
-     与主按钮亮绿双色分层，像高端卡的辅助操作位 */
-  background: linear-gradient(135deg, #23201a 0%, #3a352a 100%);
-  color: #f3dfa4;
+  /* 品牌绿同源（道哥 2026-10-16：墨金不搭，回归项目清新绿体系）：
+     浅绿底+深绿描边胶囊——比 ghost 醒目、比主按钮降档，服务动作
+     介于两者层级；与 .bar-btn--soft 同族但带描边 */
+  background: $primary-soft;
+  color: $primary-dark;
   font-size: 26rpx;
   font-weight: 700;
-  letter-spacing: 2rpx;
   line-height: 1.2;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10rpx;
   box-sizing: border-box;
-  box-shadow: 0 6rpx 18rpx rgba(35, 32, 26, 0.28);
+  box-shadow: 0 4rpx 14rpx rgba(7, 136, 59, 0.1);
 }
 .svc-btn::after {
   border: none;
 }
-/* 按下反馈：微沉 */
+/* 按下反馈：微沉+底色加深一档 */
 .svc-btn:active {
   transform: translateY(2rpx);
-  box-shadow: 0 3rpx 10rpx rgba(35, 32, 26, 0.22);
+  background: #ddf3da;
 }
 /* 纯 CSS 图标（不用 emoji/图片）：盾牌=售后保障 */
 .svc-icon {
@@ -476,14 +478,15 @@ function backHome() {
   border: 3rpx solid currentColor;
   border-radius: 5rpx 5rpx 11rpx 11rpx;
 }
-/* 对话气泡=联系客服：圆角矩形+左下小尾巴（白底盖住气泡底边形成缺口） */
+/* 对话气泡=联系客服：圆角矩形+左下小尾巴（补丁盖住气泡底边形成缺口，
+   补丁色=按钮底色，随按钮配色同步改） */
 .svc-icon--chat {
   position: relative;
   width: 26rpx;
   height: 20rpx;
   border: 3rpx solid currentColor;
   border-radius: 6rpx;
-  background: #fff;
+  background: $primary-soft;
 }
 .svc-icon--chat::after {
   content: "";
@@ -492,7 +495,7 @@ function backHome() {
   bottom: -6rpx;
   width: 10rpx;
   height: 10rpx;
-  background: #fff;
+  background: $primary-soft;
   border-left: 3rpx solid currentColor;
   border-bottom: 3rpx solid currentColor;
   transform: rotate(45deg);
