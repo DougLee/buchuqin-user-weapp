@@ -441,21 +441,30 @@ function backHome() {
   min-height: 76rpx;
   margin: 0;
   padding: 0 26rpx;
-  border: 2rpx solid rgba(7, 136, 59, 0.35);
+  border: 2rpx solid rgba(28, 22, 12, 0.22);
   border-radius: 40rpx;
-  background: #fff;
-  color: $primary-dark;
+  /* 墨金质感（道哥 2026-10-16：要显眼+高端大气）：深墨底+鎏金字，
+     与主按钮亮绿双色分层，像高端卡的辅助操作位 */
+  background: linear-gradient(135deg, #23201a 0%, #3a352a 100%);
+  color: #f3dfa4;
   font-size: 26rpx;
   font-weight: 700;
+  letter-spacing: 2rpx;
   line-height: 1.2;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10rpx;
   box-sizing: border-box;
+  box-shadow: 0 6rpx 18rpx rgba(35, 32, 26, 0.28);
 }
 .svc-btn::after {
   border: none;
+}
+/* 按下反馈：微沉 */
+.svc-btn:active {
+  transform: translateY(2rpx);
+  box-shadow: 0 3rpx 10rpx rgba(35, 32, 26, 0.22);
 }
 /* 纯 CSS 图标（不用 emoji/图片）：盾牌=售后保障 */
 .svc-icon {
