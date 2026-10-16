@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { useCartStore } from "../../stores/cart";
@@ -41,6 +41,35 @@ async function refresh() {
   } finally {
     loading.value = false;
   }
+}
+/** 送货照片凭证（道哥 2026-10-16）：后端 package 整行透传，送达照/交接照
+ *  两组分开渲染；图片为 COS 完整 URL，toAbsoluteUrl 兜底老的相对路径 */
+const proofGroups = computed(() => {
+  const pkg = order.value?.package;
+  const fmt = (iso?: string) =>
+    iso ? `${Number(iso.slice(5, 7))}月${Number(iso.slice(8, 10))}日 ${iso.slice(11, 16)}` : "";
+  const groups: Array<{ label: string; images: string[]; remark: string; time: string }> = [];
+  const proof = pkg?.proof;
+  if (proof?.images?.length)
+    groups.push({
+      label: "送达照片",
+      images: proof.images,
+      remark: proof.remark || "",
+      time: fmt(proof.time),
+    });
+  const handover = pkg?.handoverProof;
+  if (handover?.images?.length)
+    groups.push({
+      label: "骑手交接",
+      images: handover.images,
+      remark: "",
+      time: fmt(handover.time),
+    });
+  return groups;
+});
+function previewProof(images: string[], current: string) {
+  const urls = images.map((img) => api.toAbsoluteUrl(img));
+  uni.previewImage({ urls, current: api.toAbsoluteUrl(current) });
 }
 async function cancel() {
   if (!order.value) return;
@@ -177,6 +206,31 @@ function backHome() {
           }}</text></view
         ></view
       ></view
+    ><!-- 送货照片凭证（道哥 2026-10-16）：进度走完看现场——送达照/交接照
+        两组数据驱动（有才渲染），点缩略图 uni.previewImage 看大图 -->
+    <view v-if="proofGroups.length" class="proof card"
+      ><view class="proof__head"
+        ><view class="proof__title"
+          ><view class="proof__icon"
+            ><view class="proof__icon-lens" /><view class="proof__icon-flash" /></view
+          ><text>送货凭证</text></view
+        ><text class="proof__hint">点击照片查看大图</text></view
+      ><view v-for="group in proofGroups" :key="group.label" class="proof__group"
+        ><view class="proof__meta"
+          ><text class="proof__badge">{{ group.label }}</text
+          ><text v-if="group.time" class="proof__time">{{ group.time }}</text></view
+        ><view class="proof__grid"
+          ><image
+            v-for="img in group.images"
+            :key="img"
+            class="proof__thumb"
+            :class="{ 'proof__thumb--single': group.images.length === 1 }"
+            :src="api.toAbsoluteUrl(img)"
+            mode="aspectFill"
+            @tap="previewProof(group.images, img)"
+        /></view>
+        <text v-if="group.remark" class="proof__remark">配送备注：{{ group.remark }}</text>
+      </view></view
     ><view class="address card"
       ><text class="address__label">送达寝室</text
       ><text class="address__main"
@@ -377,6 +431,104 @@ function backHome() {
   font-size: 21rpx;
   color: #9aa39d;
   margin-top: 6rpx;
+}
+/* 送货凭证卡（道哥 2026-10-16）：品牌绿同族——胶囊徽章+缩略图网格+备注
+   引用条；单图放大一档，点图 previewImage 看大图 */
+.proof {
+  padding: 28rpx 30rpx;
+  margin-top: 22rpx;
+}
+.proof__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.proof__title {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  color: $primary-dark;
+  font-size: 26rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+}
+/* 纯 CSS 相机图标（不用 emoji）：机身+镜头+顶闪，currentColor 随标题深绿 */
+.proof__icon {
+  position: relative;
+  width: 30rpx;
+  height: 23rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 6rpx;
+}
+.proof__icon-lens {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9rpx;
+  height: 9rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.proof__icon-flash {
+  position: absolute;
+  top: -7rpx;
+  left: 6rpx;
+  width: 10rpx;
+  height: 5rpx;
+  background: currentColor;
+  border-radius: 2rpx 2rpx 0 0;
+}
+.proof__hint {
+  font-size: 20rpx;
+  color: $muted;
+}
+.proof__group {
+  margin-top: 24rpx;
+}
+.proof__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.proof__badge {
+  padding: 5rpx 18rpx;
+  border-radius: 999rpx;
+  background: $primary-soft;
+  color: $primary-dark;
+  font-size: 21rpx;
+  font-weight: 700;
+}
+.proof__time {
+  font-size: 21rpx;
+  color: #9aa39d;
+}
+.proof__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14rpx;
+  margin-top: 16rpx;
+}
+.proof__thumb {
+  width: 200rpx;
+  height: 200rpx;
+  border-radius: 18rpx;
+  border: 1rpx solid rgba(32, 74, 45, 0.1);
+  box-shadow: 0 4rpx 12rpx rgba(21, 75, 38, 0.08);
+}
+.proof__thumb--single {
+  width: 320rpx;
+  height: 320rpx;
+}
+.proof__remark {
+  display: block;
+  margin-top: 14rpx;
+  padding: 12rpx 18rpx;
+  background: $primary-soft;
+  border-left: 6rpx solid rgba(7, 136, 59, 0.35);
+  border-radius: 10rpx;
+  font-size: 22rpx;
+  color: #3d5745;
 }
 .address,
 .summary {

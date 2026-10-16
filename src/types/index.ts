@@ -147,6 +147,21 @@ export interface Order {
     time?: string;
     done: boolean;
   }>;
+  /** 履约包裹（后端 orderView 整行透传）：送货照片凭证给本人核验 */
+  package?: {
+    status?: string;
+    /** 送达凭证（楼长送寝室 / customer-pickup 送楼下时拍摄） */
+    proof?: {
+      images?: string[];
+      remark?: string;
+      time?: string;
+    };
+    /** 骑手交接楼长凭证 */
+    handoverProof?: {
+      images?: string[];
+      time?: string;
+    };
+  } | null;
 }
 export interface ApiResult<T> {
   code: number;
