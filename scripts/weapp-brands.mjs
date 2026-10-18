@@ -10,7 +10,7 @@ export const WEAPP_BRANDS = Object.freeze({
   }),
   xiaoman: Object.freeze({
     name: "小满优选",
-    appId: "wxf2e90f96bcc32dd1",
+    appId: "wx084a587b78b1074a",
   }),
 });
 
