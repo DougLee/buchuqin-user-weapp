@@ -12,6 +12,10 @@ export const WEAPP_BRANDS = Object.freeze({
     name: "小满优选",
     appId: "wx084a587b78b1074a",
   }),
+  daxiong: Object.freeze({
+    name: "大雄零食",
+    appId: "wxacd195fb4fdf6c4a",
+  }),
 });
 
 export function getWeappBrand(key) {
