@@ -19,8 +19,8 @@ const session = useSessionStore(),
   // 2026-09-08 道哥：券中心待领取数
   claimableCouponCount = ref(0),
   orderCount = ref(0),
-  /** 进群二维码（IKAJSZ）：null = 后台未配置楼栋群/校园群，入口不渲染 */
-  group = ref<{ image: string; scope: "building" | "campus" } | null>(null),
+  /** 进群二维码（IKQXSD 统一）：校区售后福利群码，空串=入口不渲染 */
+  group = ref(""),
   groupOpen = ref(false),
   /** 当前校区名（IKAJT2）：接口下发，无地址时「当前校区」行也有正确文案 */
   campusName = ref(""),
@@ -39,30 +39,17 @@ onShow(async () => {
   await session.ensureLogin();
   // 各请求独立容错（IK9AWK）：部分失败不清零其他栏位
   // （IK9SO5：消息中心入口已隐藏，notifications 不再拉取）
-  const [a, b, o, g, c] = await Promise.allSettled([
+  const [a, b, o, c] = await Promise.allSettled([
     api.addresses(),
     api.coupons(),
     api.orders(),
-    // IKAJSZ：进群码拉取失败静默（入口隐藏，不影响其它栏位）
-    api.wechatGroup(),
     // IKAJT2：当前校区名（切换后 onShow 重拉即刷新）
     api.currentCampus(),
   ]);
   if (a.status === "fulfilled") addresses.value = a.value;
   if (c.status === "fulfilled") campusName.value = c.value.name;
-  if (g.status === "fulfilled") group.value = g.value;
-  // 群码跟随当前收货地址楼栋（道哥 2026-09-09）：地址就位后带 buildingId 重拉
-  if (a.status === "fulfilled") {
-    const bid = pickCurrentAddress(a.value)?.buildingId;
-    if (bid)
-      api
-        .wechatGroup(bid)
-        .then((ng) => {
-          if (ng) group.value = ng;
-          else group.value = null;
-        })
-        .catch(() => {});
-  }
+  // IKQXSD 统一：进群码=校区售后福利群（campus store 随 currentCampus 刷新）
+  group.value = campusStore.afterSalesGroupQrcode;
   if (b.status === "fulfilled") {
     const now = Date.now();
     usableCouponCount.value = b.value.mine.filter(
@@ -194,8 +181,8 @@ async function onGetPhone(e: { detail: { code?: string } }) {
           ><text>{{ roomSummary || (loaded ? "去添加" : "—") }}</text
           ></view
         ></view
-      ><!-- 进群入口（IKAJSZ）：后台配了楼栋群/校园群才显示 --><view v-if="group" @tap="groupOpen = true"
-        ><text>{{ group.scope === "building" ? "加入楼栋群" : "加入校园群" }}</text
+      ><!-- 进群入口（IKQXSD 统一）：校区配了售后福利群码才显示 --><view v-if="group" @tap="groupOpen = true"
+        ><text>加入售后福利群</text
         ><view class="menu__cell"
           ><text>长按识别进群</text></view
         ></view
@@ -228,12 +215,10 @@ async function onGetPhone(e: { detail: { code?: string } }) {
   <!-- 进群弹窗（IKAJSZ）：show-menu-by-longpress 让长按弹「识别二维码」 -->
   <view v-if="groupOpen && group" class="group-mask" @tap="groupOpen = false"
     ><view class="group-pop" @tap.stop
-      ><text class="group-pop__title">{{
-        group.scope === "building" ? "本楼栋群" : "校园大群"
-      }}</text
+      ><text class="group-pop__title">售后福利群</text
       ><image
         class="group-pop__qr"
-        :src="group.image"
+        :src="group"
         mode="widthFix"
         show-menu-by-longpress
       ></image

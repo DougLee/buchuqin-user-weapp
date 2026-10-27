@@ -5,6 +5,8 @@ import { api } from "../../api";
 import { fenToYuan } from "../../utils/money";
 import type { Banner, Order } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
+import { useCampusStore } from "../../stores/campus";
+const campusStore = useCampusStore();
 import { openBannerTarget } from "../../utils/bannerLink";
 setupDefaultShare();
 const orderId = ref(""),
@@ -15,7 +17,7 @@ const orderId = ref(""),
   /** 支付成功页广告位（IKA57E→IKB87P 大卡版）：最多 2 条，空数组不渲染 */
   ads = ref<Banner[]>([]),
   /** 楼栋福利群引导（IKE4FR）：楼栋→校级兜底后端已做；未配置 null 不渲染 */
-  group = ref<Awaited<ReturnType<typeof api.wechatGroup>>>(null),
+  group = ref(""),
   /** 群弹窗开合（IKE4FR 二轮）：点卡片弹大码弹窗，长按识别进群（同首页交互） */
   groupOpen = ref(false),
   /** 支付后推荐券（道哥 2026-09-08）：featured 券中面额最大的一张，
@@ -52,15 +54,8 @@ onLoad(async (q) => {
   } finally {
     loading.value = false;
   }
-  // 群码跟随当前收货地址楼栋（道哥 2026-09-09）：订单地址快照即本单楼栋
-  const bid = (order.value?.address as { buildingId?: string } | undefined)
-    ?.buildingId;
-  api
-    .wechatGroup(bid || undefined)
-    .then((g) => {
-      if (g) group.value = g;
-    })
-    .catch(() => {});
+  // IKQXSD 统一：福利群=校区售后福利群码（campus store，与首页/售后页同源）
+  group.value = campusStore.afterSalesGroupQrcode;
 });
 /** 广告点击（IKE4FR→IKE9YC）：配置了站内跳转优先，否则图文详情——与首页 banner 同一分发 */
 function openAd(banner: Banner) {
@@ -156,9 +151,7 @@ function openCancel() {
     >
       <view class="group-card__meta">
         <view class="group-card__head"
-          ><text class="group-card__title">{{
-            group.scope === "building" ? "本楼栋福利群" : "校园福利大群"
-          }}</text
+          ><text class="group-card__title">售后福利群</text
           ><text class="group-card__badge">官方</text></view
         >
         <text class="group-card__sub">配送动态 · 优惠福利，进群早知道</text>
@@ -239,7 +232,7 @@ function openCancel() {
       }}</text
       ><image
         class="group-pop__qr"
-        :src="group?.image"
+        :src="group"
         mode="widthFix"
         show-menu-by-longpress
       /><text class="group-pop__tip">长按识别二维码，加入群聊</text
