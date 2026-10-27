@@ -19,3 +19,10 @@ export function countdownText(endsAt: string, now: number): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
+
+/** IKQZY7 周期限购标签 */
+export const PURCHASE_LIMIT_TAG: Record<string, string> = {
+  once: '每人限购一次',
+  weekly: '每周限购一次',
+  monthly: '每月限购一次',
+};

@@ -9,7 +9,11 @@ import { useCampusStore } from "../../stores/campus";
 import ServiceSheet from "../../components/ServiceSheet.vue";
 import { useSessionStore } from "../../stores/session";
 import { fenToYuan } from "../../utils/money";
-import { countdownText, PROMO_TAG } from "../../utils/promotion";
+import {
+  countdownText,
+  PROMO_TAG,
+  PURCHASE_LIMIT_TAG,
+} from "../../utils/promotion";
 import type { Product } from "../../types";
 const product = ref<Product>(),
   cart = useCartStore(),
@@ -410,6 +414,18 @@ const gallery = computed(() => {
 }
 .info {
   padding: 32rpx;
+}
+.info__limit {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 122, 33, 0.12);
+  color: #c85a22;
+  font-size: 21rpx;
+  font-weight: 700;
+  letter-spacing: 1rpx;
+  margin-bottom: 12rpx;
 }
 .info__name {
   display: block;

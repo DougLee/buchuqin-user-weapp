@@ -10,6 +10,8 @@ export interface Product {
   stock: number;
   sales: number;
   tag: string;
+  /** IKQZY7 周期限购元信息：有值显示「每人限购一次/每周一次/每月一次」 */
+  purchaseLimitMeta?: { kind: 'once' | 'weekly' | 'monthly'; qty: number };
   image: string;
   /** 详情多图（IK9SNR）：后台维护的图集，首图兼容旧字段 image */
   images?: string[];
