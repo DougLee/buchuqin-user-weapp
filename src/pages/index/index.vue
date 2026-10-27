@@ -92,7 +92,9 @@ onShow(async () => {
 /** 转盘配置：active=false（未配置/已下线）时不渲染左卡 */
 const wheelActive = ref(false);
 /** 群码（IKAJSZ 同源接口）：null = 未配置楼栋群与校级大群，右卡不渲染 */
-const group = ref<Awaited<ReturnType<typeof api.wechatGroup>>>(null);
+/** IKQXSD 统一：售后福利群数据源=校区配置 afterSalesGroupQrcode
+ * （与售后页同一张码）；原 wechatGroup（楼栋群）通道下线首页。 */
+const group = computed(() => campusStore.afterSalesGroupQrcode);
 const groupOpen = ref(false);
 async function loadHomeBlocks() {
   // 静默降级：任一失败只隐藏对应入口，不影响首页主流程
@@ -100,11 +102,6 @@ async function loadHomeBlocks() {
     wheelActive.value = (await api.wheel()).active;
   } catch {
     wheelActive.value = false;
-  }
-  try {
-    group.value = await api.wechatGroup();
-  } catch {
-    group.value = null;
   }
   // IKDETO：signup 券一次拉取两用——迎新弹窗内容 +「我的」tab 红点
   try {
@@ -582,12 +579,10 @@ function search() {
     ><view class="group-pop" @tap.stop
       ><!-- 已配置态：二维码 + 长按识别 -->
       <template v-if="group"
-        ><text class="group-pop__title">{{
-          group.scope === "building" ? "本楼栋群" : "校园大群"
-        }}</text
+        ><text class="group-pop__title">售后福利群</text
         ><image
           class="group-pop__qr"
-          :src="group.image"
+          :src="group"
           mode="widthFix"
           show-menu-by-longpress
         ></image
