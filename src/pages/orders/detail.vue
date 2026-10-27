@@ -206,6 +206,22 @@ function backHome() {
           }}</text></view
         ></view
       ></view
+    ><!-- 售后福利群（IKQXSD 道哥 2026-10-27）：校区配了码才渲染，与首页/
+        售后页/支付成功页同一张码，长按识别进群 --><view
+      v-if="campusStore.afterSalesGroupQrcode"
+      class="group-card"
+      ><view class="group-card__head"
+        ><view class="group-card__badge"></view
+        ><view class="group-card__titles"
+          ><text class="group-card__title">售后福利群</text
+          ><text class="group-card__sub">专属售后通道 · 福利优先享</text></view
+        ></view
+      ><image
+        :src="campusStore.afterSalesGroupQrcode"
+        class="group-card__qr"
+        mode="aspectFit"
+        show-menu-by-longpress
+      /><text class="group-card__tip">长按识别二维码 · 加入福利群</text></view
     ><!-- 送货照片凭证（道哥 2026-10-16）：进度走完看现场——送达照/交接照
         两组数据驱动（有才渲染），点缩略图 uni.previewImage 看大图 -->
     <view v-if="proofGroups.length" class="proof card"
@@ -786,5 +802,72 @@ function backHome() {
 }
 .sheet__submit {
   margin-top: 28rpx;
+}
+
+/* 售后福利群卡片（IKQXSD）：与售后页同款——品牌绿渐变头+白底码区 */
+.group-card {
+  margin-top: 22rpx;
+  background: #fff;
+  border-radius: 28rpx;
+  box-shadow: 0 8rpx 28rpx rgba(21, 75, 38, 0.07);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 30rpx;
+}
+.group-card__head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 26rpx 30rpx;
+  background: linear-gradient(135deg, $primary-dark, $primary);
+  color: #fff;
+}
+.group-card__badge {
+  position: relative;
+  width: 44rpx;
+  height: 36rpx;
+  border: 3rpx solid rgba(255, 255, 255, 0.95);
+  border-radius: 12rpx;
+}
+.group-card__badge::after {
+  content: "";
+  position: absolute;
+  right: -10rpx;
+  bottom: -6rpx;
+  width: 16rpx;
+  height: 14rpx;
+  border: 3rpx solid rgba(255, 255, 255, 0.95);
+  border-radius: 6rpx 6rpx 6rpx 2rpx;
+  background: linear-gradient(135deg, $primary-dark, $primary);
+}
+.group-card__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+.group-card__title {
+  font-size: 30rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+}
+.group-card__sub {
+  font-size: 21rpx;
+  opacity: 0.85;
+}
+.group-card__qr {
+  width: 320rpx;
+  height: 320rpx;
+  margin-top: 30rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid rgba(32, 74, 45, 0.08);
+}
+.group-card__tip {
+  margin-top: 18rpx;
+  font-size: 22rpx;
+  color: $muted;
+  letter-spacing: 1rpx;
 }
 </style>
