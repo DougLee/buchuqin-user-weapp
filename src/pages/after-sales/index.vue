@@ -6,6 +6,8 @@ import { isRetryable } from "../../api/request";
 import { fenToYuan } from "../../utils/money";
 import type { AfterSale, Refund } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
+import { useCampusStore } from "../../stores/campus";
+const campusStore = useCampusStore();
 setupDefaultShare();
 /** 售后单状态 → 中文（后端值：pending/approved/rejected） */
 const AFTERSALE_STATUS_TEXT: Record<string, string> = {
@@ -53,6 +55,22 @@ async function load() {
       ><text class="summary__value"
         >¥{{ fenToYuan(refunds.reduce((n, r) => n + r.amount, 0)) }}</text
       ><text class="muted">累计退款</text></view
+    ><!-- 售后福利群（IKQXSD 道哥 2026-10-27）：校区配置了二维码才渲染，
+        长按识别进群——品牌绿渐变+卡片浮层质感，与页面清新风格一体 --><view
+      v-if="campusStore.afterSalesGroupQrcode"
+      class="group-card"
+      ><view class="group-card__head"
+        ><view class="group-card__badge"></view
+        ><view class="group-card__titles"
+          ><text class="group-card__title">售后福利群</text
+          ><text class="group-card__sub">专属售后通道 · 福利优先享</text></view
+        ></view
+      ><image
+        :src="campusStore.afterSalesGroupQrcode"
+        class="group-card__qr"
+        mode="aspectFit"
+        show-menu-by-longpress
+      /><text class="group-card__tip">长按识别二维码 · 加入福利群</text></view
     ><view class="section-title"
       ><text class="section-title__main">售后记录</text></view
     ><view v-if="!cases.length" class="empty card"
@@ -169,5 +187,73 @@ async function load() {
   color: $green;
   font-size: 32rpx;
   font-weight: 900;
+}
+
+/* 售后福利群卡片（IKQXSD）：品牌绿渐变头+白底码区浮层，质感对齐页面卡片语言 */
+.group-card {
+  margin-top: 22rpx;
+  background: #fff;
+  border-radius: 28rpx;
+  box-shadow: 0 8rpx 28rpx rgba(21, 75, 38, 0.07);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 30rpx;
+}
+.group-card__head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 26rpx 30rpx;
+  background: linear-gradient(135deg, $primary-dark, $primary);
+  color: #fff;
+}
+/* 纯 CSS 群徽标（不用 emoji）：圆底双气泡 */
+.group-card__badge {
+  position: relative;
+  width: 44rpx;
+  height: 36rpx;
+  border: 3rpx solid rgba(255, 255, 255, 0.95);
+  border-radius: 12rpx;
+}
+.group-card__badge::after {
+  content: "";
+  position: absolute;
+  right: -10rpx;
+  bottom: -6rpx;
+  width: 16rpx;
+  height: 14rpx;
+  border: 3rpx solid rgba(255, 255, 255, 0.95);
+  border-radius: 6rpx 6rpx 6rpx 2rpx;
+  background: linear-gradient(135deg, $primary-dark, $primary);
+}
+.group-card__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+.group-card__title {
+  font-size: 30rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+}
+.group-card__sub {
+  font-size: 21rpx;
+  opacity: 0.85;
+}
+.group-card__qr {
+  width: 320rpx;
+  height: 320rpx;
+  margin-top: 30rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid rgba(32, 74, 45, 0.08);
+}
+.group-card__tip {
+  margin-top: 18rpx;
+  font-size: 22rpx;
+  color: $muted;
+  letter-spacing: 1rpx;
 }
 </style>

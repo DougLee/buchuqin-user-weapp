@@ -16,6 +16,7 @@ export const useCampusStore = defineStore("campus", {
     servicePhone: "",
     /** IKKTWM 校区客服微信二维码（COS 图；空=未配置回落拨号） */
     serviceQrcode: "",
+    afterSalesGroupQrcode: "",
   }),
   getters: {
     closedNow: (state) => !!state.close.closedNow,
@@ -56,6 +57,10 @@ export const useCampusStore = defineStore("campus", {
       if (phone) this.servicePhone = phone;
       const qrcode = (campus as { serviceQrcode?: string }).serviceQrcode;
       if (qrcode !== undefined) this.serviceQrcode = qrcode || "";
+      // IKQXSD：售后福利群二维码（空=售后页不渲染）
+      const groupQr = (campus as { afterSalesGroupQrcode?: string })
+        .afterSalesGroupQrcode;
+      if (groupQr !== undefined) this.afterSalesGroupQrcode = groupQr || "";
     },
     /** 轻量自刷新：失败静默沿用旧态，不拦页面主流程 */
     async refresh() {
