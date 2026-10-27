@@ -219,6 +219,20 @@ async function search() {
 }
 
 onShow(async () => {
+  // IKQX2A（道哥 2026-10-27）：从商品详情返回——不重置选中分类与浏览位置。
+  // 判据=页面栈上一页是商品详情页；此时仅轻刷新购物车红点（加购/数量变化
+  // 跨页可见），数据流/侧栏高亮/滚动全部保持原样。其余进入（tab 切换/
+  // 深链/搜索）走原有全量重置逻辑。
+  const stack = getCurrentPages();
+  const prev = stack[stack.length - 2];
+  if (
+    prev &&
+    /\/pages\/product\/detail/.test(prev.route || "") &&
+    sections.value.length
+  ) {
+    void cart.load();
+    return;
+  }
   // mock 联调短路：绕过微信登录墙，只渲染完整流（mock 秒杀段=前两个商品验证流结构）
   if (MOCK) {
     categories.value = [...MOCK_CATS];
