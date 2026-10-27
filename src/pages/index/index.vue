@@ -85,6 +85,8 @@ onShow(async () => {
   // IKD6FA：双版块数据静默拉取；IKDETO 迎新礼包内容同批拉取后判定弹窗
   await loadHomeBlocks();
   maybeShowWelcomeGift();
+  // IKQYUD：迎新弹窗在场时群码让位（避免叠加双弹），当日标记由 maybe 内部守卫
+  if (!giftOpen.value) maybeShowGroupAd();
   // IKCNRB：数据渲染后量宽判溢出（决定右缘指示是否显示）
   setTimeout(measureCategoryOverflow, 200);
 });
@@ -131,6 +133,17 @@ function maybeShowWelcomeGift() {
   if (!signupCoupons.value.length) return;
   uni.setStorageSync(GIFT_SHOWN_KEY, true);
   giftOpen.value = true;
+}
+/* ---------- IKQYUD 每日福利群弹窗（道哥 2026-10-27）：当日首进弹一次 ---------- */
+const groupAdOpen = ref(false);
+const GROUP_AD_SHOWN_KEY = "groupAdShownDate";
+function maybeShowGroupAd() {
+  // 校区配了码才弹；当日已弹过不再弹
+  if (!campusStore.afterSalesGroupQrcode) return;
+  const today = new Date().toISOString().slice(0, 10);
+  if (uni.getStorageSync(GROUP_AD_SHOWN_KEY) === today) return;
+  uni.setStorageSync(GROUP_AD_SHOWN_KEY, today);
+  groupAdOpen.value = true;
 }
 function onGiftUse() {
   giftOpen.value = false;
@@ -632,6 +645,31 @@ function search() {
   </view>
   <TabBar :current="0" />
   <CartOverlay />
+
+<!-- IKQYUD 每日福利群弹窗：居中大卡，长按识别进群 -->
+<view v-if="groupAdOpen" class="gad-mask" @tap="groupAdOpen = false">
+  <view class="gad" @tap.stop>
+    <view class="gad__head">
+      <view class="gad__badge"></view>
+      <view class="gad__titles">
+        <text class="gad__title">售后福利群</text>
+        <text class="gad__sub">专属售后通道 · 福利优先享</text>
+      </view>
+      <text class="gad__close" role="button" aria-label="关闭" @tap="groupAdOpen = false">✕</text>
+    </view>
+    <view class="gad__body">
+      <image
+        :src="campusStore.afterSalesGroupQrcode"
+        class="gad__qr"
+        mode="aspectFit"
+        show-menu-by-longpress
+      />
+      <text class="gad__hint">长按识别二维码 · 加入福利群</text>
+      <text class="gad__hint--sub">售后进度提醒 · 专属优惠券第一时间掌握</text>
+      <button class="gad__btn" @tap="groupAdOpen = false">我知道了</button>
+    </view>
+  </view>
+</view>
 </template>
 
 <style scoped lang="scss">
@@ -1427,5 +1465,123 @@ function search() {
 }
 .wheel-sheet__panel {
   padding: 0 24rpx;
+}
+
+/* IKQYUD 每日福利群弹窗：居中大卡，与订单页福利群卡同语言 */
+.gad-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(6, 46, 35, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+}
+.gad {
+  width: 100%;
+  max-width: 580rpx;
+  background: #fff;
+  border-radius: 28rpx;
+  overflow: hidden;
+  animation: gad-pop 0.2s ease;
+}
+@keyframes gad-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+.gad__head {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 26rpx 28rpx;
+  background: linear-gradient(135deg, $primary-dark, $primary);
+  color: #fff;
+}
+.gad__badge {
+  position: relative;
+  width: 44rpx;
+  height: 36rpx;
+  border: 3rpx solid rgba(255, 255, 255, 0.95);
+  border-radius: 12rpx;
+  flex: 0 0 auto;
+}
+.gad__badge::after {
+  content: "";
+  position: absolute;
+  right: -10rpx;
+  bottom: -6rpx;
+  width: 16rpx;
+  height: 14rpx;
+  border: 3rpx solid rgba(255, 255, 255, 0.95);
+  border-radius: 6rpx 6rpx 6rpx 2rpx;
+  background: linear-gradient(135deg, $primary-dark, $primary);
+}
+.gad__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  flex: 1;
+  min-width: 0;
+}
+.gad__title {
+  font-size: 30rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+}
+.gad__sub {
+  font-size: 21rpx;
+  opacity: 0.85;
+}
+.gad__close {
+  flex: 0 0 auto;
+  padding: 6rpx 4rpx 6rpx 20rpx;
+  font-size: 28rpx;
+  color: rgba(255, 255, 255, 0.85);
+}
+.gad__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 34rpx 34rpx 30rpx;
+}
+.gad__qr {
+  width: 400rpx;
+  height: 400rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid rgba(32, 74, 45, 0.08);
+  background: #fafbfa;
+}
+.gad__hint {
+  margin-top: 20rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #153628;
+  letter-spacing: 1rpx;
+}
+.gad__hint--sub {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  font-weight: 400;
+  color: $muted;
+  line-height: 1.6;
+}
+.gad__btn {
+  margin-top: 26rpx;
+  width: 100%;
+  height: 84rpx;
+  line-height: 84rpx;
+  border-radius: 42rpx;
+  background: linear-gradient(135deg, $primary-dark, $primary);
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 700;
+  border: none;
+  box-shadow: 0 10rpx 24rpx rgba(7, 136, 59, 0.18);
+}
+.gad__btn::after {
+  border: none;
 }
 </style>
