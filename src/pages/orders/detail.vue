@@ -206,23 +206,7 @@ function backHome() {
           }}</text></view
         ></view
       ></view
-    ><!-- 售后福利群（IKQXSD 道哥 2026-10-27）：校区配了码才渲染，与首页/
-        售后页/支付成功页同一张码，长按识别进群 --><view
-      v-if="campusStore.afterSalesGroupQrcode"
-      class="group-card"
-      ><view class="group-card__head"
-        ><view class="group-card__badge"></view
-        ><view class="group-card__titles"
-          ><text class="group-card__title">售后福利群</text
-          ><text class="group-card__sub">专属售后通道 · 福利优先享</text></view
-        ></view
-      ><image
-        :src="campusStore.afterSalesGroupQrcode"
-        class="group-card__qr"
-        mode="aspectFit"
-        show-menu-by-longpress
-      /><text class="group-card__tip">长按识别二维码 · 加入福利群</text></view
-    ><!-- 送货照片凭证（道哥 2026-10-16）：进度走完看现场——送达照/交接照
+<!-- 送货照片凭证（道哥 2026-10-16）：进度走完看现场——送达照/交接照
         两组数据驱动（有才渲染），点缩略图 uni.previewImage 看大图 -->
     <view v-if="proofGroups.length" class="proof card"
       ><view class="proof__head"
@@ -254,7 +238,23 @@ function backHome() {
       ><text class="muted"
         >{{ order.address.contactName }} {{ order.address.phone }}</text
       ></view
-    ><view class="summary card"
+    ><!-- 售后福利群（IKQXSD 道哥 2026-10-27）：校区配了码才渲染，与首页/
+        售后页/支付成功页同一张码，长按识别进群 --><view
+      v-if="campusStore.afterSalesGroupQrcode"
+      class="group-card"
+      ><view class="group-card__head"
+        ><view class="group-card__badge"></view
+        ><view class="group-card__titles"
+          ><text class="group-card__title">售后福利群</text
+          ><text class="group-card__sub">专属售后通道 · 福利优先享</text></view
+        ></view
+      ><image
+        :src="campusStore.afterSalesGroupQrcode"
+        class="group-card__qr"
+        mode="aspectFit"
+        show-menu-by-longpress
+      /><text class="group-card__tip">长按识别二维码 · 加入福利群</text></view
+    >    ><view class="summary card"
       ><view v-for="line in order.items" :key="line.product.id"
         ><text>{{ line.product.name }} × {{ line.quantity }}</text
         ><text
