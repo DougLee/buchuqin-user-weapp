@@ -227,9 +227,7 @@ function openCancel() {
   <!-- 群码弹窗（IKE4FR 二轮，同首页交互）：大码长按识别进群 -->
   <view v-if="groupOpen" class="group-mask" @tap="groupOpen = false"
     ><view class="group-pop" @tap.stop
-      ><text class="group-pop__title">{{
-        group?.scope === "building" ? "本楼栋群" : "校园大群"
-      }}</text
+      ><text class="group-pop__title">售后福利群</text
       ><image
         class="group-pop__qr"
         :src="group"
