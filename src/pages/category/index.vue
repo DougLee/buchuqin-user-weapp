@@ -218,18 +218,17 @@ async function search() {
   await load();
 }
 
+/** IKQX2A 修正版：跳详情时自打标记（goProduct 是唯一入口），onShow 消费。
+ *  首版用页面栈 length-2 判断——返回时详情页已出栈，取到的是分类页下面
+ *  的页面，守卫永不命中（道哥实测复现）。标记法精确且零歧义。 */
+let backFromDetail = false;
+
 onShow(async () => {
   // IKQX2A（道哥 2026-10-27）：从商品详情返回——不重置选中分类与浏览位置。
-  // 判据=页面栈上一页是商品详情页；此时仅轻刷新购物车红点（加购/数量变化
-  // 跨页可见），数据流/侧栏高亮/滚动全部保持原样。其余进入（tab 切换/
-  // 深链/搜索）走原有全量重置逻辑。
-  const stack = getCurrentPages();
-  const prev = stack[stack.length - 2];
-  if (
-    prev &&
-    /\/pages\/product\/detail/.test(prev.route || "") &&
-    sections.value.length
-  ) {
+  // 仅轻刷新购物车红点（加购/数量变化跨页可见），数据流/侧栏高亮/滚动
+  // 全部保持原样。其余进入（tab 切换/深链/搜索）走原有全量重置逻辑。
+  if (backFromDetail && sections.value.length) {
+    backFromDetail = false;
     void cart.load();
     return;
   }
@@ -469,6 +468,8 @@ const quickCats = computed(() =>
   categories.value.filter((c) => c.id !== "all" && c.id !== "seckill"),
 );
 const open = (id: string) =>
+  // IKQX2A：跳详情前打返回标记（onShow 消费，跳过分类重置）
+  backFromDetail = true;
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
 </script>
 <template>
