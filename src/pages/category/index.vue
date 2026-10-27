@@ -467,10 +467,11 @@ setInterval(() => onFlowScroll(h5ScrollTop()), 300);
 const quickCats = computed(() =>
   categories.value.filter((c) => c.id !== "all" && c.id !== "seckill"),
 );
-const open = (id: string) =>
+const open = (id: string) => {
   // IKQX2A：跳详情前打返回标记（onShow 消费，跳过分类重置）
   backFromDetail = true;
   uni.navigateTo({ url: `/pages/product/detail?id=${id}` });
+};
 </script>
 <template>
   <view class="page"
