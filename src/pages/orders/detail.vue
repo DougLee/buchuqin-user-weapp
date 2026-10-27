@@ -27,6 +27,7 @@ onLoad((q) => {
 });
 onShow(() => {
   void preloadPayTemplates();
+  groupDismissed.value = !!uni.getStorageSync(GROUP_DISMISSED_KEY);
   refresh();
 });
 async function refresh() {
@@ -41,6 +42,14 @@ async function refresh() {
   } finally {
     loading.value = false;
   }
+}
+/** 福利群卡关闭（IKQXSD 道哥 2026-10-27）：✕ 收起——本会话记忆
+ *  （storage），重进订单页恢复展示，不永久屏蔽进群入口 */
+const GROUP_DISMISSED_KEY = "groupCardDismissed";
+const groupDismissed = ref(false);
+function dismissGroup() {
+  groupDismissed.value = true;
+  uni.setStorageSync(GROUP_DISMISSED_KEY, true);
 }
 /** 送货照片凭证（道哥 2026-10-16）：后端 package 整行透传，送达照/交接照
  *  两组分开渲染；图片为 COS 完整 URL，toAbsoluteUrl 兜底老的相对路径 */
@@ -187,6 +196,32 @@ function backHome() {
             ? "15 分钟内完成支付，超时订单将自动关闭"
             : "你的这一袋，正在校园里接力"
       }}</text></view
+    ><!-- 售后福利群 v2（IKQXSD 道哥 2026-10-27 定稿：状态头下·大码·可关闭）--><view
+      v-if="campusStore.afterSalesGroupQrcode && !groupDismissed"
+      class="group-card"
+      ><view class="group-card__head"
+        ><view class="group-card__badge"></view
+        ><view class="group-card__titles"
+          ><text class="group-card__title">售后福利群</text
+          ><text class="group-card__sub">专属售后通道 · 福利优先享</text></view
+        ><text
+          class="group-card__close"
+          role="button"
+          aria-label="收起福利群"
+          @tap.stop="dismissGroup">✕</text></view
+      ><view class="group-card__body"
+        ><image
+          :src="campusStore.afterSalesGroupQrcode"
+          class="group-card__qr"
+          mode="aspectFit"
+          show-menu-by-longpress
+        /><view class="group-card__aside"
+          ><text class="group-card__hint">长按识别二维码</text
+          ><text class="group-card__hint group-card__hint--sub"
+            >加入福利群，售后进度与专属优惠第一时间掌握</text
+          ></view
+        ></view
+    ></view
     ><view class="timeline card"
       ><view
         v-for="(step, i) in order.timeline"
@@ -238,23 +273,7 @@ function backHome() {
       ><text class="muted"
         >{{ order.address.contactName }} {{ order.address.phone }}</text
       ></view
-    ><!-- 售后福利群（IKQXSD 道哥 2026-10-27）：校区配了码才渲染，与首页/
-        售后页/支付成功页同一张码，长按识别进群 --><view
-      v-if="campusStore.afterSalesGroupQrcode"
-      class="group-card"
-      ><view class="group-card__head"
-        ><view class="group-card__badge"></view
-        ><view class="group-card__titles"
-          ><text class="group-card__title">售后福利群</text
-          ><text class="group-card__sub">专属售后通道 · 福利优先享</text></view
-        ></view
-      ><image
-        :src="campusStore.afterSalesGroupQrcode"
-        class="group-card__qr"
-        mode="aspectFit"
-        show-menu-by-longpress
-      /><text class="group-card__tip">长按识别二维码 · 加入福利群</text></view
-    >    ><view class="summary card"
+    ><view class="summary card"
       ><view v-for="line in order.items" :key="line.product.id"
         ><text>{{ line.product.name }} × {{ line.quantity }}</text
         ><text
@@ -804,24 +823,20 @@ function backHome() {
   margin-top: 28rpx;
 }
 
-/* 售后福利群卡片（IKQXSD）：与售后页同款——品牌绿渐变头+白底码区 */
+/* 售后福利群卡片 v2（IKQXSD 道哥 2026-10-27 定稿）：状态头下·大码
+   横排·可关闭——码 400rpx 主视觉，右侧提示竖排，头部 ✕ 收起 */
 .group-card {
   margin-top: 22rpx;
   background: #fff;
   border-radius: 28rpx;
   box-shadow: 0 8rpx 28rpx rgba(21, 75, 38, 0.07);
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-bottom: 30rpx;
 }
 .group-card__head {
-  width: 100%;
   display: flex;
   align-items: center;
   gap: 16rpx;
-  padding: 26rpx 30rpx;
+  padding: 24rpx 28rpx;
   background: linear-gradient(135deg, $primary-dark, $primary);
   color: #fff;
 }
@@ -831,6 +846,7 @@ function backHome() {
   height: 36rpx;
   border: 3rpx solid rgba(255, 255, 255, 0.95);
   border-radius: 12rpx;
+  flex: 0 0 auto;
 }
 .group-card__badge::after {
   content: "";
@@ -847,6 +863,8 @@ function backHome() {
   display: flex;
   flex-direction: column;
   gap: 4rpx;
+  flex: 1;
+  min-width: 0;
 }
 .group-card__title {
   font-size: 30rpx;
@@ -857,17 +875,43 @@ function backHome() {
   font-size: 21rpx;
   opacity: 0.85;
 }
-.group-card__qr {
-  width: 320rpx;
-  height: 320rpx;
-  margin-top: 30rpx;
-  border-radius: 16rpx;
-  border: 1rpx solid rgba(32, 74, 45, 0.08);
+.group-card__close {
+  flex: 0 0 auto;
+  padding: 6rpx 4rpx 6rpx 20rpx;
+  font-size: 28rpx;
+  color: rgba(255, 255, 255, 0.85);
 }
-.group-card__tip {
-  margin-top: 18rpx;
-  font-size: 22rpx;
-  color: $muted;
+.group-card__body {
+  display: flex;
+  align-items: center;
+  gap: 30rpx;
+  padding: 32rpx 34rpx;
+}
+.group-card__qr {
+  width: 400rpx;
+  height: 400rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid rgba(32, 74, 45, 0.08);
+  flex: 0 0 auto;
+  background: #fafbfa;
+}
+.group-card__aside {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  min-width: 0;
+}
+.group-card__hint {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #153628;
   letter-spacing: 1rpx;
+}
+.group-card__hint--sub {
+  font-size: 22rpx;
+  font-weight: 400;
+  color: $muted;
+  line-height: 1.6;
+  letter-spacing: 0;
 }
 </style>
