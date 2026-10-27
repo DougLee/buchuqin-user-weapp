@@ -10,7 +10,7 @@ import { categoryImage } from "../../utils/categoryImage";
 import type { Category, Product } from "../../types";
 import { useSessionStore } from "../../stores/session";
 import { APP_NAME } from "../../config/app";
-import { onShareAppMessage } from "@dcloudio/uni-app";
+import { onShareAppMessage, onShareTimeline } from "@dcloudio/uni-app";
 /** IKQXK6 分类分享：选中有效分类时分享带 cat 深链（首页 onLoad 消费后
  *  switchTab 回本页并选中该分类）；all/秒杀回落默认品牌分享。
  *  imageUrl 用分类图（无图不传，微信截流首屏）。 */
@@ -31,6 +31,22 @@ onShareAppMessage(() => {
   return {
     title: `${cat.name} · ${APP_NAME}零食送到寝室`,
     path: `/pages/index/index?cat=${cat.id}${campusId ? `&campus=${campusId}` : ""}`,
+    imageUrl: cat.image || undefined,
+  };
+});
+/** IKQXK6 朋友圈分享：tab 页朋友圈落地=小程序首页+query 拼接——首页
+ *  onLoad 的 ?cat= 消费逻辑天然兼容，query 同款即可。 */
+onShareTimeline(() => {
+  const id = active.value;
+  const cat =
+    id !== "all" && id !== "seckill"
+      ? categories.value.find((c) => c.id === id)
+      : undefined;
+  const campusId = useSessionStore().user?.campusId;
+  if (!cat) return { title: `${APP_NAME}，零食送到寝室` };
+  return {
+    title: `${cat.name} · ${APP_NAME}零食送到寝室`,
+    query: `cat=${cat.id}${campusId ? `&campus=${campusId}` : ""}`,
     imageUrl: cat.image || undefined,
   };
 });
