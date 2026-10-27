@@ -55,10 +55,17 @@ const addressText = computed(() =>
     : "请选择地址",
 );
 /** IKGZSU：带校区的分享落地（tabbar 页冷启动 onLoad 可拿 query）——
- *  新用户首登落分享校区（session.pendingCampus 消费），老用户忽略 */
+ *  新用户首登落分享校区（session.pendingCampus 消费），老用户忽略。
+ *  IKQXK6：?cat= 分类分享深链——存 categoryPick（分类页 onShow 消费选中）
+ *  后直接切到分类页。 */
 onLoad((q) => {
   const c = String(q?.campus || "");
   if (c) session.pendingCampus = c;
+  const cat = String(q?.cat || "");
+  if (cat) {
+    uni.setStorageSync("categoryPick", cat);
+    uni.switchTab({ url: "/pages/category/index" });
+  }
 });
 onShow(async () => {
   await useSessionStore().ensureLogin();

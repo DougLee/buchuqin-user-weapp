@@ -8,8 +8,32 @@ import { useCampusStore } from "../../stores/campus";
 import { fenToYuan } from "../../utils/money";
 import { categoryImage } from "../../utils/categoryImage";
 import type { Category, Product } from "../../types";
-import { setupDefaultShare } from "../../utils/share";
-setupDefaultShare();
+import { useSessionStore } from "../../stores/session";
+import { APP_NAME } from "../../config/app";
+import { onShareAppMessage } from "@dcloudio/uni-app";
+/** IKQXK6 分类分享：选中有效分类时分享带 cat 深链（首页 onLoad 消费后
+ *  switchTab 回本页并选中该分类）；all/秒杀回落默认品牌分享。
+ *  imageUrl 用分类图（无图不传，微信截流首屏）。 */
+onShareAppMessage(() => {
+  const id = active.value;
+  const cat =
+    id !== "all" && id !== "seckill"
+      ? categories.value.find((c) => c.id === id)
+      : undefined;
+  const campusId = useSessionStore().user?.campusId;
+  if (!cat)
+    return {
+      title: `${APP_NAME}，零食送到寝室`,
+      path: campusId
+        ? `/pages/index/index?campus=${campusId}`
+        : "/pages/index/index",
+    };
+  return {
+    title: `${cat.name} · ${APP_NAME}零食送到寝室`,
+    path: `/pages/index/index?cat=${cat.id}${campusId ? `&campus=${campusId}` : ""}`,
+    imageUrl: cat.image || undefined,
+  };
+});
 /**
  * 分类页（IKG8PC 终版·美团式完整流；IKH0H9 去「全部」+秒杀进流首段）：
  * - 全量商品与秒杀并行拉取 → [秒杀段, ...分类段] 一次性渲染（零接续/零等待/零闪骨架）
