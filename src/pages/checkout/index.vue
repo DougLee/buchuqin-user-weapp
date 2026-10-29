@@ -31,7 +31,10 @@ const address = ref<Address | null>(),
   error = ref(false),
   /** 结算失败真实原因（IK9YPJ）：业务错误显示后端 message，网络失败留空走默认文案 */
   errorReason = ref(""),
-  slots = ref<Array<{ id: string; label: string; available: boolean }>>([]);
+  slots = ref<Array<{ id: string; label: string; available: boolean }>>([]),
+  /** 授权层关闭态（2026-10-29 可关闭改定）：关闭后可浏览结算页，
+   *  提交时 needsPhone 守卫重置此值重新弹出（方案C 收网兜底） */
+  gateDismissed = ref(false);
 const usableCoupons = ref<UserCoupon[]>([]),
   selectedCouponId = ref<string>();
 /**
@@ -176,8 +179,13 @@ async function chooseCoupon(item: UserCoupon | null) {
 }
 async function submit() {
   if (submitting.value) return;
-  // IKE3HT 方案C：未绑手机号不放行下单（弹层常在，此为极端时序守卫）
-  if (session.needsPhone) return;
+  // IKE3HT 方案C：未绑手机号不放行下单——弹层可关闭（2026-10-29 道哥改定），
+  // 此守卫即兜底：重新弹出授权层，方案C 收网不破
+  if (session.needsPhone) {
+    gateDismissed.value = false;
+    uni.showToast({ title: "需绑定手机号后才能下单", icon: "none" });
+    return;
+  }
   // 无地址前置校验（IK9AWI）：不再等后端报错
   if (!address.value) {
     uni.showToast({ title: "请先添加寝室地址", icon: "none" });
@@ -371,8 +379,11 @@ async function doSubmit() {
     ></template
     ></view
   >
-  <!-- IKE3HT 方案C：未绑手机号授权弹层（z-1100 盖支付栏，不可跳过） -->
-  <PhoneGate v-if="session.needsPhone" />
+  <!-- IKE3HT 方案C：未绑手机号授权弹层（可关闭，提交时兜底重弹） -->
+  <PhoneGate
+    v-if="session.needsPhone && !gateDismissed"
+    @close="gateDismissed = true"
+  />
   <CartOverlay />
   <!-- 楼长缺失确认弹窗（IKGN4W）：自绘样式贴合主题——品牌绿确认键，
        浅色 ghost 取消键；遮罩点击不关闭（避免误触跳过提示） -->

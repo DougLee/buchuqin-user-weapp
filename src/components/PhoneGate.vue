@@ -4,19 +4,20 @@ import { useSessionStore } from "../stores/session";
 /**
  * 手机号授权弹层（IKE3HT 方案C，2026-09-08 道哥拍板）：
  * B 首启强授权门提审被拒（强制索权）→ 回退静默登录，收网提前至加购
- * （首页商品卡/详情页，拍板A 不可跳过），结算页挂载保留兜底。
- * 不可跳过：mask 不响应点击、无关闭钮；拒绝授权停留可重试。
+ * （首页商品卡/详情页），结算页挂载保留兜底。
+ * 可关闭（2026-10-29 道哥改定）：右上 ✕ 通知宿主收起——加购场景下次触发
+ * 自动重弹、结算页提交时由宿主 needsPhone 拦截重弹；mask 点击仍不关（防误触）。
  * 绑定成功 user.phone 更新 → 宿主 v-if 翻转隐藏，@bound 补执行被拦动作。
  */
 const session = useSessionStore();
 const binding = ref(false);
-/** 绑定成功通知宿主：加购收网场景据此补执行被拦的加购 */
-const emit = defineEmits<{ bound: [] }>();
+/** 绑定成功/用户关闭均通知宿主：bound 补执行被拦加购；close 收起弹层 */
+const emit = defineEmits<{ bound: []; close: [] }>();
 async function onGetPhone(e: { detail: { code?: string; errMsg?: string } }) {
   const code = e.detail?.code;
   if (!code) {
-    // 用户点了微信弹窗的「拒绝」：弹层保持（不可跳过），说明原因后可重试
-    uni.showToast({ title: "需授权手机号才能加购，请重试", icon: "none" });
+    // 用户点了微信弹窗的「拒绝」：弹层保持，说明原因后可重试（关闭钮仍可用）
+    uni.showToast({ title: "需授权手机号才能继续，可稍后在结算时绑定", icon: "none" });
     return;
   }
   if (binding.value) return;
@@ -38,6 +39,13 @@ async function onGetPhone(e: { detail: { code?: string; errMsg?: string } }) {
 <template>
   <view class="gate-mask">
     <view class="gate-pop">
+      <view
+        class="gate__close"
+        role="button"
+        aria-label="暂不绑定"
+        @tap.stop="emit('close')"
+        ><text>✕</text></view
+      >
       <view class="gate__logo"><text>不</text></view>
       <text class="gate__title">绑定手机号</text>
       <text class="gate__desc"
@@ -74,6 +82,7 @@ async function onGetPhone(e: { detail: { code?: string; errMsg?: string } }) {
   padding: 48rpx;
 }
 .gate-pop {
+  position: relative;
   width: 100%;
   max-width: 600rpx;
   background: #fff;
@@ -83,6 +92,26 @@ async function onGetPhone(e: { detail: { code?: string; errMsg?: string } }) {
   flex-direction: column;
   align-items: center;
   text-align: center;
+}
+/* 关闭钮（2026-10-29 道哥改定可关闭）：右上角，触达区 88rpx≥44px，
+ * 视觉 ✕ 淡灰不抢主按钮；active 加深给按压反馈 */
+.gate__close {
+  position: absolute;
+  top: 8rpx;
+  right: 8rpx;
+  width: 88rpx;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gate__close text {
+  font-size: 34rpx;
+  color: #a9b2ac;
+  font-weight: 700;
+}
+.gate__close:active text {
+  color: #667069;
 }
 .gate__logo {
   width: 108rpx;

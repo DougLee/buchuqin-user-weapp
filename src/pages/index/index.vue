@@ -626,7 +626,11 @@ function search() {
   >
   <!-- IKDETO 迎新礼包：注册当次弹一次 -->
   <!-- IKE3HT 加购收网：未绑手机号点「＋」弹授权（拍板A 不可跳过），绑定成功补执行加购 -->
-  <PhoneGate v-if="phoneGateOpen && session.needsPhone" @bound="onPhoneBound" />
+  <PhoneGate
+    v-if="phoneGateOpen && session.needsPhone"
+    @bound="onPhoneBound"
+    @close="phoneGateOpen = false"
+  />
   <WelcomeGift
     v-if="giftOpen"
     :coupons="signupCoupons"
