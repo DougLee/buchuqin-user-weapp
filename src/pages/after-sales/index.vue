@@ -2,40 +2,37 @@
 import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
-import { isRetryable } from "../../api/request";
 import { fenToYuan } from "../../utils/money";
-import type { AfterSale, Refund } from "../../types";
+import type { Refund } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 import { useCampusStore } from "../../stores/campus";
 const campusStore = useCampusStore();
 setupDefaultShare();
-/** 售后单状态 → 中文（后端值：pending/approved/rejected） */
-const AFTERSALE_STATUS_TEXT: Record<string, string> = {
+/** Refund 单模型状态 → 中文。 */
+const REFUND_STATUS_TEXT: Record<string, string> = {
   pending: "待处理",
-  approved: "退款完成",
-  rejected: "已驳回",
+  approved: "已批准",
+  refunding: "退款中",
+  refunded: "已退款",
+  rejected: "已拒绝",
+  failed: "退款失败",
+  cancelled: "已撤销",
 };
 function statusText(status: string): string {
-  return AFTERSALE_STATUS_TEXT[status] ?? status;
+  return REFUND_STATUS_TEXT[status] ?? status;
 }
-const cases = ref<AfterSale[]>([]),
-  refunds = ref<Refund[]>([]),
+const refunds = ref<Refund[]>([]),
   loading = ref(true),
   error = ref(false);
 onShow(load);
 async function load() {
   loading.value = true;
   error.value = false;
-  // 两接口独立容错（IK9AWK），任一失败给整页重试
-  const [c, r] = await Promise.allSettled([api.afterSales(), api.refunds()]);
-  if (c.status === "fulfilled") cases.value = c.value;
-  if (r.status === "fulfilled") refunds.value = r.value;
-  // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
-  if (
-    (c.status === "rejected" && isRetryable(c.reason)) ||
-    (r.status === "rejected" && isRetryable(r.reason))
-  )
+  try {
+    refunds.value = await api.refunds();
+  } catch {
     error.value = true;
+  }
   loading.value = false;
 }
 </script>
@@ -53,7 +50,13 @@ async function load() {
     ><template v-else
     ><view class="summary card"
       ><text class="summary__value"
-        >¥{{ fenToYuan(refunds.reduce((n, r) => n + r.amount, 0)) }}</text
+        >¥{{
+          fenToYuan(
+            refunds
+              .filter((r) => r.status === "refunded")
+              .reduce((n, r) => n + r.amount, 0),
+          )
+        }}</text
       ><text class="muted">累计退款</text></view
     ><!-- 售后福利群（IKQXSD 道哥 2026-10-27）：校区配置了二维码才渲染，
         长按识别进群——品牌绿渐变+卡片浮层质感，与页面清新风格一体 --><view
@@ -73,21 +76,19 @@ async function load() {
       /><text class="group-card__tip">长按识别二维码 · 加入福利群</text></view
     ><view class="section-title"
       ><text class="section-title__main">售后记录</text></view
-    ><view v-if="!cases.length" class="empty card"
+    ><view v-if="!refunds.length" class="empty card"
       ><text class="empty__title">还没有售后记录</text
       ><text class="muted">订单送达后，可在订单详情申请质量售后</text></view
-    ><view v-for="item in cases" :key="item.id" class="case card"
+    ><view v-for="item in refunds" :key="item.id" class="case card"
       ><view
-        ><text class="case__title">{{ item.description }}</text
-        ><text class="muted">订单 {{ item.orderId.slice(-8) }}</text></view
-      ><text class="case__status">{{ statusText(item.status) }}</text></view
-    ><view class="section-title"
-      ><text class="section-title__main">退款明细</text></view
-    ><view v-for="r in refunds" :key="r.id" class="refund"
-      ><view
-        ><text>{{ r.reason }}</text
-        ><text class="muted">{{ r.createdAt.slice(0, 10) }}</text></view
-      ><text class="refund__amount">+¥{{ fenToYuan(r.amount) }}</text></view
+        ><text class="case__title">{{ item.description || item.reason || "退款申请" }}</text
+        ><text class="muted"
+          >订单 {{ item.orderId.slice(-8) }} · {{ item.createdAt.slice(0, 10) }}</text
+        ></view
+      ><view class="case__right"
+        ><text class="case__status">{{ statusText(item.status) }}</text
+        ><text class="refund__amount">¥{{ fenToYuan(item.amount) }}</text></view
+      ></view
     ></template
     ></view
   >
@@ -169,6 +170,12 @@ async function load() {
   padding: 8rpx 14rpx;
   font-weight: 800;
   white-space: nowrap;
+}
+.case__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10rpx;
 }
 .refund {
   display: flex;

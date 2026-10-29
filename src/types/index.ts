@@ -259,6 +259,17 @@ export interface Refund {
   /** 退款金额，单位：分 */
   amount: number;
   reason: string;
+  type?: string | null;
+  description?: string;
+  images?: string[];
+  items?: Array<{
+    id: string;
+    productId: string;
+    productName: string;
+    unitPrice: number;
+    quantity: number;
+    amount: number;
+  }>;
   status: string;
   /** IKHZKA：待审核/已批准/退款中/已退款/已拒绝/失败/已撤销 的中文文案 */
   statusText?: string;
@@ -268,6 +279,7 @@ export interface Refund {
   rejectCount?: number;
   createdAt: string;
   updatedAt?: string;
+  refundedAt?: string | null;
 }
 export interface Settlement extends Cart {
   /** 以下金额字段单位均为：分 */
