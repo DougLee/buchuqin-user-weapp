@@ -70,6 +70,9 @@ onLoad((q) => {
   track("page_view", "index"); // IKRGLV 转化漏斗
 });
 onShow(async () => {
+  // 道哥 2026-10-29：回到首页即清空搜索框（搜索词已带去分类页执行，
+  // 首页框不留残留，避免二次点搜索重复跳转同词）
+  keyword.value = "";
   await useSessionStore().ensureLogin();
   const [home, addresses] = await Promise.all([api.home(), api.addresses()]);
   // 当前地址统一走 pickCurrentAddress（道哥 2026-09-09：切地址后首页跟随）
