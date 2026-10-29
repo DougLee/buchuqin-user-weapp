@@ -152,11 +152,15 @@ async function load() {
   try {
     const rowsP = MOCK
       ? Promise.resolve(mockAll())
-      // IKR861：搜索态=分类内搜索（active 过滤）；全量分支固定拉全品类——
-      // 分组流需要全部分类段，误用 active 过滤会只出单分类段，切分类全空
-      //（道哥 2026-10-28 实测：饮料搜"水"删光后切分类全空）
+      // IKR861：搜索态=分类内搜索——但仅限用户**主动**点过的分类
+      // （userPickedCat）；进页自动高亮不算，直接搜索走全品类。
+      // 全量分支固定拉全品类——分组流需要全部分类段，误用 active 过滤
+      // 会只出单分类段，切分类全空（道哥 2026-10-28 实测）
       : keyword.value
-        ? api.products(active.value, keyword.value)
+        ? api.products(
+            userPickedCat && active.value !== "all" ? active.value : "all",
+            keyword.value,
+          )
         : api.products("all");
     if (keyword.value) {
       // 搜索态（IKAHBJ）：结果平铺单段，不参与滚动联动、不插秒杀段（保持现状）
@@ -305,6 +309,12 @@ function onDraftInput() {
  *  的页面，守卫永不命中（道哥实测复现）。标记法精确且零歧义。 */
 let backFromDetail = false;
 
+/** IKR861（道哥 2026-10-29 实测补）：用户是否**主动**点过分类——搜索范围的
+ *  依据。进页面 onShow 会自动高亮首段（秒杀/首分类），那不是用户意图：
+ *  没点过分类直接搜索必须全品类，否则「进页搜水」被锁死在自动高亮的
+ *  分类里搜不到。点「限时秒杀/推荐」不算分类意图（伪分类无搜索语义）。 */
+let userPickedCat = false;
+
 onShow(async () => {
   // IKQX2A（道哥 2026-10-27）：从商品详情返回——不重置选中分类与浏览位置。
   // 仅轻刷新购物车红点（加购/数量变化跨页可见），数据流/侧栏高亮/滚动
@@ -328,6 +338,7 @@ onShow(async () => {
   loading.value = true;
   sections.value = [];
   renderSegs.value = 1;
+  userPickedCat = false; // 新一次进入：分类意图清零（搜索默认全品类）
   const kw = (uni.getStorageSync("searchKeyword") as string) || "";
   if (kw) {
     keyword.value = kw;
@@ -376,6 +387,7 @@ onShow(async () => {
   if (pickCat) {
     keyword.value = "";
     draft.value = "";
+    userPickedCat = true; // 分类深链=用户明确分类意图（首页分类条进来）
   }
   await load();
   // IKH0H9：深链在 load 后校验（侧栏秒杀项此时才随秒杀段注入，'seckill' 深链同款生效）；
@@ -389,9 +401,11 @@ onShow(async () => {
 
 /** 侧栏点击：直达分类段头（秒杀=流内首段，同款直达/扩配额；「all」哨兵仅兜底回顶） */
 async function pick(id: string) {
+  // 主动点真实分类才算分类意图（秒杀/推荐为伪分类，无搜索范围语义）
+  if (!["seckill", "featured"].includes(id)) userPickedCat = true;
   // IKR861（道哥定稿）：搜索态点分类=**把搜索切到该分类继续搜**——搜索词
-  // 保留生效，以新分类为上下文重搜（load 搜索分支按 active 取 categoryId），
-  // 不清词不退出搜索。原「退出搜索」版被否（搜索条件无端丢失）
+  // 保留生效，以新分类为上下文重搜（load 搜索分支按 userPickedCat+active
+  // 取 categoryId），不清词不退出搜索
   if (keyword.value) {
     active.value = id;
     scrollTopTo(0);
