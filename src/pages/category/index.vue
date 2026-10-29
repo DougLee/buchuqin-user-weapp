@@ -394,7 +394,15 @@ onShow(async () => {
   // 无深链/深链失效时初始高亮=首段（秒杀段或首个分类），与顶部回落锚一致
   if (pickCat && categories.value.some((c) => c.id === pickCat)) {
     active.value = pickCat;
-  } else if (sections.value.length) {
+  } else if (
+    sections.value.length &&
+    // IKR861（道哥 2026-10-29 实测）：搜索深链的首段是搜索伪段（catId='search'），
+    // 不是合法高亮目标——覆盖成 'search' 后用户删光搜索词，load 恢复全品类
+    // 分组流（sections 不再含 search 段），active 悬空 → viewSecs 误入空分类
+    // 空态整页空白。此时保持搜索分支预设的 'all' 不动；秒杀/推荐伪段是侧栏
+    // 合法项（有段即注入），仍按原逻辑作为首段高亮，不受影响
+    sections.value[0].catId !== "search"
+  ) {
     active.value = sections.value[0].catId;
   }
 });
