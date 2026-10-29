@@ -272,6 +272,13 @@ let featuredPrefetch: Promise<Product[]> | null = null;
 /** 搜索（IKAHBJ 改 IKR861）：在当前选中分类内检索——高亮保持不动，
  *  「全部」态搜索=全品类。原「强制切 all」会让选中的类别高亮丢失
  *  （道哥 2026-10-28 实测反馈） */
+/** IKR861（道哥 2026-10-29）：搜索框内 ✕ 一键清空——与手动删光同语义
+ *  （清词恢复全品类分组流+定位回当前分类段），直接复用 search() 空词路径 */
+function clearSearch() {
+  draft.value = "";
+  void search();
+}
+
 async function search() {
   if (searchDebounce) {
     clearTimeout(searchDebounce);
@@ -593,13 +600,22 @@ const open = (id: string) => {
 <template>
   <view class="page"
     ><view class="search card"
-      ><input
-        v-model="draft"
-        placeholder="今天想吃什么？"
-        confirm-type="search"
-        @confirm="search"
-        @input="onDraftInput"
-      /><button @tap="search">搜索</button></view
+      ><view class="search__field"
+        ><input
+          v-model="draft"
+          placeholder="今天想吃什么？"
+          confirm-type="search"
+          @confirm="search"
+          @input="onDraftInput"
+        /><view
+          v-if="draft"
+          class="search__clear"
+          role="button"
+          aria-label="清空搜索"
+          @tap.stop="clearSearch"
+          ><text>✕</text></view
+        ></view
+      ><button @tap="search">搜索</button></view
     ><!-- IKDBFT：快捷分类横滑条（首页分类条同款下移），点击页内联动选中 -->
     <!-- 2026-09-05 道哥决策暂时下线，此区域预留广告位（方案待定）；恢复 = 删除 v-if="false" --><view
       v-if="false"
@@ -777,6 +793,33 @@ const open = (id: string) => {
 .search input {
   flex: 1;
   font-size: 28rpx;
+}
+/* IKR861：框内 ✕ 一键清空（淘宝式）——有字才显示；触达区撑满框高 64rpx */
+.search__field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.search__field input {
+  flex: 1;
+  min-width: 0;
+}
+.search__clear {
+  width: 64rpx;
+  height: 64rpx;
+  margin-right: 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.search__clear text {
+  font-size: 26rpx;
+  color: #b8c0ba;
+  font-weight: 700;
+}
+.search__clear:active text {
+  color: #667069;
 }
 .search button {
   min-height: 68rpx;
