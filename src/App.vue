@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { onLaunch } from "@dcloudio/uni-app";
+import { onHide, onLaunch } from "@dcloudio/uni-app";
 import { useSessionStore } from "./stores/session";
+import { flushTrack } from "./utils/track";
 onLaunch(() => {
   void useSessionStore().ensureLogin();
   // 自绘 tabBar：启动即隐藏原生条（首帧防闪现），tab 页内的 TabBar 组件 onShow 会再兜底
   uni.hideTabBar({ animation: false, fail: () => {} });
 });
+// IKRGLV：退后台前把积压埋点冲掉（防丢批次；flush 自带静默）
+onHide(() => flushTrack());
 </script>
 <style lang="scss">
 @import "./styles/theme.scss";

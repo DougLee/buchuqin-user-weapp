@@ -2,6 +2,7 @@
 import { computed, nextTick, ref } from "vue";
 import { onPageScroll, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { track } from "../../utils/track";
 import { isRetryable } from "../../api/request";
 import { useCartStore } from "../../stores/cart";
 import { useCampusStore } from "../../stores/campus";
@@ -16,6 +17,7 @@ import { onShareAppMessage, onShareTimeline } from "@dcloudio/uni-app";
  *  imageUrl 用分类图（无图不传，微信截流首屏）。 */
 onShareAppMessage(() => {
   const id = active.value;
+  track("share", id === "all" || id === "seckill" ? "category" : id); // IKRGLV
   const cat =
     id !== "all" && id !== "seckill"
       ? categories.value.find((c) => c.id === id)
@@ -276,6 +278,7 @@ async function search() {
     searchDebounce = null;
   }
   keyword.value = draft.value.trim();
+  if (keyword.value) track("search", keyword.value); // IKRGLV 搜索词热度
   scrollTopTo(0);
   await load();
   // IKR861（道哥 2026-10-28）：删光清词恢复分组流后，定位回当前选中分类段
@@ -316,6 +319,7 @@ let backFromDetail = false;
 let userPickedCat = false;
 
 onShow(async () => {
+  track("page_view", "category"); // IKRGLV 转化漏斗（PV 口径，tab 切换计入）
   // IKQX2A（道哥 2026-10-27）：从商品详情返回——不重置选中分类与浏览位置。
   // 仅轻刷新购物车红点（加购/数量变化跨页可见），数据流/侧栏高亮/滚动
   // 全部保持原样。其余进入（tab 切换/深链/搜索）走原有全量重置逻辑。

@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref } from "vue";
 import { onShareAppMessage, onShareTimeline, onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { track } from "../../utils/track";
 import { isRetryable } from "../../api/request";
 import PhoneGate from "../../components/PhoneGate.vue";
 import { useCartStore } from "../../stores/cart";
@@ -29,6 +30,8 @@ const promoTicker = setInterval(() => (now.value = Date.now()), 1000);
 onUnmounted(() => clearInterval(promoTicker));
 onLoad(async (q) => {
   productId.value = String(q?.id || "");
+  track("product_view", productId.value); // IKRGLV 商品热度
+  track("page_view", "product");
   shareCampus.value = String(q?.campus || "");
   // IKGZSU 跨校区分享：新用户首登落分享校区（后端校验采用，老用户忽略）
   if (shareCampus.value) session.pendingCampus = shareCampus.value;
@@ -50,6 +53,7 @@ onLoad(async (q) => {
  *  落地本页带商品 id；price 为生效价（促销期即促销价，productView 单一事实）。
  *  商品未加载/缺头图时 imageUrl 缺省——微信自动截当前页兜底 */
 onShareAppMessage(() => {
+  track("share", productId.value); // IKRGLV
   const p = product.value;
   const c = session.user?.campusId;
   if (!p)

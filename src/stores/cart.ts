@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { api } from "../api";
+import { track } from "../utils/track";
 import type { Cart, Product } from "../types";
 import { useSessionStore } from "./session";
 export const useCartStore = defineStore("cart", {
@@ -90,8 +91,11 @@ export const useCartStore = defineStore("cart", {
           ));
           // IKA08U 重开：加购成功即脱离"刚清空"状态，load() 恢复与服务端同步
           if (this.cart.items.length) this.clearedAt = 0;
-          for (const [id, q] of Object.entries(snapshot))
+          for (const [id, q] of Object.entries(snapshot)) {
             if (this.pending[id] === q) delete this.pending[id];
+            // IKRGLV 漏斗：加购意图成功落库即记（quantity>0；减购不计）
+            if (q > 0) track("add_cart", id, { quantity: q });
+          }
         } catch (error) {
           // 回滚未被后续连点覆盖的意图（已被覆盖的留给下一个排队请求重试）
           for (const [id, q] of Object.entries(snapshot))

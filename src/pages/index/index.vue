@@ -7,6 +7,7 @@ import {
   onShow,
 } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { track } from "../../utils/track";
 import { APP_NAME } from "../../config/app";
 import ProductCard from "../../components/ProductCard.vue";
 import WheelPanel from "../../components/WheelPanel.vue";
@@ -66,6 +67,7 @@ onLoad((q) => {
     uni.setStorageSync("categoryPick", cat);
     uni.switchTab({ url: "/pages/category/index" });
   }
+  track("page_view", "index"); // IKRGLV 转化漏斗
 });
 onShow(async () => {
   await useSessionStore().ensureLogin();
@@ -265,6 +267,7 @@ const onPhoneBound = () => {
 /** 分享（IKC7V6）：默认分享——微信自动截当前页为分享图，落地首页；
  *  IKGZSU：path 带分享者校区，新用户点开静默落同校区 */
 onShareAppMessage(() => {
+  track("share", "index"); // IKRGLV
   const c = session.user?.campusId;
   return {
     title: "不出寝，零食送到寝室",
