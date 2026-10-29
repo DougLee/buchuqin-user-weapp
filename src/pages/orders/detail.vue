@@ -27,7 +27,6 @@ onLoad((q) => {
 });
 onShow(() => {
   void preloadPayTemplates();
-  groupDismissed.value = !!uni.getStorageSync(GROUP_DISMISSED_KEY);
   refresh();
 });
 async function refresh() {
@@ -43,14 +42,8 @@ async function refresh() {
     loading.value = false;
   }
 }
-/** 福利群卡关闭（IKQXSD 道哥 2026-10-27）：✕ 收起——本会话记忆
- *  （storage），重进订单页恢复展示，不永久屏蔽进群入口 */
-const GROUP_DISMISSED_KEY = "groupCardDismissed";
-const groupDismissed = ref(false);
-function dismissGroup() {
-  groupDismissed.value = true;
-  uni.setStorageSync(GROUP_DISMISSED_KEY, true);
-}
+/** 福利群卡（IKQXSD）：道哥 2026-10-28 改定——**不支持关闭**，✕ 收起能力
+ *  整体移除（原「本会话记忆可收起」方案废弃），二维码常驻展示 */
 /** 送货照片凭证（道哥 2026-10-16）：后端 package 整行透传，送达照/交接照
  *  两组分开渲染；图片为 COS 完整 URL，toAbsoluteUrl 兜底老的相对路径 */
 const proofGroups = computed(() => {
@@ -196,19 +189,15 @@ function backHome() {
             ? "15 分钟内完成支付，超时订单将自动关闭"
             : "你的这一袋，正在校园里接力"
       }}</text></view
-    ><!-- 售后福利群 v2（IKQXSD 道哥 2026-10-27 定稿：状态头下·大码·可关闭）--><view
-      v-if="campusStore.afterSalesGroupQrcode && !groupDismissed"
+    ><!-- 售后福利群 v2（IKQXSD；2026-10-28 改定不可关闭）--><view
+      v-if="campusStore.afterSalesGroupQrcode"
       class="group-card"
       ><view class="group-card__head"
         ><view class="group-card__badge"></view
         ><view class="group-card__titles"
           ><text class="group-card__title">售后福利群</text
           ><text class="group-card__sub">专属售后通道 · 福利优先享</text></view
-        ><text
-          class="group-card__close"
-          role="button"
-          aria-label="收起福利群"
-          @tap.stop="dismissGroup">✕</text></view
+        ></view
       ><view class="group-card__body"
         ><image
           :src="campusStore.afterSalesGroupQrcode"
@@ -823,8 +812,8 @@ function backHome() {
   margin-top: 28rpx;
 }
 
-/* 售后福利群卡片 v2（IKQXSD 道哥 2026-10-27 定稿）：状态头下·大码
-   横排·可关闭——码 400rpx 主视觉，右侧提示竖排，头部 ✕ 收起 */
+/* 售后福利群卡片 v2（IKQXSD；2026-10-28 改定不可关闭）：状态头下·大码
+   横排——码 400rpx 主视觉，右侧提示竖排 */
 .group-card {
   margin-top: 22rpx;
   background: #fff;
@@ -874,12 +863,6 @@ function backHome() {
 .group-card__sub {
   font-size: 21rpx;
   opacity: 0.85;
-}
-.group-card__close {
-  flex: 0 0 auto;
-  padding: 6rpx 4rpx 6rpx 20rpx;
-  font-size: 28rpx;
-  color: rgba(255, 255, 255, 0.85);
 }
 .group-card__body {
   display: flex;

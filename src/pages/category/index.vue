@@ -119,6 +119,10 @@ const toastSeckillOnly = () =>
 /** 渲染出口统一：完整流（秒杀段置顶）/ 搜索伪段 / 空分类空态；
  *  完整流按段制渐进渲染（首段起步，滚近尾部续下一段）——秒杀进流后同享 */
 const viewSecs = computed<CatSeg[]>(() => {
+  // IKR861：搜索段优先——分类内搜索时 active 停在原分类（不在 sections 段里），
+  // 不先判搜索段会误入「空分类」分支渲染整页空
+  if (sections.value[0]?.catId === "search")
+    return sections.value.slice(0, renderSegs.value);
   if (
     active.value !== "all" &&
     !sections.value.some((s) => s.catId === active.value)
@@ -137,19 +141,28 @@ const products = computed<Product[]>(() =>
 /** 首屏加载：全量商品与秒杀并行拉取 → 客户端组装 [秒杀段, ...分类段]
  *  （IKGQ6R 数据核查：单校区 267 SKU 一次请求约 50KB；
  *  IKH0H9 秒杀失败/为空不插段不挡流——促销接口挂了不能连累分类页） */
+/** IKR861：load 序号——防抖窗口内连续输入/点击分类时，仅最新一次请求结果
+ *  落 sections（旧请求晚到不覆盖新状态，防搜索结果盖掉已切换的分类流） */
+let loadSeq = 0;
 async function load() {
+  const seq = ++loadSeq;
   loading.value = true;
   error.value = false;
   renderSegs.value = 1; // 段制渐进：随数据集重置为首段
   try {
     const rowsP = MOCK
       ? Promise.resolve(mockAll())
-      : api.products("all", keyword.value);
+      // IKR861：搜索态=分类内搜索（active 过滤）；全量分支固定拉全品类——
+      // 分组流需要全部分类段，误用 active 过滤会只出单分类段，切分类全空
+      //（道哥 2026-10-28 实测：饮料搜"水"删光后切分类全空）
+      : keyword.value
+        ? api.products(active.value, keyword.value)
+        : api.products("all");
     if (keyword.value) {
-      // 搜索态（IKAHBJ）：全品类结果平铺单段，不参与滚动联动、不插秒杀段（保持现状）
-      sections.value = [
-        { catId: "search", catName: `“${keyword.value}”`, items: await rowsP },
-      ];
+      // 搜索态（IKAHBJ）：结果平铺单段，不参与滚动联动、不插秒杀段（保持现状）
+      const rows = await rowsP;
+      if (seq !== loadSeq) return;
+      sections.value = [{ catId: "search", catName: `“${keyword.value}”`, items: rows }];
     } else {
       // 秒杀复用 onShow 预取（分类接口并行时就拉，侧栏秒杀项与分类项同拍出现）；
       // 预取缺席（异常路径）再自拉兜底
@@ -250,12 +263,41 @@ let seckillPrefetch: Promise<Product[]> | null = null;
 /** 推荐专区预取（IKI 道哥 2026-09-24）：仅勾选 featured 商品，空=不插段 */
 let featuredPrefetch: Promise<Product[]> | null = null;
 
-/** 搜索即全品类（IKAHBJ） */
+/** 搜索（IKAHBJ 改 IKR861）：在当前选中分类内检索——高亮保持不动，
+ *  「全部」态搜索=全品类。原「强制切 all」会让选中的类别高亮丢失
+ *  （道哥 2026-10-28 实测反馈） */
 async function search() {
+  if (searchDebounce) {
+    clearTimeout(searchDebounce);
+    searchDebounce = null;
+  }
   keyword.value = draft.value.trim();
-  active.value = "all";
   scrollTopTo(0);
   await load();
+  // IKR861（道哥 2026-10-28）：删光清词恢复分组流后，定位回当前选中分类段
+  // （而非回落流头部）——「饮料搜水删光」应停在饮料段继续逛
+  if (!keyword.value && active.value && active.value !== "all") {
+    const idx = sections.value.findIndex((s) => s.catId === active.value);
+    if (idx >= 0) {
+      renderSegs.value = Math.max(renderSegs.value, idx + 1);
+      await nextTick();
+      await scrollToCat(active.value);
+    }
+  }
+}
+
+/** IKR861 输入即搜：内容变动（含删光）防抖 300ms 自动搜索——删光即按空词
+ *  搜索恢复全量分类流（修复清空后 keyword 残留导致切分类整页空）。
+ *  边沿控制：与生效搜索词相同不重复搜；按钮/键盘确认走 search() 立即搜并清防抖。 */
+let searchDebounce: ReturnType<typeof setTimeout> | null = null;
+function onDraftInput() {
+  if (searchDebounce) clearTimeout(searchDebounce);
+  const next = draft.value.trim();
+  if (next === keyword.value) return;
+  searchDebounce = setTimeout(() => {
+    searchDebounce = null;
+    void search();
+  }, 300);
 }
 
 /** IKQX2A 修正版：跳详情时自打标记（goProduct 是唯一入口），onShow 消费。
@@ -347,6 +389,15 @@ onShow(async () => {
 
 /** 侧栏点击：直达分类段头（秒杀=流内首段，同款直达/扩配额；「all」哨兵仅兜底回顶） */
 async function pick(id: string) {
+  // IKR861（道哥定稿）：搜索态点分类=**把搜索切到该分类继续搜**——搜索词
+  // 保留生效，以新分类为上下文重搜（load 搜索分支按 active 取 categoryId），
+  // 不清词不退出搜索。原「退出搜索」版被否（搜索条件无端丢失）
+  if (keyword.value) {
+    active.value = id;
+    scrollTopTo(0);
+    await load();
+    return;
+  }
   active.value = id;
   if (id === "all") {
     scrollTopTo(0);
@@ -521,6 +572,7 @@ const open = (id: string) => {
         placeholder="今天想吃什么？"
         confirm-type="search"
         @confirm="search"
+        @input="onDraftInput"
       /><button @tap="search">搜索</button></view
     ><!-- IKDBFT：快捷分类横滑条（首页分类条同款下移），点击页内联动选中 -->
     <!-- 2026-09-05 道哥决策暂时下线，此区域预留广告位（方案待定）；恢复 = 删除 v-if="false" --><view
