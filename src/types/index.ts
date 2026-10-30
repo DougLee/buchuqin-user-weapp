@@ -164,6 +164,12 @@ export interface Order {
       time?: string;
     };
   } | null;
+  /** #107 配送人联系链（仅校区 showDeliveryContacts=true 时下发；
+   *  成员 null=骑手尚未接单/未指派楼长） */
+  deliveryChain?: {
+    rider: { name: string; phone: string; staffNo: string } | null;
+    manager: { name: string; phone: string; staffNo: string } | null;
+  } | null;
 }
 export interface ApiResult<T> {
   code: number;

@@ -222,7 +222,10 @@ async function onGetPhone(e: { detail: { code?: string } }) {
         mode="widthFix"
         show-menu-by-longpress
       ></image
-      ><text class="group-pop__tip">长按识别二维码，加入群聊</text
+      ><!-- IKRSJ3 #114：文案校区可配（groupQrcodeTip），空=默认 -->
+      ><text class="group-pop__tip">{{
+        campusStore.groupQrcodeTip || "长按识别二维码，加入群聊"
+      }}</text
       ><button class="group-pop__close" @tap="groupOpen = false">
         我知道了 </button
       ></view

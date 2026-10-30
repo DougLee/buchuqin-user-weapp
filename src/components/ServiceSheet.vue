@@ -2,20 +2,42 @@
   <view v-if="visible" class="sheet-mask" @tap.self="close">
     <view class="sheet" @tap.stop>
       <text class="sheet__title">联系客服</text>
-      <template v-if="qrcode">
+      <!-- #195：校区配置企微客服链接（serviceKfUrl）后，主按钮=「在线客服」
+           （点击拉起微信客服会话），二维码/电话降级为辅助通道；
+           未配置链接维持原二维码/电话布局 -->
+      <template v-if="kfUrl">
+        <button class="sheet__call" @tap="openKf">在线客服</button>
+        <text v-if="!qrcode" class="sheet__phone sheet__phone--kf">{{
+          phone
+        }}</text>
         <image
+          v-if="qrcode"
           :src="qrcode"
-          class="sheet__qr"
+          class="sheet__qr sheet__qr--kf"
           mode="aspectFit"
           show-menu-by-longpress
         />
-        <text class="sheet__tip">长按识别二维码，添加校区客服微信</text>
+        <text v-if="qrcode" class="sheet__tip"
+          >长按识别二维码，添加校区客服微信</text
+        >
         <button class="sheet__call ghost" @tap="call">拨打客服电话</button>
       </template>
       <template v-else>
-        <text class="sheet__phone">{{ phone }}</text>
-        <text class="sheet__tip">校区客服微信二维码未配置，可直接来电</text>
-        <button class="sheet__call" @tap="call">立即拨打</button>
+        <template v-if="qrcode">
+          <image
+            :src="qrcode"
+            class="sheet__qr"
+            mode="aspectFit"
+            show-menu-by-longpress
+          />
+          <text class="sheet__tip">长按识别二维码，添加校区客服微信</text>
+          <button class="sheet__call ghost" @tap="call">拨打客服电话</button>
+        </template>
+        <template v-else>
+          <text class="sheet__phone">{{ phone }}</text>
+          <text class="sheet__tip">校区客服微信二维码未配置，可直接来电</text>
+          <button class="sheet__call" @tap="call">立即拨打</button>
+        </template>
       </template>
       <text class="sheet__close" @tap="close">取消</text>
     </view>
@@ -34,8 +56,44 @@ const emit = defineEmits<{ (e: "close"): void }>();
 const campus = useCampusStore();
 const qrcode = computed(() => campus.qrcode);
 const phone = computed(() => campus.phone);
+/** #195 企微客服链接（校区行下发，空=未配置走原二维码/电话布局） */
+const kfUrl = computed(() => campus.serviceKfUrl);
 const close = () => emit("close");
 const call = () => uni.makePhoneCall({ phoneNumber: phone.value });
+/**
+ * #195 在线客服：拉起微信客服会话。wx.openCustomerServiceChat 未收录进
+ * @dcloudio/types——宽位调用（mp 端 uni 运行时 Proxy 会回落到 wx 同名 API，
+ * H5 端无此能力给明确提示）。corpAccessId=企微企业 ID（campus 行
+ * serviceKfCorpId 下发，缺失提示「客服未配置」）；fail 静默：企微侧未绑定
+ * 客服/用户取消等不阻断弹层。
+ */
+function openKf() {
+  if (!kfUrl.value) return;
+  if (!campus.serviceKfCorpId) {
+    uni.showToast({ title: "客服未配置", icon: "none" });
+    return;
+  }
+  const openChat = (
+    uni as unknown as {
+      openCustomerServiceChat?: (o: {
+        corpAccessId: string;
+        extInfo: { url: string };
+        showMessageCard: boolean;
+        fail?: () => void;
+      }) => void;
+    }
+  ).openCustomerServiceChat;
+  if (!openChat) {
+    uni.showToast({ title: "当前环境不支持在线客服", icon: "none" });
+    return;
+  }
+  openChat({
+    corpAccessId: campus.serviceKfCorpId,
+    extInfo: { url: kfUrl.value },
+    showMessageCard: false,
+    fail: () => {},
+  });
+}
 </script>
 <style scoped>
 .sheet-mask {
@@ -105,5 +163,12 @@ const call = () => uni.makePhoneCall({ phoneNumber: phone.value });
   font-size: 24rpx;
   color: #8a978f;
   padding: 10rpx;
+}
+/* #195：kf 分支内号码/二维码与「在线客服」主按钮的间距（不动基类，免影响未配置布局） */
+.sheet__phone--kf {
+  margin-top: 30rpx;
+}
+.sheet__qr--kf {
+  margin-top: 30rpx;
 }
 </style>

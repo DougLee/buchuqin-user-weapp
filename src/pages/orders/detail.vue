@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onUnmounted, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { useCartStore } from "../../stores/cart";
@@ -11,6 +11,23 @@ import ServiceSheet from "../../components/ServiceSheet.vue";
 import type { Order } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
+/** IKRSJ3 #115：delivered 态显示 48h 自动确认倒计时（分钟粒度，30s 刷新） */
+const nowTick = ref(Date.now());
+const autoTimer = setInterval(() => (nowTick.value = Date.now()), 30_000);
+onUnmounted(() => clearInterval(autoTimer));
+const autoConfirmHint = computed(() => {
+  if (order.value?.status !== "delivered") return "";
+  const deliveredIso = (order.value.timeline ?? [])
+    .filter((s) => s.time)
+    .at(-1)?.time;
+  if (!deliveredIso) return "";
+  const remainMs =
+    new Date(deliveredIso).getTime() + 48 * 3600_000 - nowTick.value;
+  if (remainMs <= 0) return "即将自动确认收货";
+  const h = Math.floor(remainMs / 3600_000);
+  const m = Math.floor((remainMs % 3600_000) / 60_000);
+  return `如未手动确认，约 ${h} 小时 ${m} 分后自动完成订单`;
+});
 const campusStore = useCampusStore(),
   /** IKKTWM 客服弹层（替代 open-type=contact） */
   serviceOpen = ref(false),
@@ -72,6 +89,24 @@ const proofGroups = computed(() => {
 function previewProof(images: string[], current: string) {
   const urls = images.map((img) => api.toAbsoluteUrl(img));
   uni.previewImage({ urls, current: api.toAbsoluteUrl(current) });
+}
+/** #107 配送人联系链：骑手/楼长（校区开启 showDeliveryContacts 且接口下发
+ *  deliveryChain 才有值；成员 null=尚未接单/未指派，前端占位提示） */
+const chainRider = computed(() => order.value?.deliveryChain?.rider ?? null);
+const chainManager = computed(
+  () => order.value?.deliveryChain?.manager ?? null,
+);
+/** 拨打配送人电话：先弹确认防误触，确认后拨真实号 */
+async function callChainContact(
+  role: "骑手" | "楼长",
+  name: string,
+  phone: string,
+) {
+  const res = await uni.showModal({
+    title: "确认拨打电话？",
+    content: `拨打${role} ${name} 的电话？`,
+  });
+  if (res.confirm) uni.makePhoneCall({ phoneNumber: phone });
 }
 async function cancel() {
   if (!order.value) return;
@@ -187,7 +222,9 @@ function backHome() {
           ? `别担心，客服正在跟进处理，可来电 ${campusStore.phone}`
           : order.status === "pending-payment"
             ? "15 分钟内完成支付，超时订单将自动关闭"
-            : "你的这一袋，正在校园里接力"
+            : order.status === "delivered"
+              ? autoConfirmHint || "你的这一袋，正在校园里接力"
+              : "你的这一袋，正在校园里接力"
       }}</text></view
     ><!-- 售后福利群 v2（IKQXSD；2026-10-28 改定不可关闭）--><view
       v-if="campusStore.afterSalesGroupQrcode"
@@ -196,7 +233,10 @@ function backHome() {
         ><view class="group-card__badge"></view
         ><view class="group-card__titles"
           ><text class="group-card__title">售后福利群</text
-          ><text class="group-card__sub">专属售后通道 · 福利优先享</text></view
+          ><!-- IKRSJ3 #114：文案校区可配（groupQrcodeTip），空=默认两行 -->
+          ><text class="group-card__sub">{{
+            campusStore.groupQrcodeTip || "专属售后通道 · 福利优先享"
+          }}</text></view
         ></view
       ><view class="group-card__body"
         ><image
@@ -206,7 +246,9 @@ function backHome() {
           show-menu-by-longpress
         /><view class="group-card__aside"
           ><text class="group-card__hint">长按识别二维码</text
-          ><text class="group-card__hint group-card__hint--sub"
+          ><text
+            v-if="!campusStore.groupQrcodeTip"
+            class="group-card__hint group-card__hint--sub"
             >加入福利群，售后进度与专属优惠第一时间掌握</text
           ></view
         ></view
@@ -262,6 +304,42 @@ function backHome() {
       ><text class="muted"
         >{{ order.address.contactName }} {{ order.address.phone }}</text
       ></view
+    ><!-- #107 配送人联系：校区开启 showDeliveryContacts 且接口下发 deliveryChain
+        才渲染；骑手/楼长都未指派时给「配送员接单后显示」占位 --><view
+      v-if="campusStore.showDeliveryContacts && order.deliveryChain"
+      class="chain card"
+      ><text class="chain__title">配送人联系</text>
+      <template v-if="chainRider || chainManager">
+        <view v-if="chainRider" class="chain__row"
+          ><view class="chain__who"
+            ><text class="chain__role">配送骑手</text
+            ><text class="chain__name">{{ chainRider.name }}</text
+            ><text class="chain__phone">{{ chainRider.phone }}</text></view
+          ><button
+            class="chain__call"
+            aria-label="拨打骑手电话"
+            @tap="callChainContact('骑手', chainRider.name, chainRider.phone)"
+          >
+            联系骑手
+          </button></view
+        >
+        <view v-if="chainManager" class="chain__row"
+          ><view class="chain__who"
+            ><text class="chain__role">楼长</text
+            ><text class="chain__name">{{ chainManager.name }}</text
+            ><text class="chain__phone">{{ chainManager.phone }}</text></view
+          ><button
+            class="chain__call"
+            aria-label="拨打楼长电话"
+            @tap="
+              callChainContact('楼长', chainManager.name, chainManager.phone)
+            "
+          >
+            联系楼长
+          </button></view
+        >
+      </template>
+      <text v-else class="chain__empty">配送员接单后显示</text></view
     ><view class="summary card"
       ><view v-for="line in order.items" :key="line.product.id"
         ><text>{{ line.product.name }} × {{ line.quantity }}</text
@@ -573,6 +651,66 @@ function backHome() {
   font-size: 34rpx;
   font-weight: 900;
   margin: 10rpx 0;
+}
+/* #107 配送人联系卡（校区开启+接口下发 deliveryChain 才渲染） */
+.chain {
+  padding: 24rpx 28rpx;
+  margin-top: 22rpx;
+}
+.chain__title {
+  display: block;
+  color: $primary-dark;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+.chain__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 18rpx 0 4rpx;
+}
+.chain__who {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  min-width: 0;
+}
+.chain__role {
+  font-size: 20rpx;
+  color: $muted;
+}
+.chain__name {
+  font-size: 30rpx;
+  font-weight: 900;
+}
+.chain__phone {
+  font-size: 24rpx;
+  color: $muted;
+}
+.chain__call {
+  flex: 0 0 auto;
+  min-height: 72rpx;
+  margin: 0;
+  padding: 0 32rpx;
+  border: 2rpx solid rgba(7, 136, 59, 0.35);
+  border-radius: 999rpx;
+  background: $primary-soft;
+  color: $primary-dark;
+  font-size: 25rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chain__call::after {
+  border: none;
+}
+.chain__empty {
+  display: block;
+  padding: 14rpx 0 4rpx;
+  color: $muted;
+  font-size: 24rpx;
 }
 .summary > view {
   display: flex;

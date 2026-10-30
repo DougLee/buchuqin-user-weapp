@@ -605,7 +605,10 @@ function search() {
           mode="widthFix"
           show-menu-by-longpress
         ></image
-        ><text class="group-pop__tip">长按识别二维码，加入群聊</text
+        ><!-- IKRSJ3 #114：文案校区可配（groupQrcodeTip），空=默认 -->
+        ><text class="group-pop__tip">{{
+          campusStore.groupQrcodeTip || "长按识别二维码，加入群聊"
+        }}</text
         ><button class="group-pop__close" @tap="groupOpen = false">
           我知道了
         </button></template
@@ -618,7 +621,10 @@ function search() {
               ><view /><view /><view /></view></view></view
         ><text class="group-pop__empty-title">福利群筹备中</text
         ><text class="group-pop__tip"
-          >楼栋专属福利与优惠早知道，群码上线后第一时间开放</text
+          >{{
+            campusStore.groupQrcodeTip ||
+            "楼栋专属福利与优惠早知道，群码上线后第一时间开放"
+          }}</text
         ><view class="group-pop__btns"
           ><button class="group-pop__close" @tap="groupOpen = false">
             我知道了

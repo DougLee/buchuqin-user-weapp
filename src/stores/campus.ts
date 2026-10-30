@@ -17,6 +17,13 @@ export const useCampusStore = defineStore("campus", {
     /** IKKTWM 校区客服微信二维码（COS 图；空=未配置回落拨号） */
     serviceQrcode: "",
     afterSalesGroupQrcode: "",
+    /** IKRSJ3 #114：群二维码弹窗/卡片说明文案（空=回落默认文案） */
+    groupQrcodeTip: "",
+    /** #107 配送人联系可见性（校区开关）：true 才在订单详情渲染配送人卡 */
+    showDeliveryContacts: false,
+    /** #195 企微客服：会话链接+企业 ID（空=未配置，客服弹层维持二维码/电话） */
+    serviceKfUrl: "",
+    serviceKfCorpId: "",
   }),
   getters: {
     closedNow: (state) => !!state.close.closedNow,
@@ -61,6 +68,20 @@ export const useCampusStore = defineStore("campus", {
       const groupQr = (campus as { afterSalesGroupQrcode?: string })
         .afterSalesGroupQrcode;
       if (groupQr !== undefined) this.afterSalesGroupQrcode = groupQr || "";
+      // IKRSJ3 #114：群二维码文案（空=前端回落默认文案）
+      const groupTip = (campus as { groupQrcodeTip?: string }).groupQrcodeTip;
+      if (groupTip !== undefined) this.groupQrcodeTip = groupTip || "";
+      // #107：配送人联系开关（宽位断言，后端未上线缺省 false 不展示）
+      const showContacts = (campus as { showDeliveryContacts?: boolean })
+        .showDeliveryContacts;
+      if (showContacts !== undefined)
+        this.showDeliveryContacts = !!showContacts;
+      // #195：企微客服链接+企业 ID（宽位断言，空=未配置维持二维码/电话现状）
+      const kfUrl = (campus as { serviceKfUrl?: string }).serviceKfUrl;
+      if (kfUrl !== undefined) this.serviceKfUrl = kfUrl || "";
+      const kfCorpId = (campus as { serviceKfCorpId?: string })
+        .serviceKfCorpId;
+      if (kfCorpId !== undefined) this.serviceKfCorpId = kfCorpId || "";
     },
     /** 轻量自刷新：失败静默沿用旧态，不拦页面主流程 */
     async refresh() {
