@@ -14,13 +14,19 @@ import {
 
 const command = process.argv[2];
 const brandKey = process.argv[3];
+// 编译平台（IKRSJ3 道哥 2026-10-31）：mp-weixin（默认，兼容旧命令）/ h5——
+// H5 复用同一套品牌注入管线（manifest/pages/env），仅输出目录与 uni -p 不同
+const platform = process.argv[4] || "mp-weixin";
 if (!["dev", "build"].includes(command)) {
   throw new Error(`构建类型必须是 dev 或 build，当前为：${command || "(空)"}`);
+}
+if (!["mp-weixin", "h5"].includes(platform)) {
+  throw new Error(`未知编译平台: ${platform}；可选值：mp-weixin, h5`);
 }
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const brand = getWeappBrand(brandKey);
-const outputDir = weappOutputDir(rootDir, command, brandKey);
+const outputDir = weappOutputDir(rootDir, command, brandKey, platform);
 const sourceDir = path.join(rootDir, "src");
 const brandInputDir = path.join(rootDir, ".cache", "weapp-input", brandKey);
 const projectConfigPath = path.join(outputDir, "project.config.json");
@@ -102,7 +108,7 @@ function patchProjectConfig() {
   }
 }
 
-console.log(`\n[微信小程序] ${brand.name} (${brand.appId})`);
+console.log(`\n[${platform === "h5" ? "H5" : "微信小程序"}] ${brand.name} (${brand.appId})`);
 console.log(`[API] ${environment.VITE_API_BASE_URL}`);
 console.log(`[输出目录] ${outputDir}\n`);
 
@@ -112,7 +118,7 @@ const uniBin = path.join(
   ".bin",
   process.platform === "win32" ? "uni.cmd" : "uni",
 );
-const args = command === "dev" ? ["-p", "mp-weixin"] : ["build", "-p", "mp-weixin"];
+const args = [command === "dev" ? "dev" : "build", "-p", platform];
 const child = spawn(uniBin, args, {
   cwd: rootDir,
   env: environment,
@@ -120,10 +126,12 @@ const child = spawn(uniBin, args, {
 });
 
 // dev 首次编译及后续重编译都可能重写 project.config.json，持续校准品牌信息。
-const timer = setInterval(patchProjectConfig, 300);
+// 仅微信小程序平台需要（H5 无 project.config.json）
+const timer =
+  platform === "mp-weixin" ? setInterval(patchProjectConfig, 300) : null;
 child.on("exit", (code, signal) => {
-  clearInterval(timer);
-  const patched = patchProjectConfig();
+  if (timer) clearInterval(timer);
+  const patched = platform === "mp-weixin" ? patchProjectConfig() : true;
   process.exitCode = signal || code !== 0 || !patched ? code || 1 : 0;
 });
 child.on("error", (error) => {

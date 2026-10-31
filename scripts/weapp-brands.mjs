@@ -28,9 +28,9 @@ export function getWeappBrand(key) {
   return brand;
 }
 
-export function weappOutputDir(rootDir, command, brandKey) {
+export function weappOutputDir(rootDir, command, brandKey, platform = "mp-weixin") {
   const stage = command === "dev" ? "dev" : "build";
-  return path.resolve(rootDir, "dist", stage, `mp-weixin-${brandKey}`);
+  return path.resolve(rootDir, "dist", stage, `${platform}-${brandKey}`);
 }
 
 export function weappEnvironment(command, brandKey, currentEnv = process.env) {
