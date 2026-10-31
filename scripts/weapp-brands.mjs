@@ -33,7 +33,12 @@ export function weappOutputDir(rootDir, command, brandKey, platform = "mp-weixin
   return path.resolve(rootDir, "dist", stage, `${platform}-${brandKey}`);
 }
 
-export function weappEnvironment(command, brandKey, currentEnv = process.env) {
+export function weappEnvironment(
+  command,
+  brandKey,
+  currentEnv = process.env,
+  platform = "mp-weixin",
+) {
   const brand = getWeappBrand(brandKey);
   return {
     ...currentEnv,
@@ -41,7 +46,8 @@ export function weappEnvironment(command, brandKey, currentEnv = process.env) {
     VITE_WECHAT_APP_ID: brand.appId,
     VITE_API_BASE_URL:
       currentEnv.VITE_API_BASE_URL ||
-      (command === "dev" ? TEST_API : PRODUCTION_API),
+      // H5：相对路径——dev 由 vite proxy 同源转发（免 CORS），生产同域部署
+      (platform === "h5" ? "/api/v1" : command === "dev" ? TEST_API : PRODUCTION_API),
   };
 }
 

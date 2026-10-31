@@ -70,8 +70,10 @@ function prepareBrandInput() {
 
 prepareBrandInput();
 const environment = {
-  ...weappEnvironment(command, brandKey),
-  UNI_INPUT_DIR: brandInputDir,
+  ...weappEnvironment(command, brandKey, process.env, platform),
+  // H5 平台不走品牌副本（副本缺根目录 index.html，产物空壳——
+  // 同款修复见 delivery 仓，道哥 2026-10-31）
+  ...(platform === "h5" ? {} : { UNI_INPUT_DIR: brandInputDir }),
   UNI_OUTPUT_DIR: outputDir,
 };
 

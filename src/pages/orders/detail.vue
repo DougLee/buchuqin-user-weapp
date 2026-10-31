@@ -233,8 +233,8 @@ function backHome() {
         ><view class="group-card__badge"></view
         ><view class="group-card__titles"
           ><text class="group-card__title">售后福利群</text
-          ><!-- IKRSJ3 #114：文案校区可配（groupQrcodeTip），空=默认两行 -->
-          ><text class="group-card__sub">{{
+          ><!-- IKRSJ3 #114：文案校区可配（groupQrcodeTip），空=默认两行
+          --><text class="group-card__sub">{{
             campusStore.groupQrcodeTip || "专属售后通道 · 福利优先享"
           }}</text></view
         ></view
