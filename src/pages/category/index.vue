@@ -89,6 +89,9 @@ const error = ref(false);
 const cart = useCartStore();
 const campusStore = useCampusStore();
 const closedNow = computed(() => campusStore.closedNow);
+/** IKS0W7：栏目标签文案（校区级可配，空回落默认）——侧栏项与段标题同源 */
+const seckillName = computed(() => campusStore.seckillLabel || "限时秒杀");
+const featuredName = computed(() => campusStore.featuredLabel || "推荐");
 
 /** 完整流：每分类一段（空分类段不渲染，点空分类走空态视图） */
 interface CatSeg {
@@ -196,10 +199,10 @@ async function load() {
       // 段顺序：秒杀（限时）→ 推荐（勾选）→ 分类段；空段不插
       const specialSegs = [
         ...(secs.length
-          ? [{ catId: "seckill", catName: "限时秒杀", items: secs }]
+          ? [{ catId: "seckill", catName: seckillName.value, items: secs }]
           : []),
         ...(feats.length
-          ? [{ catId: "featured", catName: "推荐", items: feats }]
+          ? [{ catId: "featured", catName: featuredName.value, items: feats }]
           : []),
       ];
       sections.value = [...specialSegs, ...catSegs];
@@ -220,8 +223,10 @@ function syncSeckillSide() {
   const has = sections.value.some((s) => s.catId === "seckill");
   const idx = categories.value.findIndex((c) => c.id === "seckill");
   if (has && idx < 0)
-    categories.value.unshift({ id: "seckill", name: "限时秒杀" });
+    categories.value.unshift({ id: "seckill", name: seckillName.value });
   else if (!has && idx >= 0) categories.value.splice(idx, 1);
+  // IKS0W7：已注入项同步校区配置文案（后台改文案重进页面即生效）
+  else if (has && idx >= 0) categories.value[idx].name = seckillName.value;
   // 推荐专区（道哥 2026-09-24）：同秒杀模式——有段才注入侧栏（排秒杀项后）
   const hasFeat = sections.value.some((s) => s.catId === "featured");
   const fIdx = categories.value.findIndex((c) => c.id === "featured");
@@ -229,9 +234,10 @@ function syncSeckillSide() {
     const at = categories.value.findIndex((c) => c.id === "seckill");
     categories.value.splice(at >= 0 ? at + 1 : 0, 0, {
       id: "featured",
-      name: "推荐",
+      name: featuredName.value,
     });
   } else if (!hasFeat && fIdx >= 0) categories.value.splice(fIdx, 1);
+  else if (hasFeat && fIdx >= 0) categories.value[fIdx].name = featuredName.value;
 }
 
 /** 严格段制的物理兜底：首段太短（<1.2 屏）时页面滚不动、续段永远触发不了——
@@ -380,7 +386,7 @@ onShow(async () => {
   if (secsEarly) {
     void secsEarly.then((rows) => {
       if (rows.length && !categories.value.some((c) => c.id === "seckill"))
-        categories.value.unshift({ id: "seckill", name: "限时秒杀" });
+        categories.value.unshift({ id: "seckill", name: seckillName.value });
     });
   }
   const featEarly = featuredPrefetch;
@@ -390,7 +396,7 @@ onShow(async () => {
         const at = categories.value.findIndex((c) => c.id === "seckill");
         categories.value.splice(at >= 0 ? at + 1 : 0, 0, {
           id: "featured",
-          name: "推荐",
+          name: featuredName.value,
         });
       }
     });

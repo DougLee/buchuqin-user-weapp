@@ -33,6 +33,14 @@ import type {
 const session = useSessionStore(); // IKE3HT 强授权门模板绑定
 /** IKG1C 打烊停单：闭店态随 /home 同批到位（campusStore.apply 不加请求） */
 const campusStore = useCampusStore();
+/** IKS0W7：栏目名称（校区级可配，空回落默认）——首页栏目与分类页侧栏同源 */
+const homeFeaturedName = computed(
+  () => campusStore.homeFeaturedLabel || "为你推荐",
+);
+const promoTitle = (type: string) =>
+  type === "seckill"
+    ? campusStore.seckillLabel || PROMO_TITLE.seckill
+    : campusStore.clearanceLabel || PROMO_TITLE.clearance;
 const cart = useCartStore(),
   // IKAJT2：校区名接口下发（home().campus.name），空串时模板兜底「选择校区」
   campus = ref(""),
@@ -188,7 +196,7 @@ const promoGroups = computed(() => {
     if (!alive.length) continue;
     groups.push({
       type,
-      title: PROMO_TITLE[type],
+      title: promoTitle(type),
       endsAt: alive.reduce(
         (min, x) => (x.endsAt < min ? x.endsAt : min),
         alive[0].endsAt,
@@ -570,7 +578,7 @@ function search() {
       ></view
     >
     <view class="section-title"
-      ><text class="section-title__main">为你推荐</text
+      ><text class="section-title__main">{{ homeFeaturedName }}</text
       ><text class="section-title__sub" @tap="goCategory"
         ><!-- IK9VQ3：chevron 形状即 >，改 chip 暗示可点 -->
         <text class="link-chip">更多</text></text

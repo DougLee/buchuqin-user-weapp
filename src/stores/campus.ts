@@ -24,6 +24,11 @@ export const useCampusStore = defineStore("campus", {
     /** #195 企微客服：会话链接+企业 ID（空=未配置，客服弹层维持二维码/电话） */
     serviceKfUrl: "",
     serviceKfCorpId: "",
+    /** IKS0W7 栏目标签文案（校区级可配，空=页面回落默认文案） */
+    seckillLabel: "",
+    featuredLabel: "",
+    homeFeaturedLabel: "",
+    clearanceLabel: "",
   }),
   getters: {
     closedNow: (state) => !!state.close.closedNow,
@@ -82,6 +87,21 @@ export const useCampusStore = defineStore("campus", {
       const kfCorpId = (campus as { serviceKfCorpId?: string })
         .serviceKfCorpId;
       if (kfCorpId !== undefined) this.serviceKfCorpId = kfCorpId || "";
+      // IKS0W7：栏目标签文案（宽位断言，空=页面回落默认文案）
+      const labels = campus as {
+        seckillLabel?: string;
+        featuredLabel?: string;
+        homeFeaturedLabel?: string;
+        clearanceLabel?: string;
+      };
+      if (labels.seckillLabel !== undefined)
+        this.seckillLabel = labels.seckillLabel || "";
+      if (labels.featuredLabel !== undefined)
+        this.featuredLabel = labels.featuredLabel || "";
+      if (labels.homeFeaturedLabel !== undefined)
+        this.homeFeaturedLabel = labels.homeFeaturedLabel || "";
+      if (labels.clearanceLabel !== undefined)
+        this.clearanceLabel = labels.clearanceLabel || "";
     },
     /** 轻量自刷新：失败静默沿用旧态，不拦页面主流程 */
     async refresh() {
