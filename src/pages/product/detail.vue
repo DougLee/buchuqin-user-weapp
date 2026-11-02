@@ -378,6 +378,7 @@ const gallery = computed(() => {
     @close="phoneGateOpen = false"
   />
   <CartOverlay />
+  <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
@@ -766,4 +767,3 @@ const gallery = computed(() => {
   }
 }
 </style>
-  <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />

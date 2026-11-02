@@ -222,8 +222,9 @@ async function onGetPhone(e: { detail: { code?: string } }) {
         mode="widthFix"
         show-menu-by-longpress
       ></image
-      ><!-- IKRSJ3 #114：文案校区可配（groupQrcodeTip），空=默认 -->
-      ><text class="group-pop__tip">{{
+      ><!-- IKRSJ3 #114：文案校区可配（groupQrcodeTip），空=默认。注释插进
+           排版链中间会吃掉链条产生游离 >（六复现）——注释后直接开新标签 -->
+      <text class="group-pop__tip">{{
         campusStore.groupQrcodeTip || "长按识别二维码，加入群聊"
       }}</text
       ><button class="group-pop__close" @tap="groupOpen = false">
@@ -233,6 +234,7 @@ async function onGetPhone(e: { detail: { code?: string } }) {
   >
   <TabBar :current="3" />
   <CartOverlay />
+  <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
@@ -436,4 +438,3 @@ async function onGetPhone(e: { detail: { code?: string } }) {
   border: none;
 }
 </style>
-  <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />

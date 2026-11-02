@@ -613,8 +613,8 @@ function search() {
           mode="widthFix"
           show-menu-by-longpress
         ></image
-        ><!-- IKRSJ3 #114：文案校区可配（groupQrcodeTip），空=默认 -->
-        ><text class="group-pop__tip">{{
+        ><!-- IKRSJ3 #114：文案校区可配（groupQrcodeTip），空=默认。注释后直接开新标签，游离 > 六复现 -->
+        <text class="group-pop__tip">{{
           campusStore.groupQrcodeTip || "长按识别二维码，加入群聊"
         }}</text
         ><button class="group-pop__close" @tap="groupOpen = false">
