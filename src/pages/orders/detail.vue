@@ -346,6 +346,15 @@ function backHome() {
         ><text
           >¥{{ fenToYuan(line.product.price * line.quantity) }}</text
         ></view
+      ><!-- 账单构成补全（道哥 2026-11-02）：商品行下增配送费/优惠券两行，
+          排版与配色对齐 checkout .bill 卡；配送费 0 也展示（校区可配
+          免配送费，0 有「免配」语义，与 checkout 账单无条件展示一致）；
+          券 0 无语义且进度页无选券引导需求，隐藏 --><view
+        ><text>配送费</text
+        ><text>¥{{ fenToYuan(order.deliveryFee) }}</text></view
+      ><view v-if="order.discount > 0" class="summary__coupon"
+        ><text>优惠券</text
+        ><text>−¥{{ fenToYuan(order.discount) }}</text></view
       ><view class="summary__total"
         ><text>实付</text
         ><text>¥{{ fenToYuan(order.payableAmount) }}</text></view
@@ -716,6 +725,11 @@ function backHome() {
   display: flex;
   justify-content: space-between;
   padding: 12rpx 0;
+}
+/* 优惠券行（道哥 2026-11-02）：配色对齐 checkout .bill__coupon——品牌深绿，
+   优惠语义走主题绿不用红，与结算页账单视觉一致；主题变量取色不硬编码 */
+.summary__coupon {
+  color: $primary-dark;
 }
 .summary__total {
   border-top: 2rpx dashed $line;
