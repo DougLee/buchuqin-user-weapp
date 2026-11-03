@@ -100,7 +100,63 @@ export function resolveLoginCampus(
   });
   return decided;
 }
+/** IKSN19 会员预检：wx.login → POST /auth/member-check（匿名）——
+ *  删小程序重装（storage 清空）后，已注册用户经此识别，显式落既有校区
+ *  不再弹确认页。code 一次性：预检与登录各用各的 code；失败由调用方
+ *  兜底走列表流程（退化现状）。uni.login 本地实现：bootCampus 不能
+ *  import request（成环，同 BASE_URL 拆分缘由）。 */
+function wxLoginCode(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    uni.login({
+      provider: "weixin",
+      success: (r) => (r.code ? resolve(r.code) : reject(new Error("无 code"))),
+      fail: reject,
+    });
+  });
+}
+function checkMember(): Promise<{ registered: boolean; campusId: string }> {
+  return new Promise((resolve, reject) => {
+    void wxLoginCode().then((code) => {
+      uni.request({
+        url: `${BASE_URL}/auth/member-check`,
+        method: "POST",
+        data: { code, appid: WECHAT_APP_ID },
+        success(res) {
+          const body = res.data as {
+            code?: number;
+            data?: { registered: boolean; campusId?: string };
+          };
+          if (
+            res.statusCode >= 200 &&
+            res.statusCode < 300 &&
+            body?.code === 0 &&
+            body.data
+          ) {
+            resolve({
+              registered: body.data.registered === true,
+              campusId: body.data.campusId || "",
+            });
+            return;
+          }
+          reject(new Error(`会员预检失败（${res.statusCode}）`));
+        },
+        fail: reject,
+      });
+    }, reject);
+  });
+}
 async function decideFirstCampus(sharedCampusId: string): Promise<string> {
+  // 已注册用户（重装/换设备 storage 全新）：先查注册态，显式落既有校区，
+  // 绝不弹确认页；预检失败（网络/code 无效）退化为列表流程（现状兜底）
+  try {
+    const member = await checkMember();
+    if (member.registered) {
+      if (member.campusId) rememberSelectedCampusId(member.campusId);
+      return member.campusId; // 空（异常数据）时走无 campusId 的现状登录
+    }
+  } catch {
+    /* 预检失败：继续列表流程 */
+  }
   let list: BootCampusOption[];
   try {
     list = await fetchMiniProgramCampuses();
