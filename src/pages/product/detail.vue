@@ -312,10 +312,16 @@ const gallery = computed(() => {
         ></view
       ><!-- 假「商品演示」卡已摘除（IK9AWT）：占位图+生成文案冒充商品信息，仅保留真实流程说明（下方 story） -->
       <view class="story"
-        ><text class="story__eyebrow">今晚的快乐很简单</text
-        ><text class="story__title">不用换鞋，不用下楼。</text
-        ><text class="muted"
-          >下单后从你所在校区的校园仓出发，经配送员送到楼下，再由楼长送到你的寝室门口。</text
+        ><text class="story__eyebrow">{{
+          campusStore.deliveryStoryTitle || "今晚的快乐很简单"
+        }}</text
+        ><text class="story__title">{{
+          campusStore.deliveryStoryMain || "不用换鞋，不用下楼。"
+        }}</text
+        ><text class="muted">{{
+          campusStore.deliveryStoryDesc ||
+            "下单后从你所在校区的校园仓出发，经配送员送到楼下，再由楼长送到你的寝室门口。"
+        }}</text
         ></view
       ></view
     ><view class="bottom safe-bottom"

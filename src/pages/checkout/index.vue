@@ -6,6 +6,7 @@ import { isRetryable } from "../../api/request";
 import PhoneGate from "../../components/PhoneGate.vue";
 import { pickCurrentAddress } from "../../utils/currentAddress";
 import { useCartStore } from "../../stores/cart";
+import { useCampusStore } from "../../stores/campus";
 import { useSessionStore } from "../../stores/session";
 import { fenToYuan } from "../../utils/money";
 import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
@@ -42,6 +43,8 @@ const usableCoupons = ref<UserCoupon[]>([]),
  * 不授权不能下单。session.user 就绪后 needsPhone 响应式驱动弹层。
  */
 const session = useSessionStore();
+// IKSN20：配送方式卡片营销文案（校区级可配，onShow 轻量刷新）
+const campusStore = useCampusStore();
 const selectedCoupon = computed(
   () =>
     usableCoupons.value.find((item) => item.id === selectedCouponId.value) ??
@@ -147,6 +150,8 @@ onShow(() => {
   // needsPhone 驱动授权弹层（已绑定用户全程无感）；失败不阻塞结算渲染
   void session.ensureLogin().catch(() => {});
   load();
+  // IKSN20：配送方式卡片营销文案校区级可配——onShow 轻量刷新同详情页先例
+  void campusStore.refresh();
   void preloadPayTemplates();
 });
 async function setMode(value: "instant" | "scheduled") {
@@ -280,7 +285,9 @@ async function doSubmit() {
         @tap="setMode('scheduled')"
         ><text class="mode__title">2小时送达</text
         ><text class="mode__time">更从容</text
-        ><text class="mode__gift">赠送 2 元全品类优惠券</text></view
+        ><text class="mode__gift">{{
+          campusStore.scheduledGiftText || "赠送 2 元全品类优惠券"
+        }}</text></view
       ></view
     ><!-- IK9SNV：非预约场景去掉时段选择器，scheduled 默认取第一个可用时段（load 内已处理） --><view class="section-title"
       ><text class="section-title__main">这袋有这些</text></view

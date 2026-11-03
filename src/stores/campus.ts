@@ -29,6 +29,12 @@ export const useCampusStore = defineStore("campus", {
     featuredLabel: "",
     homeFeaturedLabel: "",
     clearanceLabel: "",
+    /** IKSN20 预约达营销文案 + 商品详情页「配送到寝」说明三段
+     *  （校区级可配，空=页面回落默认文案） */
+    scheduledGiftText: "",
+    deliveryStoryTitle: "",
+    deliveryStoryMain: "",
+    deliveryStoryDesc: "",
   }),
   getters: {
     closedNow: (state) => !!state.close.closedNow,
@@ -102,6 +108,21 @@ export const useCampusStore = defineStore("campus", {
         this.homeFeaturedLabel = labels.homeFeaturedLabel || "";
       if (labels.clearanceLabel !== undefined)
         this.clearanceLabel = labels.clearanceLabel || "";
+      // IKSN20：预约达营销文案 + 详情页「配送到寝」说明三段（空=前端默认）
+      const copy = campus as {
+        scheduledGiftText?: string;
+        deliveryStoryTitle?: string;
+        deliveryStoryMain?: string;
+        deliveryStoryDesc?: string;
+      };
+      if (copy.scheduledGiftText !== undefined)
+        this.scheduledGiftText = copy.scheduledGiftText || "";
+      if (copy.deliveryStoryTitle !== undefined)
+        this.deliveryStoryTitle = copy.deliveryStoryTitle || "";
+      if (copy.deliveryStoryMain !== undefined)
+        this.deliveryStoryMain = copy.deliveryStoryMain || "";
+      if (copy.deliveryStoryDesc !== undefined)
+        this.deliveryStoryDesc = copy.deliveryStoryDesc || "";
     },
     /** 轻量自刷新：失败静默沿用旧态，不拦页面主流程 */
     async refresh() {
