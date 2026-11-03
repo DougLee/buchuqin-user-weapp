@@ -7,6 +7,7 @@ import {
   onShow,
 } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { setSharedCampusId } from "../../utils/bootCampus";
 import { track } from "../../utils/track";
 import { APP_NAME } from "../../config/app";
 import ProductCard from "../../components/ProductCard.vue";
@@ -69,7 +70,12 @@ const addressText = computed(() =>
  *  后直接切到分类页。 */
 onLoad((q) => {
   const c = String(q?.campus || "");
-  if (c) session.pendingCampus = c;
+  if (c) {
+    session.pendingCampus = c;
+    // IKSN19：同步写 storage 中转键——App onLaunch 的登录抢先于本 onLoad，
+    // 校区门在列表返回后才读键（本行必然已执行），预选才能落到分享校区
+    setSharedCampusId(c);
+  }
   const cat = String(q?.cat || "");
   if (cat) {
     uni.setStorageSync("categoryPick", cat);

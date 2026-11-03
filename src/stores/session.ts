@@ -3,6 +3,7 @@ import { api } from "../api";
 import { uploadImage } from "../api/request";
 import {
   finishBootConfirm,
+  readSharedCampusId,
   rememberSelectedCampusId,
   resolveLoginCampus,
 } from "../utils/bootCampus";
@@ -75,7 +76,9 @@ export const useSessionStore = defineStore("session", {
         if (this.ready) return;
         const result = await api.wechatLogin(
           await wxLoginCode(),
-          campusId || sharedCampus || undefined,
+          // App onLaunch 抢先于落地页 onLoad 时 store 的 pendingCampus 为空，
+          // 兜底再读 storage 中转键（IKSN19：request 层与校区门同一来源）
+          campusId || sharedCampus || readSharedCampusId() || undefined,
         );
         uni.setStorageSync("token", result.token);
         this.applyUser(result.user);

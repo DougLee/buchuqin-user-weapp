@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref } from "vue";
 import { onShareAppMessage, onShareTimeline, onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { setSharedCampusId } from "../../utils/bootCampus";
 import { track } from "../../utils/track";
 import { isRetryable } from "../../api/request";
 import PhoneGate from "../../components/PhoneGate.vue";
@@ -30,11 +31,16 @@ const promoTicker = setInterval(() => (now.value = Date.now()), 1000);
 onUnmounted(() => clearInterval(promoTicker));
 onLoad(async (q) => {
   productId.value = String(q?.id || "");
+  shareCampus.value = String(q?.campus || "");
+  // IKGZSU 跨校区分享：新用户首登落分享校区（后端校验采用，老用户忽略）。
+  // IKSN19：分享校区必须在本页首个 track 请求（会触发登录→校区门）之前
+  // 双写就位——store 供本 action 兜底，storage 键供 App onLaunch 抢跑的登录链读
+  if (shareCampus.value) {
+    session.pendingCampus = shareCampus.value;
+    setSharedCampusId(shareCampus.value);
+  }
   track("product_view", productId.value); // IKRGLV 商品热度
   track("page_view", "product");
-  shareCampus.value = String(q?.campus || "");
-  // IKGZSU 跨校区分享：新用户首登落分享校区（后端校验采用，老用户忽略）
-  if (shareCampus.value) session.pendingCampus = shareCampus.value;
   await cart.load();
   // IKGZSU：老用户校区与分享校区不一致 → 二选一确认（2026-09-19 道哥定版：
   // 「当前商品尚未在您所选校区售卖，属于xx校区，是否切换？」）

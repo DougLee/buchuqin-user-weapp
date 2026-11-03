@@ -28,6 +28,19 @@ export function readSelectedCampusId(): string {
 export function rememberSelectedCampusId(id: string) {
   if (id) uni.setStorageSync(SELECTED_KEY, id);
 }
+/** IKGZSU 分享校区 storage 中转（IKSN19 补缺口）：分享落地页 onLoad 在
+ *  首个请求前写入；App onLaunch 的 ensureLogin 抢先于页面 onLoad 触发登录，
+ *  request 层又不能反依赖 store（成环）——分享校区经 storage 送达校区门。 */
+const SHARED_KEY = "sharedCampusId";
+export function setSharedCampusId(id: string) {
+  if (id) uni.setStorageSync(SHARED_KEY, id);
+}
+export function readSharedCampusId(): string {
+  return (uni.getStorageSync(SHARED_KEY) as string) || "";
+}
+function clearSharedCampusId() {
+  uni.removeStorageSync(SHARED_KEY);
+}
 /** 匿名接口：本组织开放校区（type=campus + status=active），按创建时间升序。
  *  appid 必传（多品牌各查各的组织）；组织解析不到时后端回落全部开放校区。
  *  信封与 request 层同款（code=0），失败静默由调用方自行兜底。 */
@@ -92,9 +105,14 @@ async function decideFirstCampus(sharedCampusId: string): Promise<string> {
   try {
     list = await fetchMiniProgramCampuses();
   } catch {
-    return ""; // 列表接口失败（网络差/异常）：现状静默登录兜底
+    return ""; // 列表接口失败（网络差/异常）：现状静默登录兜底；
+    // 分享校区键保留，兜底登录仍按 IKGZSU 语义带上
   }
   if (!list.length) return "";
+  // 分享校区在这里才读（而非函数入参处）：App onLaunch 的 ensureLogin 抢先
+  // 于分享落地页 onLoad 执行，列表网络往返期间 onLoad 必然已写好 storage 键
+  const shared = sharedCampusId || readSharedCampusId();
+  clearSharedCampusId(); // 决策已捕获分享校区；仅失败出口保留键供兜底登录
   if (list.length === 1) {
     // 单校区组织：静默直落唯一校区，显式带 campusId，不依赖后端 fallback
     rememberSelectedCampusId(list[0].id);
@@ -103,9 +121,7 @@ async function decideFirstCampus(sharedCampusId: string): Promise<string> {
   // 多校区组织：阻断式确认页。分享校区在列表内才预选，已下架/非法回落第一项
   confirmContext = {
     options: list,
-    preselectId: list.some((c) => c.id === sharedCampusId)
-      ? sharedCampusId
-      : list[0].id,
+    preselectId: list.some((c) => c.id === shared) ? shared : list[0].id,
   };
   return openConfirmPage();
 }

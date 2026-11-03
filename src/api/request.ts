@@ -1,7 +1,7 @@
 import type { ApiResult, LoginResult } from "../types";
 import { WECHAT_APP_ID } from "../config/app";
 import { BASE_URL } from "./base";
-import { resolveLoginCampus } from "../utils/bootCampus";
+import { readSharedCampusId, resolveLoginCampus } from "../utils/bootCampus";
 // BASE_URL/toAbsoluteUrl 常量挪到 ./base（IKSN19：校区门也要用，避免与本模块成环），
 // 这里原位再导出，track.ts 等既有导入方不受影响
 export { BASE_URL, toAbsoluteUrl } from "./base";
@@ -106,7 +106,8 @@ function loginFlow(allowConfirmPage: boolean): Promise<string> {
     const campusId = await resolveLoginCampus({ allowConfirmPage });
     const existing = uni.getStorageSync("token") as string;
     if (existing) return existing;
-    return wechatLogin(campusId || undefined);
+    // 兜底登录（列表拉取失败/未经确认离开）：分享校区仍按 IKGZSU 语义带上
+    return wechatLogin(campusId || readSharedCampusId() || undefined);
   })().catch((error) => {
     // 失败给用户明确提示，由用户重试（凭证未配/网络异常都会走到这里）
     const message =
