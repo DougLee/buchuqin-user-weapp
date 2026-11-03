@@ -1,6 +1,11 @@
 import { defineStore } from "pinia";
 import { api } from "../api";
 import { uploadImage } from "../api/request";
+import {
+  finishBootConfirm,
+  rememberSelectedCampusId,
+  resolveLoginCampus,
+} from "../utils/bootCampus";
 import type { SessionUser } from "../types";
 /** 本地昵称覆盖（IK8W5Q：昵称编辑暂无后端接口，仅本地展示覆盖） */
 const NICKNAME_KEY = "localNickname";
@@ -62,8 +67,16 @@ export const useSessionStore = defineStore("session", {
         // IKGZSU 跨校区分享：新用户首登优先落分享链接带来的校区（后端校验，
         // 非法值静默忽略）；仅无 token 的首登路径有意义，消费后即清
         const sharedCampus = this.pendingCampus;
-        const result = await api.wechatLogin(await wxLoginCode(), sharedCampus || undefined);
+        // IKSN19 校区门：单校区静默直落唯一校区；多校区先过阻断式确认页
+        // （确认页内登录成功时 ready 已置真，复查直接返回不再二次登录）；
+        // 列表拉取失败返回空串——分享校区仍按 IKGZSU 语义带上（即现状兜底）
+        const campusId = await resolveLoginCampus({ sharedCampusId: sharedCampus });
         this.pendingCampus = "";
+        if (this.ready) return;
+        const result = await api.wechatLogin(
+          await wxLoginCode(),
+          campusId || sharedCampus || undefined,
+        );
         uni.setStorageSync("token", result.token);
         this.applyUser(result.user);
         // IKDETO：注册当次置位（首页 onShow 消费后自清，只弹一次）
@@ -89,8 +102,25 @@ export const useSessionStore = defineStore("session", {
      */
     async switchCampus(campusId: string) {
       const result = await api.selectCampus(campusId);
+      // IKSN19-D：所选校区持久化，后续 token 过期静默重登显式落同校区
+      rememberSelectedCampusId(campusId);
       uni.setStorageSync("token", result.token);
       this.applyUser(result.user);
+    },
+    /**
+     * IKSN19 校区确认页专用首登：带所选 campusId 完成微信登录，成功才
+     * finishBootConfirm 放行所有挂起的登录等待方（等待方见 ready=true 直接复用，
+     * 不再二次打登录接口）。失败原样抛出（request 层已 toast），确认页捕获后
+     * 停留本页供用户重试（E：登录失败重试兜底，不卡死）。
+     */
+    async confirmFirstLogin(campusId: string) {
+      const result = await api.wechatLogin(await wxLoginCode(), campusId);
+      rememberSelectedCampusId(campusId);
+      uni.setStorageSync("token", result.token);
+      this.applyUser(result.user);
+      this.justSignedUp = result.isNewUser === true;
+      this.pendingCampus = "";
+      finishBootConfirm(campusId);
     },
     /** 改昵称（IK9ROG）：落库为准，成功后本地 storage 双写做展示加速 */
     async setNickname(name: string) {

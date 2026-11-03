@@ -1,13 +1,10 @@
 import type { ApiResult, LoginResult } from "../types";
 import { WECHAT_APP_ID } from "../config/app";
-export const BASE_URL =
-  // 本机 API 固定 3100（3000 被占），dev 裸跑不再需要前置 VITE_API_BASE_URL；生产构建同源相对路径 /api/v1
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3100/api/v1";
-const ORIGIN = BASE_URL.replace(/\/api\/v1\/?$/, "");
-/** 后端返回的相对资源路径（如 /api/v1/uploads/xx.jpg）拼成可访问的完整地址 */
-export function toAbsoluteUrl(url: string): string {
-  return /^https?:\/\//.test(url) ? url : `${ORIGIN}${url}`;
-}
+import { BASE_URL } from "./base";
+import { resolveLoginCampus } from "../utils/bootCampus";
+// BASE_URL/toAbsoluteUrl 常量挪到 ./base（IKSN19：校区门也要用，避免与本模块成环），
+// 这里原位再导出，track.ts 等既有导入方不受影响
+export { BASE_URL, toAbsoluteUrl } from "./base";
 /** @dcloudio/types 未收录 PATCH（微信基础库 wx.request 已支持），这里放宽 method */
 type RequestOptions = Omit<UniApp.RequestOptions, "url" | "method"> & {
   method?: UniApp.RequestOptions["method"] | "PATCH";
@@ -80,12 +77,14 @@ function wxLoginCode(): Promise<string> {
     }),
   );
 }
-async function wechatLogin(): Promise<string> {
+async function wechatLogin(campusId?: string): Promise<string> {
   const code = await wxLoginCode();
-  // 双小程序凭证路由（IK8W5Q）：带上本端 appid，后端挑对应 secret
+  // 双小程序凭证路由（IK8W5Q）：带上本端 appid，后端挑对应 secret；
+  // campusId（IKSN19）：新用户首建档落确认过的校区，老用户后端忽略
   const { status, body } = await post("/auth/wechat-login", {
     code,
     appid: WECHAT_APP_ID,
+    ...(campusId ? { campusId } : {}),
   });
   if (status === 501) throw new WechatLoginNotConfigured();
   if (status >= 300) throw new Error("微信登录失败");
@@ -93,13 +92,22 @@ async function wechatLogin(): Promise<string> {
 }
 // #endif
 /** 登录通道：小程序只走微信登录（正式通道，失败不回退；test-login 已随 ADR-0004 下线）。
- *  H5 等非小程序环境无登录通道，直接拒绝。 */
-function loginFlow(): Promise<string> {
+ *  H5 等非小程序环境无登录通道，直接拒绝。
+ *  allowConfirmPage（IKSN19 校区门）：仅全新首登允许弹确认页；
+ *  401 过期静默重登是老用户，只读缓存校区、绝不弹页（老用户现状不变）。 */
+function loginFlow(allowConfirmPage: boolean): Promise<string> {
   // #ifndef MP-WEIXIN
   return Promise.reject(new Error("请在微信小程序中打开"));
   // #endif
   // #ifdef MP-WEIXIN
-  return wechatLogin().catch((error) => {
+  return (async () => {
+    // IKSN19 校区门：登录前先定校区（storage 缓存 → 单校区直落 → 多校区确认页 → 失败兜底）。
+    // 确认页内登录成功时 storage 已落 token，这里复查直接复用，不再二次打登录接口
+    const campusId = await resolveLoginCampus({ allowConfirmPage });
+    const existing = uni.getStorageSync("token") as string;
+    if (existing) return existing;
+    return wechatLogin(campusId || undefined);
+  })().catch((error) => {
     // 失败给用户明确提示，由用户重试（凭证未配/网络异常都会走到这里）
     const message =
       error instanceof WechatLoginNotConfigured
@@ -124,7 +132,7 @@ async function ensureToken(path: string, force = false) {
     throw new ApiError("登录失败，请稍后重试", "network");
   }
   if (force) uni.removeStorageSync("token");
-  loginPromise ??= loginFlow().then((token) => {
+  loginPromise ??= loginFlow(!force).then((token) => {
     uni.setStorageSync("token", token);
     return token;
   }).catch((error) => {
