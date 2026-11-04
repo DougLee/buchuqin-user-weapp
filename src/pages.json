@@ -81,6 +81,26 @@
         "navigationBarBackgroundColor": "#d8fcea",
         "navigationBarTextStyle": "black"
       }
+    },
+    {
+      "path": "pages/night/buildings",
+      "style": { "navigationBarTitleText": "夜宵店" }
+    },
+    {
+      "path": "pages/night/store",
+      "style": { "navigationBarTitleText": "夜宵店" }
+    },
+    {
+      "path": "pages/night/checkout",
+      "style": { "navigationBarTitleText": "确认订单" }
+    },
+    {
+      "path": "pages/night/orders",
+      "style": { "navigationBarTitleText": "夜宵订单" }
+    },
+    {
+      "path": "pages/night/order-detail",
+      "style": { "navigationBarTitleText": "夜宵订单进度" }
     }
   ],
   // IKAHBQ: 购物车回归 Tab（订单降级普通页，入口在「我的」/支付成功页）。

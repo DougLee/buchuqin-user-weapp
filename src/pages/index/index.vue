@@ -14,6 +14,8 @@ import ProductCard from "../../components/ProductCard.vue";
 import WheelPanel from "../../components/WheelPanel.vue";
 import WelcomeGift from "../../components/WelcomeGift.vue";
 import PhoneGate from "../../components/PhoneGate.vue";
+// IKSW1F 夜宵入口横幅：自持 /night/entry 拉取与显隐（inNightSession 才渲染）
+import NightEntryBanner from "../../components/NightEntryBanner.vue";
 import { useCartStore } from "../../stores/cart";
 import { useCampusStore } from "../../stores/campus";
 import { useSessionStore } from "../../stores/session";
@@ -372,7 +374,8 @@ function search() {
       ><text class="closed-banner__text">{{
         campusStore.closedBanner
       }}</text></view
-    ><!-- IKHM1P 公告条：小喇叭+文字，超宽滚动（双份文本无缝循环），空=隐藏 -->
+    ><!-- IKSW1F 夜宵入口横幅：/night/entry inNightSession=true 才渲染（白天零占位），点击进夜宵流程 -->
+    <NightEntryBanner /><!-- IKHM1P 公告条：小喇叭+文字，超宽滚动（双份文本无缝循环），空=隐藏 -->
     <view v-if="notice" class="notice-bar"
       ><text class="notice-bar__icon">📢</text
       ><view class="notice-bar__viewport"
