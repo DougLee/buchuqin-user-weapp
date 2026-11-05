@@ -49,6 +49,9 @@ const cartLines = computed(() => cart.linesOf(storeId.value));
 const productAmount = computed(() => cart.amountOf(storeId.value));
 /** 本地重验：商品已下架/停售/不在可购清单 = 失效；数量超当前库存 = 失效 */
 const invalidLineIds = computed(() => {
+  // 商品清单未就绪（加载中/失败）时不做本地预检：服务端提交时全量重验兜底，
+  // 避免误标全行失效阻塞下单（2026-11-05 H5 实测竞态）
+  if (!products.value.length) return [];
   const invalid: string[] = [];
   for (const line of cartLines.value) {
     const product = products.value.find((p) => p.id === line.productId);
@@ -197,7 +200,7 @@ async function submit() {
     uni.navigateTo({ url: "/pages/address/edit" });
     return;
   }
-  if (hasInvalid) {
+  if (hasInvalid.value) {
     uni.showToast({ title: "有商品已失效，请先移除后再下单", icon: "none" });
     return;
   }
