@@ -395,7 +395,10 @@ function search() {
         campusStore.closedBanner
       }}</text></view
     ><!-- IKSW1F 夜宵入口横幅：/night/entry inNightSession=true 才渲染（白天零占位），点击进夜宵流程 -->
-    <NightEntryBanner /><!-- IKHM1P 公告条：小喇叭+文字，超宽滚动（双份文本无缝循环），空=隐藏 -->
+    <NightEntryBanner />
+    </view><!-- ↑ 白天专属容器到这为止：打烊横幅/夜宵入口横幅 -->
+    <!-- IKSW1F 通用区块（公告条/banner/双卡售后群）夜场同样显示，白天顺序一位不动（道哥 2026-11-06 反馈找回） -->
+    <!-- IKHM1P 公告条：小喇叭+文字，超宽滚动（双份文本无缝循环），空=隐藏 -->
     <view v-if="notice" class="notice-bar"
       ><text class="notice-bar__icon">📢</text
       ><view class="notice-bar__viewport"
@@ -416,7 +419,7 @@ function search() {
         ></view
       ></view
     >
-    <view class="search"
+    <view v-show="!nightMode" class="search"
       ><text class="search__glass">⌕</text
       ><input
         v-model="keyword"
@@ -547,7 +550,8 @@ function search() {
     <!-- 促销模块卡（IKAHFG/ADR-0006）：秒杀/临期分组，横滑，无活动不占位。
          IKBW0K：倒计时移除（多活动结束时间不一，单一倒计时失真）；整卡改为
          分类页「限时秒杀」入口——点击秒杀商品/版块均跳分类页特殊分类 -->
-    <view
+    <view v-show="!nightMode"
+    ><view
       v-for="g in promoGroups"
       :key="g.type"
       class="promo card"
@@ -606,13 +610,14 @@ function search() {
         ></scroll-view
       ></view
     >
-    <view class="section-title"
+    <view v-show="!nightMode" class="section-title"
       ><text class="section-title__main">{{ homeFeaturedName }}</text
       ><text class="section-title__sub" @tap="goCategory"
         ><!-- IK9VQ3：chevron 形状即 >，改 chip 暗示可点 -->
         <text class="link-chip">更多</text></text
       ></view
     >
+    <view v-show="!nightMode">
     <view v-if="loading" class="grid"
       ><view v-for="n in 4" :key="n" class="skeleton" /></view
     ><view v-else-if="!products.length" class="grid-empty"
@@ -628,6 +633,7 @@ function search() {
         @open="open"
     /></view>
   </view>
+  </view><!-- ↑ IKSW1F 白天专属容器（促销/栏目标题/货架）到此为止 -->
 
   <!-- 进群弹窗（IKD6FA 复用 IKAJSZ）：show-menu-by-longpress 长按识别；
        IKDERY 未配置态：气泡占位 + 筹备中文案 + 去逛逛引导 -->
@@ -697,7 +703,7 @@ function search() {
     </view>
   </view>
   <TabBar :current="0" />
-  <CartOverlay />
+  <CartOverlay v-if="!nightMode" /><!-- IKSW1F 夜场由 NightHomeMode 夜宵购物车条接管 -->
 
 <!-- IKQYUD 每日福利群弹窗：居中大卡，长按识别进群 -->
 <view v-if="groupAdOpen" class="gad-mask" @tap="groupAdOpen = false">
