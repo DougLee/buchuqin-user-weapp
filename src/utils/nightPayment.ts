@@ -47,7 +47,7 @@ export async function startNightPayFlow(
   try {
     // #ifdef H5
     if (import.meta.env.DEV && import.meta.env.VITE_NIGHT_LOCAL_PREVIEW === 'true' && prepay.payParams.appId === 'LOCAL_PREVIEW_ONLY') {
-      const choice = await uni.showModal({ title: '本机模拟支付', content: '仅验证独立测试库内的订单流程，不会真实扣款。确认模拟支付？', confirmText: '模拟支付', cancelText: '取消' });
+      const choice = await uni.showModal({ title: '本机模拟支付', content: '仅验证测试数据的订单流程，不会真实扣款。确认模拟支付？', confirmText: '模拟支付', cancelText: '取消' });
       if (!choice.confirm) return false;
       const response = await fetch('/__night-preview/pay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId }) });
       if (!response.ok) throw new Error('本机模拟支付失败');

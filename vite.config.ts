@@ -4,13 +4,15 @@ import uni from "@dcloudio/vite-plugin-uni";
 import { nightUserPreviewLoginPlugin } from "./scripts/night-preview-login.mjs";
 // @ts-ignore Vite dev-only Node middleware.
 import { nightPreviewPayPlugin } from "./scripts/night-preview-pay.mjs";
+// @ts-ignore Development-only harness for the explicitly selected test server.
+import { nightRemoteAcceptancePlugin } from "./scripts/night-remote-acceptance.mjs";
 
 const apiTarget = process.env.VITE_API_PROXY_TARGET || "https://admin-test.buchuqin.com";
 if (!["localhost", "127.0.0.1", "admin-test.buchuqin.com"].includes(new URL(apiTarget).hostname)) throw new Error("本地开发只允许本机或指定测试API，禁止生产连接");
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [uni(), nightUserPreviewLoginPlugin({ apiTarget }), nightPreviewPayPlugin({ apiTarget })],
+  plugins: [uni(), nightRemoteAcceptancePlugin({ apiTarget, kind: 'user' }), nightUserPreviewLoginPlugin({ apiTarget }), nightPreviewPayPlugin({ apiTarget })],
   define: { 'import.meta.env.VITE_NIGHT_LOCAL_PREVIEW': JSON.stringify(["http://localhost:3150", "http://127.0.0.1:3150"].includes(apiTarget) ? "true" : "false") },
   server: {
     host: "0.0.0.0",
