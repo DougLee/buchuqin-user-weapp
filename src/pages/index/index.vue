@@ -16,6 +16,8 @@ import WelcomeGift from "../../components/WelcomeGift.vue";
 import PhoneGate from "../../components/PhoneGate.vue";
 // IKSW1F 夜宵入口横幅：自持 /night/entry 拉取与显隐（inNightSession 才渲染）
 import NightEntryBanner from "../../components/NightEntryBanner.vue";
+import NightHomeMode from "../../components/NightHomeMode.vue";
+import { nightApi } from "../../api/night";
 import { useCartStore } from "../../stores/cart";
 import { useCampusStore } from "../../stores/campus";
 import { useSessionStore } from "../../stores/session";
@@ -36,6 +38,9 @@ import type {
 const session = useSessionStore(); // IKE3HT 强授权门模板绑定
 /** IKG1C 打烊停单：闭店态随 /home 同批到位（campusStore.apply 不加请求） */
 const campusStore = useCampusStore();
+/** IKSW1F 夜宵模式（道哥 2026-11-05）：夜宵场次中首页整体切换夜宵店形态，
+ *  白天商品流/搜索/推荐全部隐藏；场次外恢复白天形态零痕迹 */
+const nightMode = ref(false);
 /** IKS0W7：栏目名称（校区级可配，空回落默认）——首页栏目与分类页侧栏同源 */
 const homeFeaturedName = computed(
   () => campusStore.homeFeaturedLabel || "为你推荐",
@@ -90,6 +95,13 @@ onShow(async () => {
   // 首页框不留残留，避免二次点搜索重复跳转同词）
   keyword.value = "";
   await useSessionStore().ensureLogin();
+  // IKSW1F 夜宵模式判定：以服务端 entry 三元组为准（客户端不自算时钟）
+  try {
+    const entry = await nightApi.entry();
+    nightMode.value = entry.inNightSession === true;
+  } catch {
+    nightMode.value = false;
+  }
   const [home, addresses] = await Promise.all([api.home(), api.addresses()]);
   // 当前地址统一走 pickCurrentAddress（道哥 2026-09-09：切地址后首页跟随）
   defaultAddress.value = pickCurrentAddress(addresses);
@@ -368,7 +380,10 @@ function search() {
       ><text class="loc-sep"> · </text
       ><text class="loc-addr" @tap.stop="goAddress">{{ addressText }}</text
       ><text class="down" @tap.stop="goCampus">⌄</text></view
-    ><!-- IKG1C 打烊横幅：closedNow 服务端判定，文案随闭店原因切换（手动/时间窗） -->
+    >
+    <NightHomeMode v-show="nightMode" ref="nightHomeRef"></NightHomeMode>
+    <view v-show="!nightMode">
+    <!-- IKG1C 打烊横幅：closedNow 服务端判定，文案随闭店原因切换（手动/时间窗） -->
     <view v-if="campusStore.closedNow" class="closed-banner"
       ><text class="closed-banner__dot">●</text
       ><text class="closed-banner__text">{{
@@ -700,6 +715,7 @@ function search() {
       <text class="gad__hint">长按识别二维码 · 加入福利群</text>
       <text class="gad__hint--sub">售后进度提醒 · 专属优惠券第一时间掌握</text>
       <button class="gad__btn" @tap="groupAdOpen = false">我知道了</button>
+    </view>
     </view>
   </view>
 </view>
