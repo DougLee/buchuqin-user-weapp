@@ -11,6 +11,9 @@ import { categoryImage } from "../../utils/categoryImage";
 import type { Category, Product } from "../../types";
 import { useSessionStore } from "../../stores/session";
 import { APP_NAME } from "../../config/app";
+import { nightApi } from "../../api/night";
+import { useNightCartStore } from "../../stores/nightCart";
+import type { NightProduct } from "../../types/night";
 import { onShareAppMessage, onShareTimeline } from "@dcloudio/uni-app";
 /** IKQXK6 分类分享：选中有效分类时分享带 cat 深链（首页 onLoad 消费后
  *  switchTab 回本页并选中该分类）；all/秒杀回落默认品牌分享。
@@ -89,6 +92,102 @@ const error = ref(false);
 const cart = useCartStore();
 const campusStore = useCampusStore();
 const closedNow = computed(() => campusStore.closedNow);
+/* ==================== IKSW1F 夜宵模式（道哥 2026-11-06）：场次中本页整体
+   换当前楼栋夜宵店数据——页面结构/段制渲染机器原样复用，侧栏「全部夜宵」
+   单项（夜主档无分类体系，将来扩分类自动多段）；加购与购物车条走夜宵
+   购物车；搜索/秒杀/推荐等白天专属入口隐藏；场次外回白天零痕迹 ==================== */
+const nightMode = ref(false);
+const nightStoreId = ref("");
+const nightBuildingId = ref("");
+const nightBuildingName = ref("");
+const nightOpen = ref(false);
+const nightCart = useNightCartStore();
+const nightCartCount = computed(() => nightCart.countOf(nightStoreId.value));
+const nightCartAmount = computed(() => nightCart.amountOf(nightStoreId.value));
+/** 加购禁用：白天=闭店拦截；夜宵=店未开业（商品上/上架/许可已由接口过滤） */
+const addDisabled = computed(() =>
+  nightMode.value ? !nightOpen.value : closedNow.value,
+);
+/** 夜宵数据装载：换源不换机器——categories/sections 填夜宵数据，
+ *  段制渐进渲染/滚动联动/锚线机制原样运行 */
+async function loadNight() {
+  const memo = String(uni.getStorageSync("nightBuildingId") || "");
+  loading.value = true;
+  error.value = false;
+  renderSegs.value = 1;
+  sections.value = [];
+  try {
+    const bundle = await nightApi.stores(memo);
+    const row = bundle.stores.find((r) => r.buildingId === memo);
+    if (!row || !row.storeId) {
+      // 该楼无店：清记忆回白天（与首页夜宵形态同口径）
+      uni.removeStorageSync("nightBuildingId");
+      nightMode.value = false;
+      await load();
+      return;
+    }
+    nightStoreId.value = row.storeId;
+    nightBuildingId.value = row.buildingId;
+    const [detail, goods] = await Promise.all([
+      nightApi.storeDetail(row.storeId),
+      nightApi.storeProducts(row.storeId),
+    ]);
+    nightBuildingName.value = row.buildingName;
+    nightOpen.value = detail.state === "open";
+    categories.value = [{ id: "night-all", name: "全部夜宵" }];
+    sections.value = [
+      {
+        catId: "night-all",
+        catName: `${row.buildingName}·夜宵店`,
+        items: goods as unknown as Product[],
+      },
+    ];
+    active.value = "night-all";
+  } catch {
+    // 网络抖动不清楼栋记忆（首页夜宵形态同口径）：保留选择下次 onShow 重试
+    error.value = true;
+  } finally {
+    loading.value = false;
+    void ensureScrollable();
+  }
+}
+/** 加购数量/写入分流：白天=day cart；夜宵=nightCart（按店分桶）。
+ *  第三参秒杀标记仅白天语义（夜宵无秒杀段，透传 false） */
+function qtyOf(p: Product) {
+  return nightMode.value
+    ? nightCart.quantityOf(nightStoreId.value, p.id)
+    : cart.quantity(p.id);
+}
+function setQty(p: Product, qty: number, seckill = false) {
+  if (nightMode.value) {
+    if (!nightOpen.value) return;
+    nightCart.setQuantity(
+      {
+        id: nightStoreId.value,
+        buildingId: nightBuildingId.value,
+        buildingName: nightBuildingName.value,
+      },
+      p as unknown as NightProduct,
+      qty,
+    );
+    return;
+  }
+  void cart.set(p, qty, seckill);
+}
+/** 夜宵商品卡不跳详情（夜主档资料只有图/名/价，无详情内容） */
+function openCard(p: Product) {
+  if (nightMode.value) return;
+  open(p.id);
+}
+function goNightBuildings() {
+  uni.navigateTo({ url: "/pages/night/buildings" });
+}
+function goNightCheckout() {
+  if (!nightCartCount.value) return;
+  uni.navigateTo({
+    url: `/pages/night/checkout?storeId=${nightStoreId.value}&buildingId=${nightBuildingId.value}`,
+  });
+}
 /** IKS0W7：栏目标签文案（校区级可配，空回落默认）——侧栏项与段标题同源 */
 const seckillName = computed(() => campusStore.seckillLabel || "限时秒杀");
 const featuredName = computed(() => campusStore.featuredLabel || "推荐");
@@ -333,6 +432,20 @@ let userPickedCat = false;
 
 onShow(async () => {
   track("page_view", "category"); // IKRGLV 转化漏斗（PV 口径，tab 切换计入）
+  // IKSW1F 夜宵分支判定：场次内 + 有楼栋记忆 → 本页整体换夜宵数据源；
+  // 判定失败/场次外回白天（每次 onShow 重判，tab 切换/返回都自动跟随）
+  try {
+    const entry = await nightApi.entry();
+    nightMode.value =
+      entry.inNightSession === true &&
+      !!uni.getStorageSync("nightBuildingId");
+  } catch {
+    nightMode.value = false;
+  }
+  if (nightMode.value) {
+    await loadNight();
+    return;
+  }
   // IKQX2A（道哥 2026-10-27）：从商品详情返回——不重置选中分类与浏览位置。
   // 仅轻刷新购物车红点（加购/数量变化跨页可见），数据流/侧栏高亮/滚动
   // 全部保持原样。其余进入（tab 切换/深链/搜索）走原有全量重置逻辑。
@@ -605,7 +718,16 @@ const open = (id: string) => {
 </script>
 <template>
   <view class="page"
-    ><view class="search card"
+    ><!-- IKSW1F 夜宵模式：搜索框隐藏换夜宵店头（楼栋名/营业状态/切换楼栋） -->
+    <view v-if="nightMode" class="night-head card"
+      ><text class="night-head__name">🌙 {{ nightBuildingName }}·夜宵店</text
+      ><text
+        class="night-head__badge"
+        :class="{ 'night-head__badge--open': nightOpen }"
+        >{{ nightOpen ? "营业中" : "未营业" }}</text
+      ><text class="night-head__link" @tap="goNightBuildings">切换楼栋</text
+    ></view
+    ><view v-else class="search card"
       ><view class="search__field"
         ><input
           v-model="draft"
@@ -684,7 +806,7 @@ const open = (id: string) => {
               v-for="p in seg.items"
               :key="p.id"
               class="item card"
-              @tap="open(p.id)"
+              @tap="openCard(p)"
               ><image
                 class="item__image"
                 :src="p.image"
@@ -705,39 +827,39 @@ const open = (id: string) => {
                     ></view
                   ><!-- 计数器（IK9AWL）：数量>0 时展开 − n ＋，数字不再是隐形加号；
                        IKG8FF 秒杀限购：达到 limit 上限后 ＋ 禁用 -->
-                  <view v-if="cart.quantity(p.id)" class="counter" @tap.stop
+                  <view v-if="qtyOf(p)" class="counter" @tap.stop
                     ><button
                       class="counter__btn counter__btn--minus"
                       aria-label="减少一件"
-                      @tap.stop="cart.set(p, cart.quantity(p.id) - 1, seg.catId === 'seckill')"
+                      @tap.stop="setQty(p, qtyOf(p) - 1, seg.catId === 'seckill')"
                     >
                       −
                     </button
-                    ><text class="counter__num">{{ cart.quantity(p.id) }}</text
+                    ><text class="counter__num">{{ qtyOf(p) }}</text
                     ><button
                       class="counter__btn"
                       :class="{
                         'counter__btn--cap':
                           p.seckillLimit &&
-                          cart.quantity(p.id) >= p.seckillLimit.limit,
-                        'add--closed': closedNow,
+                          qtyOf(p) >= p.seckillLimit.limit,
+                        'add--closed': addDisabled,
                       }"
                       :disabled="
-                        closedNow ||
+                        addDisabled ||
                         (!!p.seckillLimit &&
-                          cart.quantity(p.id) >= p.seckillLimit.limit)
+                          qtyOf(p) >= p.seckillLimit.limit)
                       "
                       aria-label="增加一件"
-                      @tap.stop="cart.set(p, cart.quantity(p.id) + 1, seg.catId === 'seckill')"
+                      @tap.stop="setQty(p, qtyOf(p) + 1, seg.catId === 'seckill')"
                     >
                       ＋
                     </button></view
-                  ><!-- IKG1C：闭店时 ＋ 置灰禁买，优先于已抢购（整店都买不了） -->
+                  ><!-- IKG1C：闭店时 ＋ 置灰禁买（夜宵模式=店未开业），优先于已抢购 -->
                   <button
-                    v-else-if="closedNow"
+                    v-else-if="addDisabled"
                     class="add add--closed"
                     disabled
-                    aria-label="已打烊"
+                    :aria-label="nightMode ? '未营业' : '已打烊'"
                   >
                     ＋
                   </button
@@ -762,7 +884,7 @@ const open = (id: string) => {
                     v-else
                     class="add"
                     aria-label="加入购物车"
-                    @tap.stop="cart.set(p, cart.quantity(p.id) + 1, seg.catId === 'seckill')"
+                    @tap.stop="setQty(p, qtyOf(p) + 1, seg.catId === 'seckill')"
                   >
                     ＋
                   </button></view
@@ -776,7 +898,18 @@ const open = (id: string) => {
           ></template
         ></view
       ></view
-    ><TabBar :current="1" /><CartOverlay /></view
+    ><TabBar :current="1" />
+    <CartOverlay v-if="!nightMode" />
+    <!-- IKSW1F 夜宵模式购物车条：夜场中替换白天悬浮窗，直达夜宵结算 -->
+    <view
+      v-else-if="nightCartCount"
+      class="night-cartbar"
+      @tap="goNightCheckout"
+      ><text class="night-cartbar__badge">{{ nightCartCount }}</text
+      ><text class="night-cartbar__amount"
+        >¥{{ fenToYuan(nightCartAmount) }}</text
+      ><text class="night-cartbar__go">去结算</text></view
+    ></view
   >
 </template>
 <style scoped lang="scss">
@@ -1075,5 +1208,74 @@ const open = (id: string) => {
   50% {
     opacity: 0.55;
   }
+}
+/* ==================== IKSW1F 夜宵模式：店头 + 购物车条 ==================== */
+.night-head {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 22rpx 28rpx;
+  background: linear-gradient(135deg, #10381f, #0d6b3a);
+  border-radius: 20rpx;
+  color: #fff;
+  margin-bottom: 18rpx;
+}
+.night-head__name {
+  font-size: 30rpx;
+  font-weight: 800;
+  flex: 1;
+}
+.night-head__badge {
+  font-size: 22rpx;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999rpx;
+  padding: 6rpx 18rpx;
+}
+.night-head__badge--open {
+  background: #ffd75e;
+  color: #7a4d00;
+  font-weight: 700;
+}
+.night-head__link {
+  font-size: 24rpx;
+  color: #ffe9a8;
+  text-decoration: underline;
+}
+.night-cartbar {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: calc(120rpx + env(safe-area-inset-bottom));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 22rpx 36rpx;
+  border-radius: 999rpx;
+  background: #10381f;
+  color: #fff;
+  box-shadow: 0 10rpx 24rpx rgba(7, 60, 30, 0.35);
+}
+.night-cartbar__badge {
+  min-width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: #ffd75e;
+  color: #7a4d00;
+  font-size: 24rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.night-cartbar__amount {
+  flex: 1;
+  font-size: 32rpx;
+  font-weight: 800;
+}
+.night-cartbar__go {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: #ffd75e;
 }
 </style>

@@ -4,6 +4,9 @@ import { onShow } from "@dcloudio/uni-app";
 import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
 import type { CartLine } from "../../types";
+import { nightApi } from "../../api/night";
+import { useNightCartStore } from "../../stores/nightCart";
+import type { NightProduct } from "../../types/night";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
 /**
@@ -15,7 +18,90 @@ const cart = useCartStore();
 /** 首次加载标记（骨架屏）：store.loading 在 ensureLogin 之后才置真，
  *  首帧会闪空态——用本地 booted 盖住首帧，拉完才允许展示空车引导 */
 const booted = ref(false);
+/* ==================== IKSW1F 夜宵模式（道哥 2026-11-06）：场次中本页换
+   夜宵购物车——当前楼栋店行编辑/合计/去结算，白天购物车 v-show 隐藏零改动。
+   夜宵车为客户端本地暂存（store 初始化即读 storage），无骨架诉求 ==================== */
+const nightCart = useNightCartStore();
+const nightMode = ref(false);
+const nightStoreId = ref("");
+const nightBuildingId = ref("");
+const nightBuildingName = ref("");
+const nightOpen = ref(false);
+/** 本店商品实时列表：行步进的库存上限依据（服务端下单仍全量重验兜底） */
+const nightProducts = ref<NightProduct[]>([]);
+const nightLines = computed(() => nightCart.linesOf(nightStoreId.value));
+const nightCount = computed(() => nightCart.countOf(nightStoreId.value));
+const nightAmount = computed(() => nightCart.amountOf(nightStoreId.value));
+const nightQty = (productId: string) =>
+  nightCart.quantityOf(nightStoreId.value, productId);
+const nightStockOf = (productId: string) =>
+  nightProducts.value.find((p) => p.id === productId)?.stock ?? 999;
+/** 步进写入：需 NightProduct 全量（setQuantity 以最新 stock/price 快照为准） */
+function nightSet(productId: string, qty: number) {
+  if (!nightOpen.value) return;
+  const product = nightProducts.value.find((p) => p.id === productId);
+  if (!product) return; // 已下架/列表未就绪：不动行，结算页服务端重验兜底
+  nightCart.setQuantity(
+    {
+      id: nightStoreId.value,
+      buildingId: nightBuildingId.value,
+      buildingName: nightBuildingName.value,
+    },
+    product,
+    qty,
+  );
+}
+function goNightCheckout() {
+  if (!nightCount.value) return;
+  uni.navigateTo({
+    url: `/pages/night/checkout?storeId=${nightStoreId.value}&buildingId=${nightBuildingId.value}`,
+  });
+}
+function goNightStore() {
+  uni.navigateTo({
+    url: `/pages/night/store?storeId=${nightStoreId.value}&buildingId=${nightBuildingId.value}`,
+  });
+}
+/** 夜宵分支装载：解析楼栋记忆 → 店态 + 本店商品（库存上限用）；
+ *  失败容忍本地快照行继续展示（结算页服务端全量重验兜底） */
+async function loadNight() {
+  booted.value = true;
+  const memo = String(uni.getStorageSync("nightBuildingId") || "");
+  try {
+    const bundle = await nightApi.stores(memo);
+    const row = bundle.stores.find((r) => r.buildingId === memo);
+    if (!row || !row.storeId) {
+      uni.removeStorageSync("nightBuildingId");
+      nightMode.value = false;
+      await cart.load();
+      return;
+    }
+    nightStoreId.value = row.storeId;
+    nightBuildingId.value = row.buildingId;
+    nightBuildingName.value = row.buildingName;
+    const [detail, goods] = await Promise.all([
+      nightApi.storeDetail(row.storeId),
+      nightApi.storeProducts(row.storeId),
+    ]);
+    nightOpen.value = detail.state === "open";
+    nightProducts.value = goods;
+  } catch {
+    /* 网络抖动不清楼栋记忆：下次 onShow 重试（首页/分类页同口径） */
+  }
+}
 onShow(async () => {
+  // IKSW1F 夜宵分支判定（同首页/分类页口径）：场次内+有楼栋记忆 → 夜宵车
+  try {
+    const entry = await nightApi.entry();
+    nightMode.value =
+      entry.inNightSession === true && !!uni.getStorageSync("nightBuildingId");
+  } catch {
+    nightMode.value = false;
+  }
+  if (nightMode.value) {
+    await loadNight();
+    return;
+  }
   await cart.load();
   booted.value = true;
 });
@@ -104,6 +190,71 @@ function onClearCart() {
 </script>
 <template>
   <view class="page cart-page"
+    ><!-- IKSW1F 夜宵模式：夜场整页换夜宵购物车（本地暂存车行编辑+去结算），
+         白天购物车 v-show 隐藏零改动 -->
+    <view v-if="nightMode" class="night-cart"
+      ><view class="cart-head"
+        ><text class="cart-head__title"
+          >🌙 {{ nightBuildingName }}·夜宵店</text
+        ><text class="muted">{{ nightCount }} 件</text></view
+      ><view v-if="!nightLines.length" class="cart-empty"
+        ><text class="cart-empty__mark">空</text
+        ><text class="cart-empty__title">夜宵购物车还空着</text
+        ><text class="muted">去夜宵店挑点今晚想吃的吧</text
+        ><button class="cart-empty__go" @tap="goNightStore">回夜宵店加购</button
+      ></view
+      ><template v-else
+        ><view class="cart-list card"
+          ><view
+            v-for="line in nightLines"
+            :key="line.productId"
+            class="line"
+            ><image
+              class="line__image"
+              :src="line.image"
+              mode="aspectFit"
+              :alt="line.name"
+            /><view class="line__main"
+              ><text class="line__name">{{ line.name }}</text
+              ><view class="line__bottom"
+                ><text class="price"
+                  ><text class="price__symbol">¥</text
+                  >{{ fenToYuan(line.price) }}</text
+                ><view class="counter"
+                  ><button
+                    aria-label="减少一件"
+                    @tap="nightSet(line.productId, nightQty(line.productId) - 1)"
+                  >
+                    −</button
+                  ><text>{{ nightQty(line.productId) }}</text
+                  ><button
+                    aria-label="增加一件"
+                    :disabled="nightQty(line.productId) >= nightStockOf(line.productId)"
+                    @tap="nightSet(line.productId, nightQty(line.productId) + 1)"
+                  >
+                    ＋</button
+                  ></view
+                ></view
+              ></view
+            ></view
+          ></view
+        ><view class="cart-foot safe-bottom"
+          ><view class="cart-foot__row"
+            ><view
+              ><text class="muted">合计</text
+              ><text class="cart-foot__total"
+                >¥{{ fenToYuan(nightAmount) }}</text
+              ></view
+            ><button
+              class="primary-btn cart-foot__checkout"
+              @tap="goNightCheckout"
+            >
+              去结算
+            </button></view
+          ></view
+        ></template
+      ></view
+    ><view v-show="!nightMode"
     ><view class="cart-head"
       ><text class="cart-head__title">购物车</text
       ><text class="muted">{{ cart.cart.totalQuantity }} 件</text
@@ -209,6 +360,7 @@ function onClearCart() {
         </button></view
       ></view
     >
+    </view>
   </view>
   <TabBar :current="2" />
 </template>
