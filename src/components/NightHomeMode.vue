@@ -88,8 +88,9 @@ function add(product: NightProduct) {
 }
 function goCheckout() {
   if (!cartCount.value) return;
+  // storeId=夜宵店 id（购物车分桶键，与店铺页同约定），buildingId=楼栋 id
   uni.navigateTo({
-    url: `/pages/night/checkout?storeId=${buildingId.value}&buildingId=${buildingId.value}`,
+    url: `/pages/night/checkout?storeId=${storeId.value}&buildingId=${buildingId.value}`,
   });
 }
 </script>

@@ -41,6 +41,9 @@ const campusStore = useCampusStore();
 /** IKSW1F 夜宵模式（道哥 2026-11-05）：夜宵场次中首页整体切换夜宵店形态，
  *  白天商品流/搜索/推荐全部隐藏；场次外恢复白天形态零痕迹 */
 const nightMode = ref(false);
+/** 夜宵组件句柄：onShow 回首页时触发 reload（v-show 不重挂载，记忆楼栋
+ *  变更后必须手动 load——否则选楼栋返回首页永远停留引导态） */
+const nightHomeRef = ref<InstanceType<typeof NightHomeMode>>();
 /** IKS0W7：栏目名称（校区级可配，空回落默认）——首页栏目与分类页侧栏同源 */
 const homeFeaturedName = computed(
   () => campusStore.homeFeaturedLabel || "为你推荐",
@@ -102,6 +105,8 @@ onShow(async () => {
   } catch {
     nightMode.value = false;
   }
+  // 夜场中每次回首页都重拉本店数据（选楼栋返回/店页返回的刷新入口）
+  if (nightMode.value) nightHomeRef.value?.load();
   const [home, addresses] = await Promise.all([api.home(), api.addresses()]);
   // 当前地址统一走 pickCurrentAddress（道哥 2026-09-09：切地址后首页跟随）
   defaultAddress.value = pickCurrentAddress(addresses);
