@@ -2,7 +2,6 @@
 import { ref } from "vue";
 import { onReachBottom, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
-import { isRetryable } from "../../api/request";
 import type { Notification } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
@@ -22,9 +21,8 @@ async function load(reset = true) {
     const res = await api.notificationsPage(page.value);
     items.value = reset ? res.items : [...items.value, ...res.items];
     total.value = res.total;
-  } catch (e) {
-    // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
-    if (isRetryable(e)) error.value = true;
+  } catch {
+    error.value = true;
   } finally {
     loading.value = false;
   }
@@ -42,17 +40,25 @@ onReachBottom(async () => {
   }
 });
 async function read(item: Notification) {
+  try {
   if (!item.read) {
     await api.readNotification(item.id);
     item.read = true;
   }
+  } catch { /* 保留未读状态，请求层已提示失败。 */ }
 }
 /** 全部已读（IK9AWO）：POST /notifications/read-all 后本地全标 */
 async function readAll() {
   if (!items.value.some((item) => !item.read)) return;
+  try {
   await api.readAllNotifications();
   items.value = items.value.map((item) => ({ ...item, read: true }));
   uni.showToast({ title: "已全部标为已读", icon: "success" });
+  } catch { /* 失败时不提前清除未读标记。 */ }
+}
+function messageTime(iso: string) {
+  const time = new Date(iso).getTime();
+  return Number.isFinite(time) ? new Date(time + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ') : '—';
 }
 </script>
 <template>
@@ -63,8 +69,8 @@ async function readAll() {
     ><view v-else-if="loading" class="msg-skeleton"
       ><view v-for="n in 3" :key="n" class="skeleton-block" /></view
     ><template v-else
-      ><view v-if="items.length && items.some((i) => !i.read)" class="read-all"
-        ><text @tap="readAll">全部已读</text></view
+      ><view v-if="items.length && items.some((i) => !i.read)" class="read-all" role="button" aria-label="全部标为已读" @tap="readAll"
+        ><text>全部已读</text></view
       ><view
         v-for="item in items"
         :key="item.id"
@@ -75,7 +81,7 @@ async function readAll() {
           ><text class="message__title">{{ item.title }}</text
           ><text class="message__content">{{ item.content }}</text
           ><text class="message__time">{{
-            item.createdAt.slice(0, 16).replace("T", " ")
+            messageTime(item.createdAt)
           }}</text></view
         ></view
       ><view v-if="!items.length" class="empty">暂时没有新消息</view
@@ -138,6 +144,8 @@ async function readAll() {
 }
 .read-all {
   display: flex;
+  min-height: 44px;
+  align-items: center;
   justify-content: flex-end;
   margin-bottom: 16rpx;
   color: $primary-dark;

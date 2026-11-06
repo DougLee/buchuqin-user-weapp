@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { api } from "../api";
+import { useNightCartStore } from "./nightCart";
 import { uploadImage } from "../api/request";
 import {
   finishBootConfirm,
@@ -93,6 +94,7 @@ export const useSessionStore = defineStore("session", {
     },
     /** 写入会话用户并完成初始化（登录 / token 换取资料两条路径共用） */
     applyUser(user: SessionUser) {
+      useNightCartStore().setOwner(user.id);
       this.user = user;
       this.needsNickname =
         !readLocalNickname() &&

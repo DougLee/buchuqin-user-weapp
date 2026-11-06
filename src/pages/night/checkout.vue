@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
-import { isRetryable } from "../../api/request";
+import { ApiError } from "../../api/request";
 import { nightApi } from "../../api/night";
 import PhoneGate from "../../components/PhoneGate.vue";
 import { useNightCartStore } from "../../stores/nightCart";
@@ -33,6 +33,7 @@ const buildingId = ref("");
 const store = ref<NightStoreRow>();
 const entry = ref<NightEntry>();
 const products = ref<NightProduct[]>([]);
+const productsLoaded = ref(false);
 const addresses = ref<Address[]>([]);
 const addressId = ref("");
 const remark = ref("");
@@ -51,7 +52,7 @@ const productAmount = computed(() => cart.amountOf(storeId.value));
 const invalidLineIds = computed(() => {
   // 商品清单未就绪（加载中/失败）时不做本地预检：服务端提交时全量重验兜底，
   // 避免误标全行失效阻塞下单（2026-11-05 H5 实测竞态）
-  if (!products.value.length) return [];
+  if (!productsLoaded.value) return [];
   const invalid: string[] = [];
   for (const line of cartLines.value) {
     const product = products.value.find((p) => p.id === line.productId);
@@ -71,13 +72,20 @@ const currentAddress = computed(() =>
     null,
 );
 /** 夜宵券：可下单用的 = claimed/released 且未过期且门槛够 */
+function eligibleAmount(coupon: { nightProductIds?: string[] }) {
+  if (!coupon.nightProductIds?.length) return productAmount.value;
+  return cartLines.value.reduce((sum, line) => {
+    const p = products.value.find(p => p.id === line.productId);
+    return sum + (p && coupon.nightProductIds!.includes(p.catalogProductId) ? line.price * line.quantity : 0);
+  }, 0);
+}
 const usableCoupons = computed(() =>
   mineCoupons.value.filter(
     (item) =>
       (item.status === "claimed" || item.status === "released") &&
       (!item.coupon.expiresAt ||
         new Date(item.coupon.expiresAt).getTime() > Date.now()) &&
-      item.coupon.threshold <= productAmount.value,
+      eligibleAmount(item.coupon) > 0 && item.coupon.threshold <= eligibleAmount(item.coupon),
   ),
 );
 const selectedCoupon = computed(
@@ -87,28 +95,24 @@ const selectedCoupon = computed(
 );
 /** 不可用原因（门槛不够就地标差价；过期/已锁定直接隐藏不误导） */
 function couponReason(item: NightUserCoupon): string {
-  if (item.coupon.threshold > productAmount.value)
-    return `还差 ¥${fenToYuan(item.coupon.threshold - productAmount.value)} 可用`;
+  if (item.status === 'used') return '已使用';
+  if (item.status === 'locked') return '已被待支付订单占用';
   if (
     item.coupon.expiresAt &&
     new Date(item.coupon.expiresAt).getTime() <= Date.now()
   )
     return "已过期";
+  if (!eligibleAmount(item.coupon)) return '本次未选购适用商品';
+  if (item.coupon.threshold > eligibleAmount(item.coupon)) return `适用商品还差 ¥${fenToYuan(item.coupon.threshold - eligibleAmount(item.coupon))} 可用`;
   return "当前状态不可使用";
 }
 const disabledCoupons = computed(() =>
-  mineCoupons.value.filter(
-    (item) =>
-      (item.status === "claimed" || item.status === "released") &&
-      (!item.coupon.expiresAt ||
-        new Date(item.coupon.expiresAt).getTime() > Date.now()) &&
-      item.coupon.threshold > productAmount.value,
-  ),
+  mineCoupons.value.filter(item => !usableCoupons.value.some(usable => usable.id === item.id)),
 );
 /** 券不抵配送费且优惠不超商品金额（PRD 6.9：不找零） */
 const effectiveDiscount = computed(() =>
   selectedCoupon.value
-    ? Math.min(selectedCoupon.value.coupon.amount, productAmount.value)
+    ? Math.min(selectedCoupon.value.coupon.amount, eligibleAmount(selectedCoupon.value.coupon))
     : 0,
 );
 const deliveryFee = computed(() => entry.value?.nightDeliveryFee ?? 0);
@@ -117,8 +121,9 @@ const payableAmount = computed(
 );
 
 async function load() {
-  if (!storeId.value) return;
+  if (!storeId.value) { error.value = true; loading.value = false; return; }
   loading.value = true;
+  productsLoaded.value = false;
   error.value = false;
   const [detail, goods, entryData, addressList, coupons] =
     await Promise.allSettled([
@@ -132,37 +137,47 @@ async function load() {
     store.value = detail.value;
     if (detail.value.buildingId) buildingId.value = detail.value.buildingId;
   }
-  if (goods.status === "fulfilled") products.value = goods.value;
+  if (goods.status === "fulfilled") {
+    products.value = goods.value;
+    productsLoaded.value = true;
+    if (cart.refreshProducts(storeId.value, goods.value)) uni.showToast({ title: "商品价格已更新，请核对金额", icon: "none" });
+  }
   if (entryData.status === "fulfilled") entry.value = entryData.value;
-  if (addressList.status === "fulfilled")
+  if (addressList.status === "fulfilled") {
     addresses.value = addressList.value.filter(
       (a) => a.buildingId === buildingId.value,
     );
+    if (!addressId.value || !addresses.value.some(a => a.id === addressId.value)) {
+      const preferred = String(uni.getStorageSync('selectedAddressId') || '');
+      addressId.value = addresses.value.find(a => a.id === preferred)?.id || addresses.value[0]?.id || '';
+    }
+  }
   if (coupons.status === "fulfilled") {
     mineCoupons.value = coupons.value.mine;
     claimable.value = coupons.value.claimable;
   }
-  // 主数据挂了才整页重试（ADR-0005）；券/地址缺省不阻塞渲染
-  if (detail.status === "rejected" && isRetryable(detail.reason)) {
-    if (isRetryable(detail.reason)) error.value = true;
-  }
-  if (goods.status === "rejected" && isRetryable(goods.reason))
-    error.value = true;
+  // 地址与账单加载失败时应重试，不能把失败伪装成“没有地址/优惠券”。
+  error.value = [detail, goods, entryData, addressList, coupons].some(result => result.status === 'rejected');
   loading.value = false;
 }
 onLoad((q) => {
   storeId.value = String(q?.storeId || "");
   buildingId.value = String(q?.buildingId || "");
 });
-onShow(() => {
-  void session.ensureLogin().catch(() => {});
-  load();
+function manageAddresses() {
+  if (currentAddress.value) uni.setStorageSync('selectedAddressId', currentAddress.value.id);
+  addressId.value = '';
+  uni.navigateTo({ url: '/pages/address/index' });
+}
+onShow(async () => {
+  try { await session.ensureLogin(); await load(); }
+  catch { loading.value = false; error.value = true; }
 });
 /* ---------- 券操作 ---------- */
 function chooseCoupon(item: NightUserCoupon | null) {
-  if (item && item.coupon.threshold > productAmount.value) {
+  if (item && !usableCoupons.value.some(coupon => coupon.id === item.id)) {
     uni.showToast({
-      title: `满 ${Number(fenToYuan(item.coupon.threshold))} 元才能用这张券`,
+      title: couponReason(item),
       icon: "none",
     });
     return;
@@ -209,8 +224,12 @@ async function submit() {
     return;
   }
   submitting.value = true;
+  const intentKey = `nightCheckoutIntent:${cart.ownerId}:${storeId.value}`;
   try {
-    const created = await nightApi.submitOrder({
+    let payload: Parameters<typeof nightApi.submitOrder>[0] = {
+      requestId: `NC-${Date.now()}-${Math.random().toString(36).slice(2, 14)}`,
+      expectedProductAmount: productAmount.value,
+      expectedDeliveryFee: deliveryFee.value,
       storeId: storeId.value,
       items: cartLines.value.map((line) => ({
         productId: line.productId,
@@ -219,7 +238,17 @@ async function submit() {
       couponId: selectedCoupon.value?.id || undefined,
       addressId: currentAddress.value.id,
       remark: remark.value.trim() || undefined,
-    });
+    };
+    const saved = uni.getStorageSync(intentKey);
+    if (saved) {
+      try {
+        const prior = JSON.parse(saved);
+        if (prior.storeId === storeId.value && typeof prior.requestId === 'string' && Array.isArray(prior.items)) { payload = prior; uni.showToast({ title: '先核对上次提交的订单', icon: 'none' }); }
+      } catch { uni.removeStorageSync(intentKey); }
+    }
+    uni.setStorageSync(intentKey, JSON.stringify(payload));
+    const created = await nightApi.submitOrder(payload);
+    uni.removeStorageSync(intentKey);
     let paid = false;
     try {
       paid = await startNightPayFlow(created.id, storeId.value);
@@ -238,6 +267,10 @@ async function submit() {
         uni.redirectTo({ url: `/pages/night/order-detail?id=${created.id}` }),
       500,
     );
+  } catch (e) {
+    if (e instanceof ApiError && e.kind === 'business') uni.removeStorageSync(intentKey);
+    // 请求层已提示原因；重拉库存和价格，保留地址/备注及可重试的购物车。
+    await load();
   } finally {
     submitting.value = false;
   }
@@ -259,7 +292,7 @@ function goStore() {
     ><template v-else
     ><!-- 本楼地址卡：夜宵订单仅支持本楼配送（服务端强校验，前端先过滤） -->
     <view v-if="buildingAddresses.length" class="address card"
-      ><text class="address__flag">送到本楼寝室</text
+      ><view class="address__head"><text class="address__flag">送到本楼寝室</text><button class="address__manage" @tap="manageAddresses">管理地址</button></view
       ><view
         v-for="a in buildingAddresses"
         :key="a.id"
@@ -343,7 +376,7 @@ function goStore() {
           ><text class="coupon-opt__desc">{{ couponReason(item) }}</text></view
         ></view
       ><view v-if="!usableCoupons.length && !disabledCoupons.length" class="coupon-opt coupon-opt--empty"
-        ><text>暂无夜宵券，下方可领取</text></view
+        ><text>{{ claimable.length ? '暂无夜宵券，下方可领取' : '暂无可用夜宵券' }}</text></view
       ></view
     ><view v-if="claimable.length" class="coupon-claim card"
       ><view
@@ -437,7 +470,7 @@ function goStore() {
 .address {
   padding: 30rpx;
   border-left: 8rpx solid #17332a;
-  background: linear-gradient(135deg, #17241f, #fff 140%);
+  background: linear-gradient(135deg, #f0f5e9, #fff 140%);
 }
 .address__flag {
   display: block;
@@ -445,6 +478,9 @@ function goStore() {
   font-size: 22rpx;
   font-weight: 800;
 }
+.address__head { display: flex; align-items: center; justify-content: space-between; }
+.address__manage { margin: -12rpx -12rpx -12rpx 0; padding: 0 12rpx; min-height: 44px; display: flex; align-items: center; color: #335e40; background: transparent; font-size: 24rpx; line-height: 1.4; }
+.address__manage::after { border: none; }
 .address--empty {
   border-left-color: #d4380d;
   background: linear-gradient(135deg, #fff1ec, #fff);

@@ -1,5 +1,6 @@
 {
   "name": "不出寝食社",
+  "locale": "zh-Hans",
   /* 用户端正式 appid（道哥 2026-08-17 提供，IK8W5Q） */
   "appid": "wxc814687e5ae26924",
   "description": "",

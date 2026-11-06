@@ -30,13 +30,26 @@ interface NightCartBucket {
 }
 
 const STORAGE_KEY = "nightCart";
+const OWNER_KEY = "nightCartOwner";
+
+function ownerKey(owner: string) { return `${STORAGE_KEY}:${owner}`; }
 
 function loadStorage(): Record<string, NightCartBucket> {
   try {
-    const raw = uni.getStorageSync(STORAGE_KEY) as string;
+    const owner = String(uni.getStorageSync(OWNER_KEY) || "");
+    if (!owner) return {};
+    const raw = uni.getStorageSync(ownerKey(owner)) as string;
     if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, NightCartBucket>;
-    return parsed && typeof parsed === "object" ? parsed : {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).filter(([key, value]) => {
+      if (["__proto__", "constructor", "prototype"].includes(key) || !value || typeof value !== "object") return false;
+      const b = value as NightCartBucket;
+      return b.storeId === key && typeof b.buildingId === "string" && typeof b.buildingName === "string" && Array.isArray(b.items);
+    }).map(([key, value]) => {
+      const b = value as NightCartBucket;
+      return [key, { ...b, items: b.items.filter(line => line && typeof line.productId === "string" && typeof line.name === "string" && typeof line.image === "string" && Number.isInteger(line.price) && line.price >= 0 && Number.isInteger(line.quantity) && line.quantity > 0) }];
+    }));
   } catch {
     return {};
   }
@@ -44,6 +57,7 @@ function loadStorage(): Record<string, NightCartBucket> {
 
 export const useNightCartStore = defineStore("nightCart", {
   state: () => ({
+    ownerId: String(uni.getStorageSync(OWNER_KEY) || ""),
     carts: loadStorage() as Record<string, NightCartBucket>,
   }),
   getters: {
@@ -68,9 +82,15 @@ export const useNightCartStore = defineStore("nightCart", {
     },
   },
   actions: {
+    setOwner(userId: string) {
+      if (this.ownerId === userId) return;
+      this.ownerId = userId;
+      uni.setStorageSync(OWNER_KEY, userId);
+      this.carts = loadStorage();
+    },
     persist() {
       try {
-        uni.setStorageSync(STORAGE_KEY, JSON.stringify(this.carts));
+        if (this.ownerId) uni.setStorageSync(ownerKey(this.ownerId), JSON.stringify(this.carts));
       } catch {
         /* storage 满等异常静默：内存态仍可用，本次进程内不丢 */
       }
@@ -97,7 +117,8 @@ export const useNightCartStore = defineStore("nightCart", {
           items: [],
           savedAt: 0,
         });
-      const qty = Math.max(0, Math.min(quantity, product.stock));
+      const requested = Number.isFinite(quantity) ? Math.floor(quantity) : 0;
+      const qty = Math.max(0, Math.min(requested, product.stock, 999));
       const index = bucket.items.findIndex(
         (l) => l.productId === product.id,
       );
@@ -121,6 +142,20 @@ export const useNightCartStore = defineStore("nightCart", {
       bucket.savedAt = Date.now();
       this.persist();
     },
+    /** 重验结算快照，保留数量供用户核对缺货，不静默减少已选数量。 */
+    refreshProducts(storeId: string, products: NightProduct[]) {
+      const bucket = this.carts[storeId];
+      if (!bucket) return false;
+      let changed = false;
+      for (const line of bucket.items) {
+        const product = products.find(p => p.id === line.productId);
+        if (!product) continue;
+        if (line.price !== product.price) changed = true;
+        Object.assign(line, { price: product.price, name: product.name, image: product.image });
+      }
+      this.persist();
+      return changed;
+    },
     /** 移除失效行（结算页「移除失效商品」一键清） */
     removeLines(storeId: string, productIds: string[]) {
       const bucket = this.carts[storeId];
@@ -132,6 +167,25 @@ export const useNightCartStore = defineStore("nightCart", {
       this.persist();
     },
     /** 清空某店铺购物车（下单成功后调） */
+    consumeOrder(storeId: string, orderId: string, lines: Array<{ nightProductId: string; quantity: number }>) {
+      if (!this.ownerId) return;
+      const key = `nightCartConsumed:${this.ownerId}`;
+      let consumed: string[] = [];
+      try { const value = JSON.parse(String(uni.getStorageSync(key) || '[]')); if (Array.isArray(value)) consumed = value.filter(id => typeof id === 'string'); } catch {}
+      if (consumed.includes(orderId)) return;
+      const bucket = this.carts[storeId];
+      if (bucket) {
+        for (const line of lines) {
+          const selected = bucket.items.find(item => item.productId === line.nightProductId);
+          if (selected) selected.quantity = Math.max(0, selected.quantity - line.quantity);
+        }
+        bucket.items = bucket.items.filter(item => item.quantity > 0);
+        bucket.savedAt = Date.now();
+        this.persist();
+      }
+      uni.setStorageSync(key, JSON.stringify([...consumed.slice(-499), orderId]));
+    },
+    /** 用户主动清空某店购物车。 */
     clear(storeId: string) {
       delete this.carts[storeId];
       this.persist();

@@ -1,4 +1,5 @@
 import { request } from "./request";
+import { fetchAddresses } from './addresses';
 import type {
   NightCouponBundle,
   NightEntry,
@@ -8,7 +9,7 @@ import type {
   NightProduct,
   NightStoreRow,
 } from "../types/night";
-import type { Address, UserCoupon } from "../types";
+import type { UserCoupon } from "../types";
 
 /**
  * 夜宵店（/night/*）API 层：与白天 api/index.ts 完全隔离的独立封装。
@@ -30,6 +31,9 @@ export const nightApi = {
     request<NightProduct[]>(`/night/stores/${storeId}/products`),
   /** 提交夜宵订单（服务端全量重验+券锁定+库存原子扣减） */
   submitOrder: (data: {
+    requestId?: string;
+    expectedProductAmount?: number;
+    expectedDeliveryFee?: number;
     storeId: string;
     items: Array<{ productId: string; quantity: number }>;
     couponId?: string;
@@ -37,8 +41,8 @@ export const nightApi = {
     remark?: string;
   }) => request<NightOrder>("/night/orders", { method: "POST", data }),
   /** 我的夜宵订单（status 过滤；服务端懒关超时未支付单） */
-  orders: (status = "all") =>
-    request<NightOrder[]>(`/night/orders?status=${status}`),
+  orders: (status = "all", page = 1) =>
+    request<{ items: NightOrder[]; total: number; page: number; pageSize: number }>(`/night/orders?status=${encodeURIComponent(status)}&page=${page}&pageSize=20`),
   /** 夜宵订单详情 */
   order: (id: string) => request<NightOrder>(`/night/orders/${id}`),
   /** 取消订单（未接单；已支付走原路退款） */
@@ -53,7 +57,7 @@ export const nightApi = {
   /** 售后申请（一期轻量：类型+文字描述） */
   applyAfterSale: (
     id: string,
-    data: { type: string; description: string },
+    data: { type: string; description: string; images?: string[] },
   ) =>
     request<{ id: string; afterSaleStatus: string }>(
       `/night/orders/${id}/after-sale`,
@@ -75,13 +79,5 @@ export const nightApi = {
       method: "POST",
     }),
   /** 复用白天地址列表（夜宵结算按楼栋过滤） */
-  addresses: async () => {
-    const envelope = await request<{
-      items: Address[];
-      total: number;
-      page: number;
-      pageSize: number;
-    }>("/addresses");
-    return envelope.items;
-  },
+  addresses: fetchAddresses,
 };

@@ -51,15 +51,16 @@
 import { computed } from "vue";
 import { useCampusStore } from "../stores/campus";
 
-const props = defineProps<{ visible: boolean }>();
+const props = defineProps<{ visible: boolean; contact?: { phone: string; qrcode: string; kfUrl: string; corpId: string } | null }>();
 const emit = defineEmits<{ (e: "close"): void }>();
 const campus = useCampusStore();
-const qrcode = computed(() => campus.qrcode);
-const phone = computed(() => campus.phone);
+const qrcode = computed(() => props.contact?.qrcode ?? campus.qrcode);
+const phone = computed(() => props.contact?.phone ?? campus.phone);
+const corpId = computed(() => props.contact?.corpId ?? campus.serviceKfCorpId);
 /** #195 企微客服链接（校区行下发，空=未配置走原二维码/电话布局） */
-const kfUrl = computed(() => campus.serviceKfUrl);
+const kfUrl = computed(() => props.contact?.kfUrl ?? campus.serviceKfUrl);
 const close = () => emit("close");
-const call = () => uni.makePhoneCall({ phoneNumber: phone.value });
+const call = () => phone.value ? uni.makePhoneCall({ phoneNumber: phone.value }) : uni.showToast({ title: '此校区暂未配置客服电话', icon: 'none' });
 /**
  * #195 在线客服：拉起微信客服会话。wx.openCustomerServiceChat 未收录进
  * @dcloudio/types——宽位调用（mp 端 uni 运行时 Proxy 会回落到 wx 同名 API，
@@ -69,7 +70,7 @@ const call = () => uni.makePhoneCall({ phoneNumber: phone.value });
  */
 function openKf() {
   if (!kfUrl.value) return;
-  if (!campus.serviceKfCorpId) {
+  if (!corpId.value) {
     uni.showToast({ title: "客服未配置", icon: "none" });
     return;
   }
@@ -88,7 +89,7 @@ function openKf() {
     return;
   }
   openChat({
-    corpAccessId: campus.serviceKfCorpId,
+    corpAccessId: corpId.value,
     extInfo: { url: kfUrl.value },
     showMessageCard: false,
     fail: () => {},

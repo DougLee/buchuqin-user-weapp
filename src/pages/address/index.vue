@@ -6,6 +6,7 @@ import type { Address } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
 const addresses = ref<Address[]>([]),
+  failed = ref(false),
   selectedId = ref(""),
   busy = ref(false),
   /** 当前校区名（IKAJT2 去硬编码）：提示条随切换的校区走 */
@@ -13,6 +14,7 @@ const addresses = ref<Address[]>([]),
   /** 首次加载标记（2026-08-24 骨架屏）：盖住首帧，「还没有地址」引导不再抢跑 */
   booted = ref(false);
 async function refresh() {
+  failed.value = false;
   try {
     const [list, campus] = await Promise.allSettled([
       api.addresses(),
@@ -24,7 +26,7 @@ async function refresh() {
         uni.getStorageSync("selectedAddressId") ||
         addresses.value[0]?.id ||
         "";
-    }
+    } else failed.value = true;
     if (campus.status === "fulfilled") campusName.value = campus.value.name;
   } finally {
     booted.value = true;
@@ -41,19 +43,22 @@ function edit(a: Address) {
   uni.navigateTo({ url: `/pages/address/edit?id=${a.id}` });
 }
 async function remove(a: Address) {
+  if (busy.value) return;
+  busy.value = true;
+  try {
   const res = await uni.showModal({
     title: "删除这间寝室地址？",
     content: `${a.buildingName} ${a.room}（${a.contactName}）将被移除`,
     confirmText: "删除",
     confirmColor: "#d4380d",
   });
-  if (!res.confirm || busy.value) return;
-  busy.value = true;
-  try {
+  if (!res.confirm) return;
     await api.deleteAddress(a.id);
     if (selectedId.value === a.id) uni.removeStorageSync("selectedAddressId");
     uni.showToast({ title: "已删除", icon: "success" });
     await refresh();
+  } catch {
+    // 保留地址，请求层提示后可重试。
   } finally {
     busy.value = false;
   }
@@ -65,6 +70,8 @@ async function makeDefault(a: Address) {
     await api.setDefaultAddress(a.id);
     uni.showToast({ title: "已设为默认地址", icon: "success" });
     await refresh();
+  } catch {
+    // 不提前更改默认状态，失败后可以重试。
   } finally {
     busy.value = false;
   }
@@ -75,14 +82,17 @@ async function makeDefault(a: Address) {
     ><view class="notice"
       >当前配送{{ campusName || "所在校区" }}校内寝室</view
     ><!-- 加载骨架（2026-08-24）：地址卡同构占位 --><view
-      v-if="!booted && !addresses.length"
+      v-if="failed"
+      class="card"
+      ><text>寝室地址加载失败，请重试</text><button class="primary-btn" @tap="refresh">重新加载地址</button></view
+    ><view v-else-if="!booted && !addresses.length"
       class="addr-skeleton"
       ><view v-for="n in 3" :key="n" class="addr-skeleton__card" /></view
     ><view v-else-if="!addresses.length" class="empty-hint"
       ><text class="empty-hint__title">还没有寝室地址</text
       ><text class="muted">点下方按钮添加一间，楼长才知道送到哪</text></view
     ><view
-      v-for="a in addresses"
+      v-for="a in failed ? [] : addresses"
       :key="a.id"
       class="address card"
       :class="{ 'address--selected': selectedId === a.id }"
@@ -107,6 +117,7 @@ async function makeDefault(a: Address) {
         ></view
       ></view
     ><button
+      v-if="!failed"
       class="primary-btn"
       @tap="uni.navigateTo({ url: '/pages/address/edit' })"
     >

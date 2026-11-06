@@ -7,6 +7,7 @@ import type { Building, Room } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
 const editId = ref(""),
+  loadFailed = ref(false),
   saving = ref(false),
   buildings = ref<Building[]>([]),
   /** 配送学校名（IKAJT2 去硬编码）：接口下发 */
@@ -29,6 +30,7 @@ const currentBuilding = computed(() =>
 const allRooms = ref<Room[]>([]);
 /** 房间列表是否已就位（区分「没录数据」与「还没拉到」） */
 const roomsLoaded = ref(false);
+const roomsError = ref(false);
 /** 该楼有数据的楼层集合（升序）：枚举不到的层不出现 */
 const floors = computed(() =>
   [...new Set(allRooms.value.map((r) => r.floor))].sort((a, b) => a - b),
@@ -97,6 +99,7 @@ function roomKey(buildingId: string | undefined, floor: number | undefined) {
 /** 拉当前楼栋全部房间。legacy 伪楼栋（历史地址，后台无此楼）跳过；
  *  接口 silent：空列表按「未录入」处理，失败同（换楼栋可重试） */
 async function loadBuildingRooms() {
+  roomsError.value = false;
   const building = currentBuilding.value;
   if (!building || building.id.startsWith("legacy-")) {
     allRooms.value = [];
@@ -119,7 +122,7 @@ async function loadBuildingRooms() {
     allRooms.value = list;
     roomsLoaded.value = true;
   } catch {
-    /* 静默：按未录入处理 */
+    if (currentBuilding.value?.id === building.id) roomsError.value = true;
   }
 }
 // 楼栋变化：重拉房间分组
@@ -146,10 +149,16 @@ onLoad(async (q) => {
   editId.value = String(q?.id || "");
   if (editId.value)
     uni.setNavigationBarTitle({ title: "编辑寝室地址" });
+  await loadForm();
+});
+async function loadForm() {
+  loadFailed.value = false;
+  try {
   const [buildingRes, campusRes] = await Promise.allSettled([
     api.buildings(),
     api.currentCampus(),
   ]);
+  if (buildingRes.status === 'rejected' || campusRes.status === 'rejected') { loadFailed.value = true; return; }
   if (buildingRes.status === "fulfilled") buildings.value = buildingRes.value;
   if (campusRes.status === "fulfilled") campusName.value = campusRes.value.name;
   // IKE3HT 方案C：新建地址联系电话默认带出账号已绑手机号（可改）；
@@ -160,7 +169,7 @@ onLoad(async (q) => {
   if (!editId.value) return;
   const list = await api.addresses();
   const found = list.find((a) => a.id === editId.value);
-  if (!found) return;
+  if (!found) { loadFailed.value = true; return; }
   form.buildingName = found.buildingName;
   form.floor = found.floor;
   form.room = found.room;
@@ -182,8 +191,11 @@ onLoad(async (q) => {
     ];
   // IKD6FH：回填的寝室号锚定到「楼栋+楼层」，watcher 首次触发时才不会误清
   roomAnchor = roomKey(currentBuilding.value?.id, form.floor);
-});
+  } catch { loadFailed.value = true; }
+}
 async function save() {
+  if (saving.value) return;
+  if (roomsError.value) { uni.showToast({ title: '寝室数据加载失败，请先重试', icon: 'none' }); return; }
   const floor = form.floor;
   const building = currentBuilding.value;
   form.room = form.room.trim(); // 输入通道可能带进空格
@@ -236,6 +248,8 @@ async function save() {
       icon: "success",
     });
     setTimeout(() => uni.navigateBack(), 500);
+  } catch {
+    // 保留表单，请求层已提示原因，网络恢复后可重试。
   } finally {
     saving.value = false;
   }
@@ -243,7 +257,7 @@ async function save() {
 </script>
 <template>
   <view class="page"
-    ><view class="campus card"
+    ><view v-if="loadFailed" class="card"><text>地址信息加载失败或已失效</text><button class="primary-btn" @tap="loadForm">重新加载</button></view><template v-else><view class="campus card"
       ><text class="campus__label">配送学校</text
       ><text class="campus__name">{{
         campusName || "当前校区"
@@ -265,6 +279,7 @@ async function save() {
         ><text v-if="noRoomData" class="warn"
           >该楼栋寝室数据未录入，请换楼栋或联系管理员</text
         ></label
+      ><button v-if="roomsError" class="warn" @tap="loadBuildingRooms">寝室数据加载失败，点击重试</button
       ><label
         ><text>所在楼层</text
         ><picker
@@ -331,7 +346,7 @@ async function save() {
           placeholder="用于配送联系" /></label></view
     ><button class="primary-btn" :disabled="saving || noRoomData" @tap="save">
       {{ saving ? "正在保存…" : editId ? "保存修改" : "保存寝室地址" }}
-    </button></view
+    </button></template></view
   >
 </template>
 <style scoped lang="scss">

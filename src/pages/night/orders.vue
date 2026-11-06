@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { onUnmounted, ref } from "vue";
-import { onShow } from "@dcloudio/uni-app";
-import { isRetryable } from "../../api/request";
+import { onShow, onReachBottom } from "@dcloudio/uni-app";
 import { nightApi } from "../../api/night";
 import { fenToYuan } from "../../utils/money";
 import { startNightPayFlow } from "../../utils/nightPayment";
 import type { NightOrder } from "../../types/night";
 import { setupDefaultShare } from "../../utils/share";
+import { useSessionStore } from "../../stores/session";
+import { nightDate } from "../../utils/nightDate";
 setupDefaultShare();
 
 /**
@@ -15,10 +16,16 @@ setupDefaultShare();
  * 点卡片进详情页操作（取消/确认收货/售后）。
  */
 const orders = ref<NightOrder[]>([]);
+const session = useSessionStore();
 const active = ref("all");
 const paying = ref("");
 const loading = ref(true);
 const error = ref(false);
+const page = ref(1);
+const total = ref(0);
+const loadingMore = ref(false);
+const moreError = ref(false);
+let loadGeneration = 0;
 const nowTick = ref(Date.now());
 const ticker = setInterval(() => (nowTick.value = Date.now()), 30_000);
 onUnmounted(() => clearInterval(ticker));
@@ -31,20 +38,47 @@ const tabs: Array<[string, string]> = [
   ["delivered", "已送达"],
   ["completed", "已完成"],
   ["cancelled", "已取消"],
+  ["cancelling", "退款中"],
+  ["refunded", "已退款"],
+  ["exception", "需处理"],
 ];
 async function load(status = "all") {
+  const generation = ++loadGeneration;
   active.value = status;
   loading.value = true;
   error.value = false;
+  loadingMore.value = false;
+  moreError.value = false;
   try {
-    orders.value = await nightApi.orders(status);
+    await session.ensureLogin();
+    const result = await nightApi.orders(status, 1);
+    if (generation !== loadGeneration) return;
+    orders.value = result.items;
+    page.value = 1;
+    total.value = result.total;
   } catch (e) {
     // ADR-0005：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
-    if (isRetryable(e)) error.value = true;
+    if (generation === loadGeneration) error.value = true;
   } finally {
-    loading.value = false;
+    if (generation === loadGeneration) loading.value = false;
   }
 }
+async function loadMore() {
+  if (loading.value || loadingMore.value || orders.value.length >= total.value) return;
+  const generation = loadGeneration;
+  loadingMore.value = true;
+  moreError.value = false;
+  try {
+    const result = await nightApi.orders(active.value, page.value + 1);
+    if (generation !== loadGeneration) return;
+    const seen = new Set(orders.value.map(row => row.id));
+    orders.value.push(...result.items.filter(row => !seen.has(row.id)));
+    page.value = result.page;
+    total.value = result.total;
+  } catch { if (generation === loadGeneration) moreError.value = true; }
+  finally { if (generation === loadGeneration) loadingMore.value = false; }
+}
+onReachBottom(loadMore);
 onShow(() => {
   load(active.value);
 });
@@ -83,7 +117,7 @@ const metaText = (order: NightOrder) =>
   `${order.store?.buildingName ?? "夜宵店"} · ${order.businessDate} 夜宵场`;
 /** 列表副行兜底文案（无优惠时展示下单时间） */
 const remarkOf = (order: NightOrder) =>
-  `下单 ${order.createdAt.slice(5, 16).replace("T", " ")}`;
+  `下单 ${nightDate(order.createdAt)}`;
 </script>
 
 <template>
@@ -108,7 +142,7 @@ const remarkOf = (order: NightOrder) =>
     ><view v-else-if="!orders.length" class="empty"
       ><text class="empty__mark">🌙</text
       ><text class="empty__title">还没有夜宵订单</text
-      ><text class="muted">深夜饿了，去夜宵店逛逛</text></view
+      ><text class="muted">深夜饿了，去夜宵店逛逛</text><button class="primary-btn" @tap="uni.navigateTo({ url: '/pages/night/buildings' })">逛逛夜宵店</button></view
     ><template v-else
     ><view
       v-for="order in orders"
@@ -133,7 +167,7 @@ const remarkOf = (order: NightOrder) =>
             : remarkOf(order)
         }}</text
         ><text class="order__price"
-          >{{ order.status === "pending-payment" ? "应付" : "实付" }} ¥{{
+          >{{ order.paidAt ? "实付" : order.status === 'pending-payment' ? "待付" : "未支付" }} ¥{{
             fenToYuan(order.payableAmount)
           }}</text
         ></view
@@ -150,7 +184,7 @@ const remarkOf = (order: NightOrder) =>
           {{ paying === order.id ? "正在支付…" : "去支付" }}
         </button></view
       ></view
-    ></template
+    ><button class="load-more" :disabled="loadingMore" @tap="loadMore">{{ loadingMore ? '加载中…' : moreError ? '加载失败，点击重试' : orders.length < total ? '加载更多订单' : '已显示全部订单' }}</button></template
     ></view
   >
 </template>
@@ -160,6 +194,7 @@ const remarkOf = (order: NightOrder) =>
 .page {
   padding-bottom: calc(30rpx + env(safe-area-inset-bottom));
 }
+.load-more { min-height: 88rpx; background: transparent; color: #637368; font-size: 24rpx; }
 .tabs {
   white-space: nowrap;
   margin-bottom: 26rpx;

@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from "vue";
 import { nightApi } from "../api/night";
 import { useNightCartStore } from "../stores/nightCart";
+import { useSessionStore } from "../stores/session";
+import NightProductShelf from "./NightProductShelf.vue";
 import type { NightProduct, NightStoreRow } from "../types/night";
 
 /**
@@ -13,6 +15,9 @@ import type { NightProduct, NightStoreRow } from "../types/night";
  * 本组件信任挂载时机，不再重复拉 entry。
  */
 const cart = useNightCartStore();
+const session = useSessionStore();
+const error = ref(false);
+let generation = 0;
 const LOADING_BUILDING_KEY = "nightBuildingId"; // 与楼栋页「上次去过」同一键（agent C 既有体系）
 
 const store = ref<NightStoreRow>();
@@ -31,18 +36,27 @@ const cartAmount = computed(() => cart.amountOf(storeId.value));
 /** 加载本店数据（挂载方 onShow 可复用——首页 tabbar 页不销毁，
  *  返回首页/进店后回首页需刷新楼栋店状态） */
 async function load() {
+  const current = ++generation;
+  error.value = false;
   const memo = String(uni.getStorageSync(LOADING_BUILDING_KEY) || "");
   if (!memo) {
+    store.value = undefined;
+    storeId.value = "";
+    products.value = [];
     loading.value = false;
     return;
   }
   loading.value = true;
   try {
+    await session.ensureLogin();
     // 楼栋列表接口按楼栋找店（列表行含 storeId+状态）——无店=引导选楼栋
     // stores 接口返回 { session, stores }——夜主档/楼栋行均在 stores 数组
     const bundle = await nightApi.stores(memo);
+    if (current !== generation) return;
     const row = bundle.stores.find(r => r.buildingId === memo);
     if (!row || !row.storeId) {
+      store.value = undefined;
+      products.value = [];
       uni.removeStorageSync(LOADING_BUILDING_KEY);
       loading.value = false;
       return;
@@ -54,10 +68,13 @@ async function load() {
       nightApi.storeDetail(row.storeId),
       nightApi.storeProducts(row.storeId),
     ]);
+    if (current !== generation) return;
     store.value = detail;
     sessionInfo.value = detail.session;
     products.value = goods;
+    cart.refreshProducts(row.storeId, goods);
   } catch {
+    if (current === generation) error.value = true;
     // 加载失败（网络抖动等）不清楼栋记忆：保留用户选择，下次进首页重试
     // （清记忆仅发生在组件判定「该楼无店」时，见上方分支）
     loading.value = false;
@@ -74,20 +91,9 @@ function goBuildings() {
 function goOrders() {
   uni.navigateTo({ url: "/pages/night/orders" });
 }
-function add(product: NightProduct) {
-  if (!isOpen.value) return;
-  cart.setQuantity(
-    {
-      id: storeId.value,
-      buildingId: buildingId.value,
-      buildingName: buildingName.value,
-    },
-    product,
-    cart.quantityOf(storeId.value, product.id) + 1,
-  );
-}
 function goCheckout() {
   if (!cartCount.value) return;
+  if (!isOpen.value) { uni.showToast({ title: "店铺休息中，开门后可下单", icon: "none" }); return; }
   // storeId=夜宵店 id（购物车分桶键，与店铺页同约定），buildingId=楼栋 id
   uni.navigateTo({
     url: `/pages/night/checkout?storeId=${storeId.value}&buildingId=${buildingId.value}`,
@@ -96,12 +102,14 @@ function goCheckout() {
 </script>
 <template>
   <view class="nhm">
+    <view v-if="error" class="nhm__guide card"><text class="nhm__guide-title">夜宵好物暂时没加载出来</text><text class="nhm__guide-sub">保留了你的楼栋选择和购物车</text><button class="nhm__guide-btn" @tap="load">重新加载</button></view>
     <!-- 引导：未选楼栋/店铺失效 -->
-    <view v-if="!loading && !store" class="nhm__guide card">
+    <view v-else-if="!loading && !store" class="nhm__guide card">
       <text class="nhm__guide-title">🌙 夜宵店 · 选择你的楼栋</text>
       <text class="nhm__guide-sub">楼长夜宵店营业中，选好楼栋即可下单送到寝室</text>
       <button class="nhm__guide-btn" @tap="goBuildings">选择楼栋</button>
     </view>
+    <view v-else-if="loading && !store" class="nhm__guide card"><text class="nhm__guide-sub">正在准备今晚的好物…</text></view>
     <template v-else-if="store">
       <!-- 店头 -->
       <view class="nhm__head card">
@@ -118,27 +126,7 @@ function goCheckout() {
           <text class="nhm__head-link" @tap="goBuildings">切换楼栋</text>
         </view>
       </view>
-      <!-- 商品流（仅本店可售商品） -->
-      <view
-        v-for="p in products"
-        :key="p.id"
-        class="nhm__goods card"
-        ><!-- 售罄/未上架灰化 -->
-        <image class="nhm__img" :src="p.image" mode="aspectFill" />
-        <view class="nhm__main"
-          ><text class="nhm__name">{{ p.name }}</text
-          ><text class="nhm__price">￥{{ (p.price / 100).toFixed(2) }}</text></view
-        >
-        <view
-          class="nhm__add"
-          :class="{ 'nhm__add--off': p.stock <= 0 }"
-          @tap="p.stock > 0 && add(p)"
-          >{{ p.stock > 0 ? "＋" : "售罄" }}</view
-        >
-      </view>
-      <view v-if="!products.length" class="nhm__empty card">
-        <text>本店商品备货中，稍后再来看看</text>
-      </view>
+      <NightProductShelf :products="products" :store-id="storeId" :building-id="buildingId" :building-name="buildingName" :open="isOpen" />
       <!-- 购物车条 -->
       <view v-if="cartCount" class="nhm__cartbar" @tap="goCheckout">
         <text class="nhm__cartbar-badge">{{ cartCount }}</text>
@@ -151,6 +139,7 @@ function goCheckout() {
 <style scoped>
 .nhm {
   display: block;
+  padding-bottom: 160rpx;
 }
 .nhm__head {
   background: linear-gradient(135deg, #10381f, #0d6b3a);
@@ -187,7 +176,9 @@ function goCheckout() {
 .nhm__head-link {
   font-size: 24rpx;
   color: #ffe9a8;
-  text-decoration: underline;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
 }
 .nhm__goods {
   display: flex;
@@ -244,7 +235,7 @@ function goCheckout() {
   position: fixed;
   left: 24rpx;
   right: 24rpx;
-  bottom: calc(24rpx + env(safe-area-inset-bottom));
+  bottom: calc(124rpx + env(safe-area-inset-bottom));
   background: #10381f;
   border-radius: 999rpx;
   padding: 22rpx 36rpx;

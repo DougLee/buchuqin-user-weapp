@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { APP_NAME } from "../../config/app";
 import { useSessionStore } from "../../stores/session";
@@ -31,6 +31,16 @@ const form = reactive({
   name: "",
   phone: "",
   note: "",
+});
+const nightIntent = ref(false);
+const suggestedCampus = ref(''), suggestedBuilding = ref('');
+onLoad(query => {
+  nightIntent.value = query?.intent === 'night';
+  if (nightIntent.value) {
+    suggestedCampus.value = String(query?.campusId || '');
+    suggestedBuilding.value = String(query?.buildingId || '');
+    form.note = '【夜宵店经营意向】';
+  }
 });
 const campusName = computed(
   () => campuses.value.find((c) => c.id === form.campusId)?.name ?? "",
@@ -84,13 +94,17 @@ onShow(async () => {
       // 默认当前校区（可自由改选，道哥拍板）
       if (!form.campusId)
         form.campusId =
+          cs.value.find(c => c.id === suggestedCampus.value)?.id ??
           cs.value.find((c) => c.id === session.user?.campusId)?.id ??
           cs.value[0]?.id ??
           "";
     }
     // 首访表单预填：授权手机号；楼栋随校区联动加载
     if (!form.phone) form.phone = session.user?.phone ?? "";
-    if (showForm.value && form.campusId) await loadBuildings();
+    if (showForm.value && form.campusId) {
+      await loadBuildings();
+      if (!form.buildingId && buildings.value.some(b => b.id === suggestedBuilding.value)) form.buildingId = suggestedBuilding.value;
+    }
   } finally {
     loading.value = false;
   }
@@ -154,7 +168,13 @@ async function submit() {
 }
 </script>
 <template>
-  <view class="page recruit">
+  <view class="page recruit" :class="{ 'recruit--night': nightIntent }">
+    <view v-if="nightIntent" class="night-recruit-hero">
+      <text class="night-recruit-hero__eyebrow">NIGHT PARTNER</text>
+      <text class="night-recruit-hero__title">成为本楼夜宵楼长</text>
+      <text class="night-recruit-hero__sub">把方便送到寝室，让深夜多一份好吃的。</text>
+      <text class="night-recruit-hero__note">报名审核通过后，还需校区确认经营资格、绑定店铺并完成押金与备货，准备就绪后才可营业。已有报名可在进度页补充夜宵经营意向。</text>
+    </view>
     <!-- 双背景图（道哥 2026-09-09 定稿）：#77 横幅背景贴顶、#78 波浪品牌
          背景贴底（.recruit 三层 background），中段同源底色衔接；
          内容 padding-top 让位顶部背景，一屏呈现 -->
@@ -320,7 +340,7 @@ async function submit() {
       <view class="pass-card__guide">
         <text>1. 打开微信，搜索「{{ APP_NAME }}配送」小程序</text>
         <text>2. 使用工号 + 姓名 登录</text>
-        <text>3. 开始接单，收入实时可查</text>
+        <text>{{ nightIntent ? '3. 联系校区完成夜宵经营开通，准备就绪后营业' : '3. 开始接单，收入实时可查' }}</text>
       </view>
     </view>
   </view>
@@ -341,6 +361,13 @@ async function submit() {
       center bottom / 100% auto no-repeat,
     linear-gradient(180deg, #d9f9e8 0%, #ddf9ea 100%);
 }
+.recruit--night { padding-top: 30rpx; background: radial-gradient(ellipse at top right, #f3eed1, transparent 48%), linear-gradient(150deg, #eef6e5, #f7faf2); }
+.recruit--night .perks { margin: 24rpx 8rpx 0; }
+.night-recruit-hero { padding: 38rpx 32rpx; color: #f3f6e9; border-radius: 32rpx; background: radial-gradient(ellipse at top right, #576443, transparent 70%), linear-gradient(125deg, #163b2b, #12291f); box-shadow: 0 12rpx 30rpx rgba(29, 65, 42, .12); }
+.night-recruit-hero__eyebrow { display: block; color: #e8d792; letter-spacing: 4rpx; font-size: 22rpx; }
+.night-recruit-hero__title { display: block; font-size: 43rpx; font-weight: 850; margin: 18rpx 0; }
+.night-recruit-hero__sub { display: block; font-size: 27rpx; color: #d4e5ce; }
+.night-recruit-hero__note { display: block; margin-top: 26rpx; padding-top: 24rpx; border-top: 1px solid #4a6147; font-size: 23rpx; color: #bfd0ba; line-height: 1.8; }
 /* 权益四列：白卡上浮压顶部背景下沿形成层次 */
 .perks {
   position: relative;

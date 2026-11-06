@@ -52,6 +52,10 @@ export interface NightStoreRow {
 
 /** GET /night/stores/:id/products 行（引夜宵统一售价主档） */
 export interface NightProduct {
+  categoryId?: string;
+  categoryName?: string;
+  retailUnit?: string;
+  barcode?: string | null;
   /** NightProduct 楼栋行 id（下单用的 productId） */
   id: string;
   catalogProductId: string;
@@ -77,6 +81,9 @@ export interface NightOrderLine {
 
 /** 夜宵订单时间线节点（轻量自持，不复用白天 12 态） */
 export interface NightTimelineStep {
+  description?: string;
+  proof?: { images: string[]; remark?: string };
+  images?: string[];
   key: string;
   title: string;
   time?: string;
@@ -84,6 +91,8 @@ export interface NightTimelineStep {
 
 /** 夜宵订单视图（orderView 全量口径） */
 export interface NightOrder {
+  support?: { phone: string; qrcode: string; kfUrl: string; corpId: string } | null;
+  deliveryContact?: { name: string; phone: string } | null;
   id: string;
   orderNo: string;
   status: string;
@@ -119,6 +128,7 @@ export interface NightOrder {
   cancelReason: string | null;
   /** null 无售后 / requested 申请中 / resolved 已处理 */
   afterSaleStatus: string | null;
+  refund?: { id: string; status: string; amount: number; message: string; completedAt: string | null } | null;
   store: { id: string; buildingName: string } | null;
 }
 
@@ -149,6 +159,7 @@ export interface NightPayStatus {
 
 /** GET /night/coupons 行（可领） */
 export interface NightClaimableCoupon {
+  nightProductIds?: string[];
   id: string;
   name: string;
   /** 面额，单位：分 */
@@ -167,6 +178,7 @@ export interface NightUserCoupon {
   status: string;
   claimedAt: string;
   coupon: {
+    nightProductIds?: string[];
     id: string;
     name: string;
     amount: number;

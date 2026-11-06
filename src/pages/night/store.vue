@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { onLoad, onShareAppMessage, onShow } from "@dcloudio/uni-app";
-import { isRetryable } from "../../api/request";
 import { nightApi } from "../../api/night";
 import { useNightCartStore } from "../../stores/nightCart";
 import { useSessionStore } from "../../stores/session";
@@ -11,7 +10,7 @@ import type {
   NightProduct,
   NightStoreRow,
 } from "../../types/night";
-import PhoneGate from "../../components/PhoneGate.vue";
+import NightProductShelf from "../../components/NightProductShelf.vue";
 
 /**
  * 夜宵店铺页（IKSW1F 三态）：
@@ -35,16 +34,16 @@ const error = ref(false);
 const claimable = ref<NightClaimableCoupon[]>([]);
 const mineCount = ref(0);
 const claimingId = ref("");
-/** IKE3HT 同款收网：未绑手机号点加购先弹授权层（可关闭，结算页兜底） */
-const phoneGateOpen = ref(false);
-let pendingProduct: NightProduct | undefined;
-
 const isOpen = computed(() => store.value?.state === "open");
 /** 未开业店头文案：休息中给开门时间窗；无楼长给招募语 */
 const openHint = computed(() => {
   if (store.value?.state === "no-manager")
     return "本楼夜宵店招募楼长中，暂未开业";
+  if (store.value?.state === "open") return "本楼楼长直送 · 好吃的送到寝室";
+  if (store.value?.storeStatus === "paused") return "楼长暂时忙碌，恢复营业后可下单";
   const s = sessionInfo.value;
+  if (s && !s.nightEnabled) return "校区夜宵服务暂未开启";
+  if (s && !s.dayClosed) return "白天店营业中，夜宵场次开启后可下单";
   if (s?.nightStartAt && s?.nightEndAt)
     return `${s.nightStartAt} 开门营业`;
   return "楼长休息中，开门后可下单";
@@ -54,7 +53,7 @@ const cartCount = computed(() => cart.countOf(storeId.value));
 const cartAmount = computed(() => cart.amountOf(storeId.value));
 
 async function load() {
-  if (!storeId.value) return;
+  if (!storeId.value) { error.value = true; loading.value = false; return; }
   loading.value = !store.value;
   error.value = false;
   try {
@@ -67,9 +66,10 @@ async function load() {
     sessionInfo.value = detail.session;
     if (detail.buildingId) buildingId.value = detail.buildingId;
     products.value = goods;
+    cart.refreshProducts(storeId.value, goods);
     void loadCoupons();
-  } catch (e) {
-    if (isRetryable(e)) error.value = true;
+  } catch {
+    error.value = true;
   } finally {
     loading.value = false;
   }
@@ -90,63 +90,10 @@ onLoad((q) => {
   buildingId.value = String(q?.buildingId || "");
   uni.setNavigationBarTitle({ title: "夜宵店" });
 });
-onShow(() => {
-  void session.ensureLogin().catch(() => {});
-  load();
+onShow(async () => {
+  try { await session.ensureLogin(); await load(); }
+  catch { loading.value = false; error.value = true; }
 });
-/* ---------- 加购（本地暂存车） ---------- */
-function quantityOf(product: NightProduct) {
-  return cart.quantityOf(storeId.value, product.id);
-}
-function add(product: NightProduct) {
-  if (!isOpen.value) {
-    uni.showToast({ title: `${openHint.value}，先逛逛吧`, icon: "none" });
-    return;
-  }
-  // IKE3HT 收网：未绑手机号先弹授权，绑定成功（@bound）补执行加购
-  if (session.needsPhone) {
-    pendingProduct = product;
-    phoneGateOpen.value = true;
-    return;
-  }
-  cart.setQuantity(
-    {
-      id: storeId.value,
-      buildingId: buildingId.value,
-      buildingName: store.value?.buildingName ?? "",
-    },
-    product,
-    quantityOf(product) + 1,
-  );
-}
-function removeLine(product: NightProduct) {
-  cart.setQuantity(
-    {
-      id: storeId.value,
-      buildingId: buildingId.value,
-      buildingName: store.value?.buildingName ?? "",
-    },
-    product,
-    quantityOf(product) - 1,
-  );
-}
-function onPhoneBound() {
-  phoneGateOpen.value = false;
-  if (pendingProduct) {
-    const product = pendingProduct;
-    pendingProduct = undefined;
-    if (isOpen.value)
-      cart.setQuantity(
-        {
-          id: storeId.value,
-          buildingId: buildingId.value,
-          buildingName: store.value?.buildingName ?? "",
-        },
-        product,
-        quantityOf(product) + 1,
-      );
-  }
-}
 /* ---------- 领券（夜宵券与白天券双向隔离） ---------- */
 async function claim(coupon: NightClaimableCoupon) {
   if (claimingId.value) return;
@@ -189,7 +136,7 @@ onShareAppMessage(() => {
   <view class="page night-store"
     ><view v-if="error" class="retry card" @tap="load"
       ><text class="retry__title">店铺加载失败</text
-      ><text class="muted">网络异常，点击重试</text></view
+      ><text class="muted">店铺不可访问或网络异常，点击重试</text><button class="primary-btn" @tap.stop="uni.redirectTo({ url: '/pages/night/buildings' })">重新选择楼栋</button></view
     ><view v-else-if="loading && !store" class="skeleton"
       ><view class="skeleton__head" /><view class="skeleton__grid"
         ><view v-for="n in 4" :key="n" class="skeleton__card" /></view
@@ -239,41 +186,9 @@ onShareAppMessage(() => {
           {{ claimingId === coupon.id ? "领取中" : "领取" }}
         </button></view
       ></view
-    ><!-- 商品平铺卡片流（无分类侧栏，10~30 件直排两列） -->
-    <view v-if="!products.length" class="empty"
-      ><text class="empty__mark">🌙</text
-      ><text class="empty__title">货架空着</text
-      ><text class="muted">楼长备货后这里就热闹了</text></view
-    ><view v-else class="grid"
-      ><view v-for="p in products" :key="p.id" class="goods card"
-        ><image class="goods__image" :src="p.image" mode="aspectFit" /><text
-          class="goods__name"
-          >{{ p.name }}</text
-        ><text v-if="p.subtitle" class="goods__subtitle">{{
-          p.subtitle
-        }}</text><view class="goods__bottom"
-          ><text class="price"
-            ><text class="price__symbol">¥</text
-            >{{ fenToYuan(p.price) }}</text
-          ><!-- 数量控制：0 显示单加号，>0 展开 − n ＋（夜间小目标热区 64rpx 起） -->
-          <view v-if="quantityOf(p) > 0" class="stepper"
-            ><text class="stepper__btn" @tap.stop="removeLine(p)">−</text
-            ><text class="stepper__num">{{ quantityOf(p) }}</text
-            ><text
-              class="stepper__btn stepper__btn--add"
-              @tap.stop="add(p)"
-              >＋</text
-            ></view
-          ><text
-            v-else
-            class="goods__add"
-            :class="{ 'goods__add--dim': !isOpen }"
-            @tap.stop="add(p)"
-            >＋</text
-          ></view
-        ></view
-      ></view
-    ></template
+    >
+    <NightProductShelf :products="products" :store-id="storeId" :building-id="buildingId" :building-name="store.buildingName" :open="isOpen" />
+    </template
     ><!-- 底部购物车条：件数+金额+去结算（未开业置灰并给开门时间） -->
     <view v-if="store" class="cart-bar safe-bottom"
       ><view class="cart-bar__left"
@@ -298,11 +213,7 @@ onShareAppMessage(() => {
         }}
       </button></view
     >
-    <PhoneGate
-      v-if="phoneGateOpen && session.needsPhone"
-      @bound="onPhoneBound"
-      @close="phoneGateOpen = false"
-    />
+
   </view>
 </template>
 

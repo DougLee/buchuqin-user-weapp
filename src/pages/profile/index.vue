@@ -55,7 +55,7 @@ onShow(async () => {
     usableCouponCount.value = b.value.mine.filter(
       (item) =>
         (item.status === "claimed" || item.status === "released") &&
-        new Date(item.coupon.expiresAt).getTime() > now,
+        (!item.coupon.expiresAt || new Date(item.coupon.expiresAt).getTime() > now),
     ).length;
     // 2026-09-08 道哥：优惠券行同时显示「可领」数——引导去券中心领取
     claimableCouponCount.value = b.value.claimable.length;

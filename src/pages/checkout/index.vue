@@ -15,6 +15,7 @@ import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
 /** 结算金额字段单位均为分（契约 API-3），展示统一经 fenToYuan */
 interface Settlement {
+  managerTip?: string;
   productAmount: number;
   deliveryFee: number;
   discount: number;

@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { onUnmounted, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
-import { isRetryable } from "../../api/request";
+import { ApiError } from "../../api/request";
 import { nightApi } from "../../api/night";
 import { fenToYuan } from "../../utils/money";
 import { startNightPayFlow } from "../../utils/nightPayment";
 import { setupDefaultShare } from "../../utils/share";
 import type { NightOrder } from "../../types/night";
 import { NIGHT_AFTER_SALE_TYPES } from "../../utils/nightAfterSale";
+import { nightDate } from '../../utils/nightDate';
+import ProofImagePicker from '../../components/ProofImagePicker.vue';
+import ServiceSheet from '../../components/ServiceSheet.vue';
 
 /**
  * 夜宵订单详情（IKSW1F）：夜宵单独立标识 + 轻量状态时间线。
@@ -22,8 +25,12 @@ const orderId = ref("");
 const order = ref<NightOrder>();
 const paying = ref(false);
 const confirming = ref(false);
+const cancelling = ref(false);
+const serviceOpen = ref(false);
 const loading = ref(true);
 const error = ref(false);
+const errorText = ref('网络异常，请点击重试');
+let refreshGeneration = 0;
 const nowTick = ref(Date.now());
 const payTimer = setInterval(() => (nowTick.value = Date.now()), 30_000);
 onUnmounted(() => clearInterval(payTimer));
@@ -35,15 +42,17 @@ onShow(() => {
   refresh();
 });
 async function refresh() {
-  if (!orderId.value) return;
+  const generation = ++refreshGeneration;
+  if (!orderId.value) { error.value = true; errorText.value = '缺少订单信息，请从订单列表重新进入'; loading.value = false; return; }
   loading.value = !order.value;
   error.value = false;
   try {
-    order.value = await nightApi.order(orderId.value);
+    const result = await nightApi.order(orderId.value);
+    if (generation === refreshGeneration) order.value = result;
   } catch (e) {
-    if (isRetryable(e)) error.value = true;
+    if (generation === refreshGeneration) { error.value = true; errorText.value = e instanceof ApiError && e.status === 404 ? '订单不存在或无权查看，可返回订单列表' : '网络异常，请点击重试'; }
   } finally {
-    loading.value = false;
+    if (generation === refreshGeneration) loading.value = false;
   }
 }
 /** 待支付倒计时（timeoutAt 服务端下发） */
@@ -57,7 +66,7 @@ function countdownText(): string {
   return `剩 ${minutes}:${String(seconds).padStart(2, "0")} 自动关闭`;
 }
 async function payAgain() {
-  if (!order.value || paying.value) return;
+  if (!order.value || paying.value || cancelling.value || confirming.value) return;
   paying.value = true;
   try {
     const paid = await startNightPayFlow(order.value.id, order.value.store?.id);
@@ -68,35 +77,56 @@ async function payAgain() {
       uni.showToast({ title: "支付未完成，可稍后再试", icon: "none" });
       await refresh();
     }
+  } catch {
+    // 支付查询失败时保留原订单，刷新可在网络恢复后继续支付。
+    await refresh();
   } finally {
     paying.value = false;
   }
 }
 /** 取消：待支付直接关单；已支付未接单全额原路退款（接单后不可取消） */
 async function cancel() {
-  if (!order.value) return;
+  if (!order.value || cancelling.value || paying.value || confirming.value) return;
   const paid = !!order.value.paidAt;
+  cancelling.value = true;
+  refreshGeneration++;
+  try {
   const res = await uni.showModal({
     title: "确认取消订单？",
+    confirmText: '确认取消',
+    cancelText: '暂不取消',
     content: paid
       ? "已支付未接单，取消后货款将原路退回"
       : "订单尚未支付，取消后将直接关闭",
   });
   if (!res.confirm) return;
-  order.value = await nightApi.cancelOrder(order.value.id, "用户取消");
-  uni.showToast({ title: "订单已取消", icon: "success" });
+    const result = await nightApi.cancelOrder(order.value.id, "用户取消");
+    refreshGeneration++;
+    order.value = result;
+    const state = order.value.refund?.status;
+    const cancelled = ['cancelled', 'refunded'].includes(order.value.status);
+    uni.showToast({ title: state === 'failed' ? '退款未完成，可重试' : order.value.status === 'cancelling' ? '退款处理中' : cancelled ? '订单已取消' : '订单状态已更新，请核对后再取消', icon: cancelled ? 'success' : 'none' });
+  } catch { await refresh(); }
+  finally { cancelling.value = false; }
 }
 async function confirmReceipt() {
-  if (!order.value || confirming.value) return;
+  if (!order.value || confirming.value || paying.value || cancelling.value) return;
+  confirming.value = true;
+  refreshGeneration++;
+  try {
   const res = await uni.showModal({
     title: "确认收货？",
+    confirmText: '确认收货',
+    cancelText: '再等等',
     content: "确认后订单完成，楼长佣金随之结算",
   });
   if (!res.confirm) return;
-  confirming.value = true;
-  try {
-    order.value = await nightApi.confirmOrder(order.value.id);
+    const result = await nightApi.confirmOrder(order.value.id);
+    refreshGeneration++;
+    order.value = result;
     uni.showToast({ title: "已完成", icon: "success" });
+  } catch {
+    // request 层提示网络或业务失败；保留原订单供刷新重试。
   } finally {
     confirming.value = false;
   }
@@ -106,13 +136,16 @@ const sheetOpen = ref(false);
 const saleType = ref("missing");
 const saleDesc = ref("");
 const saleSubmitting = ref(false);
+const saleImages = ref<string[]>([]);
+const saleUploading = ref(false);
 function openAfterSale() {
   saleType.value = "missing";
   saleDesc.value = "";
+  saleImages.value = [];
   sheetOpen.value = true;
 }
 async function submitAfterSale() {
-  if (!order.value || saleSubmitting.value) return;
+  if (!order.value || saleSubmitting.value || saleUploading.value) return;
   if (saleDesc.value.trim().length < 5) {
     uni.showToast({ title: "请简单描述遇到的问题", icon: "none" });
     return;
@@ -122,10 +155,13 @@ async function submitAfterSale() {
     await nightApi.applyAfterSale(order.value.id, {
       type: saleType.value,
       description: saleDesc.value.trim(),
+      images: saleImages.value,
     });
     sheetOpen.value = false;
     uni.showToast({ title: "售后申请已提交", icon: "success" });
     await refresh();
+  } catch {
+    // 请求层已提示原因，保留文字与照片供恢复网络后重试。
   } finally {
     saleSubmitting.value = false;
   }
@@ -146,7 +182,8 @@ const canAfterSale = () =>
   <view v-if="error" class="page detail"
     ><view class="detail-retry card" @tap="refresh"
       ><text class="detail-retry__title">夜宵订单加载失败</text
-      ><text class="muted">网络异常或订单不存在，点击重试</text></view
+      ><text class="muted">{{ errorText }}</text></view
+    ><button class="bar-btn bar-btn--soft" @tap="uni.redirectTo({ url: '/pages/night/orders' })">返回夜宵订单</button
     ></view
   >
   <view v-else-if="loading && !order" class="page detail"
@@ -159,9 +196,9 @@ const canAfterSale = () =>
       ><view class="status__row"
         ><text class="status__eyebrow">🌙 夜宵订单</text
         ><text
-          v-if="order.afterSaleStatus === 'requested'"
+          v-if="['requested', 'refund-processing'].includes(order.afterSaleStatus || '')"
           class="status__sale"
-          >售后处理中</text
+          >{{ order.afterSaleStatus === 'refund-processing' ? '退款处理中' : '售后处理中' }}</text
         ></view
       ><text class="status__title">{{ order.statusText }}</text
       ><text class="status__sub">{{
@@ -175,9 +212,21 @@ const canAfterSale = () =>
                 ? "已送达寝室门口，请确认收货"
                 : order.status === "cancelled"
                   ? order.cancelReason || "订单已取消"
+                  : order.status === 'refunded'
+                    ? '退款结果已核实，可在下方查看明细'
+                    : order.status === 'cancelling'
+                      ? '退款正在核对，确认到账后会更新状态'
+                      : order.status === 'exception'
+                        ? '支付结果需核对，请联系校区客服处理'
                   : "感谢信任，夜宵愉快"
       }}</text></view
-    ><!-- 时间线：服务端 timeline 透传（submit/paid/accept/delivered/completed…） -->
+    >
+    <view v-if="order.refund" class="card refund-note">
+      <text class="refund-note__title">{{ order.refund.status === 'succeeded' ? '退款已到账' : order.refund.status === 'failed' ? '退款未完成' : '退款正在核对' }} · ¥{{ fenToYuan(order.refund.amount) }}</text>
+      <text>{{ order.refund.message || (order.refund.status === 'succeeded' ? '款项已按原支付路径退回' : '到账以渠道确认为准，请稍后刷新查看') }}</text>
+      <button v-if="!['succeeded', 'failed'].includes(order.refund.status)" class="bar-btn bar-btn--soft" @tap="refresh">刷新退款进度</button>
+    </view>
+    <!-- 时间线：服务端 timeline 透传（submit/paid/accept/delivered/completed…） -->
     <view class="timeline card"
       ><view
         v-for="(step, i) in order.timeline"
@@ -189,9 +238,14 @@ const canAfterSale = () =>
             class="step__line" /></view
         ><view
           ><text class="step__title">{{ step.title }}</text
-          ><text v-if="step.time" class="step__time">{{
-            step.time.slice(5, 16).replace("T", " ")
-          }}</text></view
+          ><text v-if="step.time || step.key === 'submit'" class="step__time">{{
+            nightDate(step.time || order.createdAt)
+          }}</text>
+          <text v-if="step.description" class="step__description">{{ step.description }}</text>
+          <view v-if="step.proof?.images?.length || step.images?.length" class="step__proof">
+            <image v-for="url in step.proof?.images || step.images" :key="url" :src="url" mode="aspectFill" @tap="uni.previewImage({ urls: step.proof?.images || step.images || [], current: url })" />
+          </view>
+          </view
         ></view
       ></view
     ><view class="address card"
@@ -212,15 +266,22 @@ const canAfterSale = () =>
         ><text>{{ order.couponSnapshot?.name || "夜宵券" }}</text
         ><text>−¥{{ fenToYuan(order.couponDiscount) }}</text></view
       ><view class="summary__total"
-        ><text>{{ order.paidAt ? "实付" : "应付" }}</text
+        ><text>{{ order.paidAt ? "实付" : order.status === 'pending-payment' ? "待付" : "未支付" }}</text
         ><text>¥{{ fenToYuan(order.payableAmount) }}</text></view
       ><text class="muted summary__no">夜宵单号 {{ order.orderNo }}</text></view
-    ><!-- 操作区吸底：语义配色沿用白天单（绿=推进/资金、白底描边=逆向、浅绿=导航） -->
+    >
+    <view class="order-contact card">
+      <button v-if="order.deliveryContact" @tap="uni.makePhoneCall({ phoneNumber: order.deliveryContact.phone })">联系楼长 · {{ order.deliveryContact.name }}</button>
+      <button @tap="serviceOpen = true">联系校区客服</button>
+    </view>
+    <ServiceSheet :visible="serviceOpen" :contact="order.support" @close="serviceOpen = false" />
+    <!-- 操作区吸底：语义配色沿用白天单（绿=推进/资金、白底描边=逆向、浅绿=导航） -->
     <view class="action-bar"
       ><view class="action-bar__row"
         ><button
           v-if="order.status === 'pending-payment' || order.status === 'pending-accept'"
           class="bar-btn bar-btn--ghost"
+          :disabled="cancelling || paying || confirming || order.afterSaleStatus === 'refund-processing'"
           @tap="cancel"
         >
           {{ order.paidAt ? "取消并退款" : "取消订单" }}</button
@@ -233,14 +294,14 @@ const canAfterSale = () =>
         ><button
           v-if="order.status === 'pending-payment'"
           class="bar-btn bar-btn--primary"
-          :disabled="paying"
+          :disabled="paying || cancelling || confirming"
           @tap="payAgain"
         >
           {{ paying ? "正在拉起支付…" : "继续支付" }}</button
         ><button
           v-if="order.status === 'delivered'"
           class="bar-btn bar-btn--primary"
-          :disabled="confirming"
+          :disabled="confirming || paying || cancelling"
           @tap="confirmReceipt"
         >
           {{ confirming ? "正在确认…" : "确认收货" }}</button
@@ -274,9 +335,13 @@ const canAfterSale = () =>
           :maxlength="300"
           placeholder="请说明遇到的问题（缺货／破损／少送等），至少 5 个字"
         />
+        <view class="sale-proofs">
+          <view v-for="(url, index) in saleImages" :key="url" class="sale-proof"><image :src="url" mode="aspectFill" @tap="uni.previewImage({ urls: saleImages, current: url })" /><button :disabled="saleSubmitting || saleUploading" @tap="saleImages.splice(index, 1)">移除</button></view>
+          <ProofImagePicker v-if="saleImages.length < 6" v-model="saleImages" :max="6" :disabled="saleSubmitting" label="上传问题照片（选填）" @busy="saleUploading = $event" />
+        </view>
         <button
           class="primary-btn sheet__submit"
-          :disabled="saleSubmitting || saleDesc.trim().length < 5"
+          :disabled="saleSubmitting || saleUploading || saleDesc.trim().length < 5"
           @tap="submitAfterSale"
         >
           {{ saleSubmitting ? "提交中…" : "提交申请" }}
@@ -299,6 +364,8 @@ const canAfterSale = () =>
   margin-bottom: 24rpx;
   box-shadow: 0 14rpx 32rpx rgba(10, 34, 24, 0.26);
 }
+.refund-note { margin-bottom: 24rpx; padding: 28rpx; display: flex; flex-direction: column; gap: 16rpx; color: #617168; font-size: 25rpx; }
+.refund-note__title { color: #1d4937; font-weight: 800; font-size: 29rpx; }
 .status__row {
   display: flex;
   align-items: center;
@@ -367,6 +434,9 @@ const canAfterSale = () =>
   color: #9aa39d;
   margin-top: 6rpx;
 }
+.step__description { display: block; margin-top: 12rpx; color: #637366; font-size: 26rpx; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.step__proof { display: flex; flex-wrap: wrap; gap: 14rpx; margin: 20rpx 0; }
+.step__proof image { width: 144rpx; height: 144rpx; border-radius: 18rpx; border: 1px solid #dfe7db; }
 .address,
 .summary {
   padding: 28rpx;
@@ -419,6 +489,9 @@ const canAfterSale = () =>
   box-shadow: 0 -6rpx 24rpx rgba(21, 75, 38, 0.06);
   padding: 12rpx 28rpx calc(12rpx + env(safe-area-inset-bottom));
 }
+.order-contact { display: flex; gap: 18rpx; margin-top: 24rpx; padding: 12rpx 24rpx; }
+.order-contact button { flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; font-size: 26rpx; line-height: 1.4; color: #335e40; background: transparent; padding: 12rpx 0; }
+.order-contact button::after { border: none; }
 .action-bar__row {
   display: flex;
   gap: 18rpx;
@@ -537,6 +610,9 @@ const canAfterSale = () =>
 .sheet {
   width: 100%;
   background: #fff;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-sizing: border-box;
   border-radius: 34rpx 34rpx 0 0;
   padding: 38rpx 34rpx calc(38rpx + env(safe-area-inset-bottom));
 }
@@ -585,4 +661,7 @@ const canAfterSale = () =>
 .sheet__submit {
   margin-top: 28rpx;
 }
+.sale-proofs { display: flex; flex-wrap: wrap; align-items: center; gap: 16rpx; margin-top: 22rpx; }
+.sale-proof image { display: block; width: 132rpx; height: 132rpx; border-radius: 18rpx; }
+.sale-proof button { min-height: 44px; margin: 0; padding: 0 16rpx; display: flex; align-items: center; justify-content: center; font-size: 24rpx; color: #53715b; background: transparent; }
 </style>

@@ -1,4 +1,5 @@
 import { request, toAbsoluteUrl, uploadImage } from "./request";
+import { fetchAddresses } from './addresses';
 import { WECHAT_APP_ID } from "../config/app";
 import type {
   Address,
@@ -145,7 +146,7 @@ export const api = {
         bizImage: string;
         bizNote: string;
       };
-    }>("/wheel/draw", { method: "POST", body: "{}" }),
+    }>("/wheel/draw", { method: "POST", data: {} }),
   /** 商品分类列表（IK97FA：分类页直连，替代 /home 聚合里的分类字段） */
   categories: () => request<Category[]>("/categories"),
   products: async (categoryId = "all", keyword = "") =>
@@ -164,9 +165,8 @@ export const api = {
   updateCart: (
     items: Array<{ productId: string; quantity: number; asSeckill?: boolean }>,
   ) => request<Cart>("/cart", { method: "PUT", data: { items } }),
-  /** 后端 /addresses 返回 {items,page,pageSize,total} 分页信封，这里解包成数组供页面直接用 */
-  addresses: async () =>
-    (await request<PageResult<Address>>("/addresses")).items,
+  /** 地址管理与夜宵结算共用完整分页列表。 */
+  addresses: fetchAddresses,
   addAddress: (data: Record<string, unknown>) =>
     request<Address>("/addresses", { method: "POST", data }),
   updateAddress: (id: string, data: Record<string, unknown>) =>

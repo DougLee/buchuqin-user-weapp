@@ -41,6 +41,8 @@ const campusStore = useCampusStore();
 /** IKSW1F 夜宵模式（道哥 2026-11-05）：夜宵场次中首页整体切换夜宵店形态，
  *  白天商品流/搜索/推荐全部隐藏；场次外恢复白天形态零痕迹 */
 const nightMode = ref(false);
+const homeError = ref(false);
+let homeGeneration = 0;
 /** 夜宵组件句柄：onShow 回首页时触发 reload（v-show 不重挂载，记忆楼栋
  *  变更后必须手动 load——否则选楼栋返回首页永远停留引导态） */
 const nightHomeRef = ref<InstanceType<typeof NightHomeMode>>();
@@ -93,21 +95,23 @@ onLoad((q) => {
   }
   track("page_view", "index"); // IKRGLV 转化漏斗
 });
-onShow(async () => {
+async function loadHome() {
+  const current = ++homeGeneration;
+  homeError.value = false;
+  loading.value = true;
+  try {
   // 道哥 2026-10-29：回到首页即清空搜索框（搜索词已带去分类页执行，
   // 首页框不留残留，避免二次点搜索重复跳转同词）
   keyword.value = "";
   await useSessionStore().ensureLogin();
   // IKSW1F 夜宵模式判定：以服务端 entry 三元组为准（客户端不自算时钟）
-  try {
-    const entry = await nightApi.entry();
-    nightMode.value = entry.inNightSession === true;
-  } catch {
-    nightMode.value = false;
-  }
+  const entry = await nightApi.entry();
+  if (current !== homeGeneration) return;
+  nightMode.value = entry.inNightSession === true;
   // 夜场中每次回首页都重拉本店数据（选楼栋返回/店页返回的刷新入口）
   if (nightMode.value) nightHomeRef.value?.load();
-  const [home, addresses] = await Promise.all([api.home(), api.addresses()]);
+  const [home, addresses] = await Promise.all([api.home(), nightApi.addresses()]);
+  if (current !== homeGeneration) return;
   // 当前地址统一走 pickCurrentAddress（道哥 2026-09-09：切地址后首页跟随）
   defaultAddress.value = pickCurrentAddress(addresses);
   campus.value = home.campus.name;
@@ -127,7 +131,13 @@ onShow(async () => {
   if (!giftOpen.value) maybeShowGroupAd();
   // IKCNRB：数据渲染后量宽判溢出（决定右缘指示是否显示）
   setTimeout(measureCategoryOverflow, 200);
-});
+  } catch {
+    if (current === homeGeneration) homeError.value = true;
+  } finally {
+    if (current === homeGeneration) loading.value = false;
+  }
+}
+onShow(loadHome);
 /* ---------- 首页双版块（IKD6FA）：左「天天抽奖」入口 + 右「楼栋福利群」 ---------- */
 /** 转盘配置：active=false（未配置/已下线）时不渲染左卡 */
 const wheelActive = ref(false);
@@ -386,6 +396,12 @@ function search() {
       ><text class="loc-addr" @tap.stop="goAddress">{{ addressText }}</text
       ><text class="down" @tap.stop="goCampus">⌄</text></view
     >
+    <view v-if="homeError" class="home-error card">
+      <text>首页暂时没加载出来</text>
+      <text class="home-error__hint">请检查网络后重试，楼栋选择和购物车已保留</text>
+      <button @tap="loadHome">重新加载</button>
+    </view>
+    <view v-show="!homeError">
     <NightHomeMode v-show="nightMode" ref="nightHomeRef"></NightHomeMode>
     <view v-show="!nightMode">
     <!-- IKG1C 打烊横幅：closedNow 服务端判定，文案随闭店原因切换（手动/时间窗） -->
@@ -634,6 +650,7 @@ function search() {
     /></view>
   </view>
   </view><!-- ↑ IKSW1F 白天专属容器（促销/栏目标题/货架）到此为止 -->
+  </view>
 
   <!-- 进群弹窗（IKD6FA 复用 IKAJSZ）：show-menu-by-longpress 长按识别；
        IKDERY 未配置态：气泡占位 + 筹备中文案 + 去逛逛引导 -->
@@ -703,7 +720,7 @@ function search() {
     </view>
   </view>
   <TabBar :current="0" />
-  <CartOverlay v-if="!nightMode" /><!-- IKSW1F 夜场由 NightHomeMode 夜宵购物车条接管 -->
+  <CartOverlay v-if="!nightMode && !homeError" /><!-- IKSW1F 夜场由 NightHomeMode 夜宵购物车条接管 -->
 
 <!-- IKQYUD 每日福利群弹窗：居中大卡，长按识别进群 -->
 <view v-if="groupAdOpen" class="gad-mask" @tap="groupAdOpen = false">
@@ -733,6 +750,9 @@ function search() {
 </template>
 
 <style scoped lang="scss">
+.home-error { margin: 20px 0; padding: 24px; display: flex; flex-direction: column; gap: 12px; color: #173d2e; }
+.home-error__hint { color: #52675e; font-size: 14px; line-height: 1.6; }
+.home-error button { min-height: 44px; margin: 4px 0 0; background: #e2f5e9; color: #174c34; font-size: 15px; }
 @import "../../styles/theme.scss";
 .home {
   padding-top: calc(30rpx + env(safe-area-inset-top));

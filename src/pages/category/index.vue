@@ -14,6 +14,7 @@ import { APP_NAME } from "../../config/app";
 import { nightApi } from "../../api/night";
 import { useNightCartStore } from "../../stores/nightCart";
 import type { NightProduct } from "../../types/night";
+import NightProductShelf from '../../components/NightProductShelf.vue';
 import { onShareAppMessage, onShareTimeline } from "@dcloudio/uni-app";
 /** IKQXK6 分类分享：选中有效分类时分享带 cat 深链（首页 onLoad 消费后
  *  switchTab 回本页并选中该分类）；all/秒杀回落默认品牌分享。
@@ -73,6 +74,8 @@ const mockAll = (): Product[] =>
       id: `${c.id}-p${i + 1}`,
       name: `${c.name}·商品${i + 1}`,
       subtitle: "",
+      tag: "",
+      weight: 0,
       price: 300 + ((i * 137) % 1500),
       originalPrice: 0,
       stock: 50,
@@ -101,6 +104,7 @@ const nightStoreId = ref("");
 const nightBuildingId = ref("");
 const nightBuildingName = ref("");
 const nightOpen = ref(false);
+const nightProducts = ref<NightProduct[]>([]);
 const nightCart = useNightCartStore();
 const nightCartCount = computed(() => nightCart.countOf(nightStoreId.value));
 const nightCartAmount = computed(() => nightCart.amountOf(nightStoreId.value));
@@ -108,8 +112,7 @@ const nightCartAmount = computed(() => nightCart.amountOf(nightStoreId.value));
 const addDisabled = computed(() =>
   nightMode.value ? !nightOpen.value : closedNow.value,
 );
-/** 夜宵数据装载：换源不换机器——categories/sections 填夜宵数据，
- *  段制渐进渲染/滚动联动/锚线机制原样运行 */
+/** 夜宵使用与首页一致的商品货架；白天的渐进分类流保持独立。 */
 async function loadNight() {
   const memo = String(uni.getStorageSync("nightBuildingId") || "");
   loading.value = true;
@@ -134,21 +137,14 @@ async function loadNight() {
     ]);
     nightBuildingName.value = row.buildingName;
     nightOpen.value = detail.state === "open";
-    categories.value = [{ id: "night-all", name: "全部夜宵" }];
-    sections.value = [
-      {
-        catId: "night-all",
-        catName: `${row.buildingName}·夜宵店`,
-        items: goods as unknown as Product[],
-      },
-    ];
-    active.value = "night-all";
+    nightProducts.value = goods;
+    nightCart.refreshProducts(row.storeId, goods);
   } catch {
     // 网络抖动不清楼栋记忆（首页夜宵形态同口径）：保留选择下次 onShow 重试
     error.value = true;
   } finally {
     loading.value = false;
-    void ensureScrollable();
+    if (!nightMode.value) void ensureScrollable();
   }
 }
 /** 加购数量/写入分流：白天=day cart；夜宵=nightCart（按店分桶）。
@@ -184,6 +180,7 @@ function goNightBuildings() {
 }
 function goNightCheckout() {
   if (!nightCartCount.value) return;
+  if (!nightOpen.value) { uni.showToast({ title: '店铺休息中，开门后再来结算', icon: 'none' }); return; }
   uni.navigateTo({
     url: `/pages/night/checkout?storeId=${nightStoreId.value}&buildingId=${nightBuildingId.value}`,
   });
@@ -440,7 +437,8 @@ onShow(async () => {
       entry.inNightSession === true &&
       !!uni.getStorageSync("nightBuildingId");
   } catch {
-    nightMode.value = false;
+    // 场次查询失败时保留已选夜宵楼栋，显示夜宵重试，避免误切白天数据。
+    nightMode.value = !!uni.getStorageSync('nightBuildingId');
   }
   if (nightMode.value) {
     await loadNight();
@@ -619,6 +617,7 @@ async function scrollToCat(id: string) {
 let segSyncAt = 0;
 let lastScrollTop = 0;
 function onFlowScroll(scrollTop: number) {
+  if (nightMode.value) return;
   lastScrollTop = scrollTop;
   const now = Date.now();
   if (now - segSyncAt < 150) return;
@@ -678,7 +677,7 @@ function measureAndApply() {
   );
   q.exec((rects) => {
     let cur = -1;
-    rects.forEach((r, i) => {
+    rects.forEach((r: { top?: number } | null, i: number) => {
       if (r && (r.top ?? 9e9) <= ANCHOR + 24) cur = i;
     });
     applyActive(cur);
@@ -727,7 +726,7 @@ const open = (id: string) => {
         >{{ nightOpen ? "营业中" : "未营业" }}</text
       ><text class="night-head__link" @tap="goNightBuildings">切换楼栋</text
     ></view
-    ><view v-else class="search card"
+    ><template v-if="nightMode"><view v-if="error" class="cat-retry card" role="button" @tap="loadNight"><text class="cat-retry__title">夜宵商品加载失败</text><text class="muted">点击重试，已保留楼栋与购物车</text></view><view v-else-if="loading" class="cat-skeleton"><view v-for="n in 4" :key="n" class="cat-skeleton__block" /></view><NightProductShelf v-else :products="nightProducts" :store-id="nightStoreId" :building-id="nightBuildingId" :building-name="nightBuildingName" :open="nightOpen" /></template><template v-else><view class="search card"
       ><view class="search__field"
         ><input
           v-model="draft"
@@ -898,12 +897,13 @@ const open = (id: string) => {
           ></template
         ></view
       ></view
-    ><TabBar :current="1" />
+    ></template><TabBar :current="1" />
     <CartOverlay v-if="!nightMode" />
     <!-- IKSW1F 夜宵模式购物车条：夜场中替换白天悬浮窗，直达夜宵结算 -->
     <view
       v-else-if="nightCartCount"
       class="night-cartbar"
+      role="button"
       @tap="goNightCheckout"
       ><text class="night-cartbar__badge">{{ nightCartCount }}</text
       ><text class="night-cartbar__amount"

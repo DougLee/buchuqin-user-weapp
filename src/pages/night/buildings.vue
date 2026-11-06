@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
-import { isRetryable } from "../../api/request";
 import { nightApi } from "../../api/night";
 import { useSessionStore } from "../../stores/session";
 import type { NightStoreRow } from "../../types/night";
@@ -50,9 +49,8 @@ async function load() {
       nightEndAt: entry.nightEndAt,
     };
     stores.value = list.stores;
-  } catch (e) {
-    // ADR-0005：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
-    if (isRetryable(e)) error.value = true;
+  } catch {
+    error.value = true;
   } finally {
     loading.value = false;
   }
@@ -66,8 +64,9 @@ onLoad((q) => {
     prefillTag.value = "来自分享";
   }
 });
-onShow(() => {
-  void session.ensureLogin().catch(() => {});
+onShow(async () => {
+  try { await session.ensureLogin(); }
+  catch { loading.value = false; error.value = true; return; }
   // 无分享参数时读历史选择（分享优先级更高，不覆盖）
   if (!prefillBuildingId.value) {
     const last = String(uni.getStorageSync(LAST_BUILDING_KEY) || "");
@@ -76,7 +75,7 @@ onShow(() => {
       prefillTag.value = "上次去过";
     }
   }
-  load();
+  await load();
 });
 /** 状态徽章文案/样式键 */
 function stateText(row: NightStoreRow): string {
@@ -87,7 +86,7 @@ function stateText(row: NightStoreRow): string {
 function pick(row: NightStoreRow) {
   // 无楼长=该楼店未开张，不可进店
   if (row.state === "no-manager" || !row.storeId) {
-    uni.showToast({ title: "本楼夜宵店招募楼长中，敬请期待", icon: "none" });
+    uni.navigateTo({ url: `/pages/recruit/index?intent=night&campusId=${encodeURIComponent(session.user?.campusId || '')}&buildingId=${encodeURIComponent(row.buildingId)}` });
     return;
   }
   uni.setStorageSync(LAST_BUILDING_KEY, row.buildingId);
