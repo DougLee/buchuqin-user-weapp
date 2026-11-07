@@ -70,7 +70,7 @@ export const api = {
       method: "POST",
       data,
     }),
-  home: () =>
+  home: (businessType: "day" | "night" = "day") =>
     request<{
       /** 校区视图（IKGI1C）：闭店五字段随本接口同批下发，首页不再额外请求 */
       campus: { name: string } & CampusCloseState;
@@ -81,10 +81,10 @@ export const api = {
       promotions?: HomePromotion[];
       /** IKHM1P 公告：生效窗内多条「｜」拼接；空串 = 整条隐藏 */
       notice?: string;
-    }>("/home"),
+    }>(`/home?businessType=${businessType}`),
   /** 支付成功页广告位（IKA57E→IKB87P）：大卡列表，sort 升序最多 2 条；空数组不占位 */
-  paySuccessBanners: () =>
-    request<Banner[]>("/banners/current?placement=pay-success"),
+  paySuccessBanners: (businessType: "day" | "night" = "day") =>
+    request<Banner[]>(`/banners/current?placement=pay-success&businessType=${businessType}`),
   /* ---------- 楼长招募（IKEAGE） ---------- */
   /** 我的报名（最新一条任意状态；approved 附工号）——报名页即进度页 */
   recruitApplication: () =>
@@ -164,7 +164,8 @@ export const api = {
   /** IKHL6Y 秒杀双渠道：行身份 asSeckill——秒杀专区 true，正常入口缺省 false */
   updateCart: (
     items: Array<{ productId: string; quantity: number; asSeckill?: boolean }>,
-  ) => request<Cart>("/cart", { method: "PUT", data: { items } }),
+    expectedVersion?: string,
+  ) => request<Cart>("/cart", { method: "PUT", data: { items, expectedVersion } }),
   /** 地址管理与夜宵结算共用完整分页列表。 */
   addresses: fetchAddresses,
   addAddress: (data: Record<string, unknown>) =>
@@ -262,15 +263,15 @@ export const api = {
   notifications: async () =>
     (await request<PageResult<Notification>>("/notifications")).items,
   /** 消息分页契约（IK9AWO）：滚动加载用 */
-  notificationsPage: (page = 1, pageSize = 20) =>
+  notificationsPage: (page = 1, pageSize = 20, businessType: "day" | "night" = "day") =>
     request<PageResult<Notification>>(
-      `/notifications?page=${page}&pageSize=${pageSize}`,
+      `/notifications?page=${page}&pageSize=${pageSize}&businessType=${businessType}`,
     ),
   /** 全部已读（IK9AWO）：POST /notifications/read-all */
-  readAllNotifications: () =>
-    request<{ updated: number }>("/notifications/read-all", {
+  readAllNotifications: (businessType: "day" | "night" = "day") =>
+    request<{ total: number; byType: Record<string, number> }>("/notifications/read-all", {
       method: "POST",
-      data: {},
+      data: { businessType },
     }),
   readNotification: (id: string) =>
     request<Notification>(`/notifications/${id}/read`, { method: "POST" }),

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { computed, ref } from "vue";
+import { useNightCartStore } from "../stores/nightCart";
+import { readNightBuilding, resolveBusinessType, type BusinessType } from "../utils/businessContext";
 import { onShow } from "@dcloudio/uni-app";
 import { useCartStore } from "../stores/cart";
 import { useSessionStore } from "../stores/session";
@@ -18,7 +21,10 @@ const TABS = [
   { text: "我的", path: "/pages/profile/index", icon: "profile" },
 ] as const;
 const props = defineProps<{ current: number }>();
-const cart = useCartStore();
+const cart = useCartStore(), nightCart = useNightCartStore();
+const businessType = ref<BusinessType | null>(null), buildingId = ref('');
+let generation = 0;
+const totalQuantity = computed(() => businessType.value === 'day' ? cart.cart.totalQuantity : businessType.value === 'night' ? Object.values(nightCart.carts).filter(bucket => bucket.buildingId === buildingId.value).reduce((count, bucket) => count + bucket.items.reduce((sum, line) => sum + line.quantity, 0), 0) : 0);
 // IKDETO：「我的」tab 红点——存在未使用的新人券（首页 onShow 拉取更新）
 const session = useSessionStore();
 function go(index: number) {
@@ -26,7 +32,18 @@ function go(index: number) {
   uni.switchTab({ url: TABS[index].path });
 }
 // 兜底再压一次原生条：App onLaunch 已隐藏过，极端场景（系统弹回）再保险
-onShow(() => uni.hideTabBar({ animation: false, fail: () => {} }));
+onShow(async () => {
+  uni.hideTabBar({ animation: false, fail: () => {} });
+  const current = ++generation;
+  businessType.value = null;
+  try {
+    await session.ensureLogin();
+    const identity = uni.getStorageSync('token'), type = await resolveBusinessType();
+    if (type === 'day') await cart.load();
+    if (current !== generation || identity !== uni.getStorageSync('token')) return;
+    businessType.value = type; buildingId.value = readNightBuilding();
+  } catch { /* Unknown context has no badge from another channel. */ }
+});
 </script>
 <template>
   <view class="tabbar safe-bottom" role="tablist">
@@ -50,14 +67,14 @@ onShow(() => uni.hideTabBar({ animation: false, fail: () => {} }));
           :src="`/static/tabbar/tab-${tab.icon}${index === current ? '-active' : ''}.png`"
         />
         <view
-          v-if="tab.icon === 'profile' && session.hasUsableSignupCoupon"
+          v-if="tab.icon === 'profile' && businessType === 'day' && session.hasUsableSignupCoupon"
           class="tabbar__dot"
         ></view>
         <text
-          v-if="tab.icon === 'cart' && cart.cart.totalQuantity > 0"
+          v-if="tab.icon === 'cart' && totalQuantity > 0"
           class="tabbar__badge"
           >{{
-            cart.cart.totalQuantity > 99 ? "99+" : cart.cart.totalQuantity
+            totalQuantity > 99 ? "99+" : totalQuantity
           }}</text
         ></view
       >

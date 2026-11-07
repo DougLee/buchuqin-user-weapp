@@ -1,7 +1,34 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onLoad, onReachBottom, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { nightApi } from "../../api/night";
+import BusinessModeTabs from "../../components/BusinessModeTabs.vue";
+import { businessUrl, resolveBusinessType, type BusinessType } from "../../utils/businessContext";
+import type { NightOrder } from "../../types/night";
+const businessType = ref<BusinessType>('day');
+let requestedType: unknown, generation = 0;
+const page = ref(1), total = ref(0), refundedAmount = ref(0), loadingMore = ref(false), moreError = ref(false), withdrawing = ref('');
+onLoad(query => { requestedType = query?.businessType; });
+function selectBusiness(type: BusinessType) { requestedType = type; void load(); }
+function openRecord(item: CaseRow) { uni.navigateTo({ url: businessType.value === 'night' ? `/pages/night/order-detail?id=${encodeURIComponent(item.orderId)}` : businessUrl(`/pages/orders/detail?id=${encodeURIComponent(item.orderId)}`, 'day') }); }
+async function withdraw(item: CaseRow) {
+  if (withdrawing.value) return;
+  const result = await uni.showModal({ title: '撤销售后申请', content: '仅撤销尚未审核的申请，已发生的退款不会被取消。', confirmText: '确认撤销' });
+  if (!result.confirm) return;
+  withdrawing.value = item.id;
+  const type = businessType.value;
+  try { await (type === 'night' ? nightApi.withdrawAfterSale(item.orderId) : api.cancelAfterSale(item.id)); await load(); }
+  catch { /* Request layer displays rejection. */ }
+  finally { withdrawing.value = ''; }
+}
+type CaseRow = Pick<Refund, 'id' | 'orderId' | 'description' | 'reason' | 'createdAt' | 'amount' | 'status'>;
+function nightCase(order: NightOrder): CaseRow {
+  const request = [...order.timeline].reverse().find(step => step.key === 'after-sale');
+  const statuses: Record<string, string> = { requested: 'pending', 'refund-processing': 'refunding', resolved: 'refunded', withdrawn: 'cancelled', rejected: 'rejected' };
+  return { id: order.id, orderId: order.id, description: request?.description || order.refund?.reason || '退款记录', reason: '', createdAt: request?.time || order.refund?.createdAt || order.createdAt,
+    amount: order.refund?.amount || 0, status: order.refund?.status === 'succeeded' ? 'refunded' : order.refund?.status === 'failed' ? 'failed' : statuses[order.afterSaleStatus || ''] || 'pending' };
+}
 import { fenToYuan } from "../../utils/money";
 import type { Refund } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
@@ -21,24 +48,33 @@ const REFUND_STATUS_TEXT: Record<string, string> = {
 function statusText(status: string): string {
   return REFUND_STATUS_TEXT[status] ?? status;
 }
-const refunds = ref<Refund[]>([]),
+const refunds = ref<CaseRow[]>([]),
   loading = ref(true),
   error = ref(false);
-onShow(load);
-async function load() {
-  loading.value = true;
-  error.value = false;
+onShow(() => load());
+onReachBottom(() => load(false));
+async function load(reset = true) {
+  if (!reset && (businessType.value !== 'night' || loading.value || loadingMore.value || refunds.value.length >= total.value)) return;
+  const current = reset ? ++generation : generation, identity = uni.getStorageSync('token');
+  if (reset) { loading.value = true; error.value = false; } else { loadingMore.value = true; moreError.value = false; }
   try {
-    refunds.value = await api.refunds();
-  } catch {
-    error.value = true;
-  }
-  loading.value = false;
+    const type = reset ? await resolveBusinessType(requestedType) : businessType.value;
+    let rows: CaseRow[], count: number, sum: number, nextPage = 1;
+    if (type === 'night') {
+      const result = await nightApi.afterSales(reset ? 1 : page.value + 1);
+      rows = result.items.map(nightCase); count = result.total; sum = result.refundedAmount; nextPage = result.page;
+    } else { rows = await api.refunds(); count = rows.length; sum = rows.filter(row => row.status === 'refunded').reduce((amount, row) => amount + row.amount, 0); }
+    if (current !== generation || identity !== uni.getStorageSync('token')) return;
+    businessType.value = type; total.value = count; refundedAmount.value = sum; page.value = nextPage;
+    const seen = new Set(refunds.value.map(row => row.id));
+    refunds.value = reset ? rows : [...refunds.value, ...rows.filter(row => !seen.has(row.id))];
+  } catch { if (current === generation) { if (reset) error.value = true; else moreError.value = true; } }
+  finally { if (current === generation) { loading.value = false; loadingMore.value = false; } }
 }
 </script>
 <template>
   <view class="page"
-    ><view v-if="error" class="as-retry card" @tap="load"
+    ><BusinessModeTabs :model-value="businessType" :disabled="loading || !!withdrawing" @change="selectBusiness" /><view v-if="error" class="as-retry card" @tap="load()"
       ><text class="as-retry__title">加载失败</text
       ><text class="muted">网络异常，点击重试</text></view
     ><!-- 加载骨架（2026-08-24）：loading 变量早已存在，此处补接线（汇总卡+记录行） --><view
@@ -51,11 +87,7 @@ async function load() {
     ><view class="summary card"
       ><text class="summary__value"
         >¥{{
-          fenToYuan(
-            refunds
-              .filter((r) => r.status === "refunded")
-              .reduce((n, r) => n + r.amount, 0),
-          )
+          fenToYuan(refundedAmount)
         }}</text
       ><text class="muted">累计退款</text></view
     ><!-- 售后福利群（IKQXSD 道哥 2026-10-27）：校区配置了二维码才渲染，
@@ -79,7 +111,7 @@ async function load() {
     ><view v-if="!refunds.length" class="empty card"
       ><text class="empty__title">还没有售后记录</text
       ><text class="muted">订单送达后，可在订单详情申请质量售后</text></view
-    ><view v-for="item in refunds" :key="item.id" class="case card"
+    ><view v-for="item in refunds" :key="item.id" class="case card" @tap="openRecord(item)"
       ><view
         ><text class="case__title">{{ item.description || item.reason || "退款申请" }}</text
         ><text class="muted"
@@ -87,9 +119,9 @@ async function load() {
         ></view
       ><view class="case__right"
         ><text class="case__status">{{ statusText(item.status) }}</text
-        ><text class="refund__amount">¥{{ fenToYuan(item.amount) }}</text></view
+        ><text class="refund__amount">{{ item.amount ? `¥${fenToYuan(item.amount)}` : '金额待审核' }}</text><button v-if="item.status === 'pending'" :disabled="!!withdrawing" @tap.stop="withdraw(item)">{{ withdrawing === item.id ? '撤销中…' : '撤销申请' }}</button></view
       ></view
-    ></template
+    ><view v-if="moreError" class="empty" @tap="load(false)">加载失败，点击重试</view><view v-else-if="refunds.length < total" class="empty">{{ loadingMore ? '加载中…' : '上拉查看更多' }}</view></template
     ></view
   >
 </template>

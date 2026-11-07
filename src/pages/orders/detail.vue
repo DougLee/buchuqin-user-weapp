@@ -3,7 +3,6 @@ import { computed, onUnmounted, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { useCartStore } from "../../stores/cart";
-import { useCampusStore } from "../../stores/campus";
 import { isRetryable } from "../../api/request";
 import { fenToYuan } from "../../utils/money";
 import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
@@ -28,7 +27,7 @@ const autoConfirmHint = computed(() => {
   const m = Math.floor((remainMs % 3600_000) / 60_000);
   return `如未手动确认，约 ${h} 小时 ${m} 分后自动完成订单`;
 });
-const campusStore = useCampusStore(),
+const
   /** IKKTWM 客服弹层（替代 open-type=contact） */
   serviceOpen = ref(false),
   orderId = ref(""),
@@ -219,7 +218,7 @@ function backHome() {
       ><text class="status__title">{{ order.statusText }}</text
       ><text class="status__sub">{{
         order.status === "exception"
-          ? `别担心，客服正在跟进处理，可来电 ${campusStore.phone}`
+          ? `别担心，客服正在跟进处理，可来电 ${order.support?.phone || '未配置'}`
           : order.status === "pending-payment"
             ? "15 分钟内完成支付，超时订单将自动关闭"
             : order.status === "delivered"
@@ -227,7 +226,7 @@ function backHome() {
               : "你的这一袋，正在校园里接力"
       }}</text></view
     ><!-- 售后福利群 v2（IKQXSD；2026-10-28 改定不可关闭）--><view
-      v-if="campusStore.afterSalesGroupQrcode"
+      v-if="order.support?.groupQrcode"
       class="group-card"
       ><view class="group-card__head"
         ><view class="group-card__badge"></view
@@ -235,19 +234,19 @@ function backHome() {
           ><text class="group-card__title">售后福利群</text
           ><!-- IKRSJ3 #114：文案校区可配（groupQrcodeTip），空=默认两行
           --><text class="group-card__sub">{{
-            campusStore.groupQrcodeTip || "专属售后通道 · 福利优先享"
+            order.support?.groupTip || "专属售后通道 · 福利优先享"
           }}</text></view
         ></view
       ><view class="group-card__body"
         ><image
-          :src="campusStore.afterSalesGroupQrcode"
+          :src="order.support?.groupQrcode"
           class="group-card__qr"
           mode="aspectFit"
           show-menu-by-longpress
         /><view class="group-card__aside"
           ><text class="group-card__hint">长按识别二维码</text
           ><text
-            v-if="!campusStore.groupQrcodeTip"
+            v-if="!order.support?.groupTip"
             class="group-card__hint group-card__hint--sub"
             >加入福利群，售后进度与专属优惠第一时间掌握</text
           ></view
@@ -306,7 +305,7 @@ function backHome() {
       ></view
     ><!-- #107 配送人联系：校区开启 showDeliveryContacts 且接口下发 deliveryChain
         才渲染；骑手/楼长都未指派时给「配送员接单后显示」占位 --><view
-      v-if="campusStore.showDeliveryContacts && order.deliveryChain"
+      v-if="order.deliveryChain"
       class="chain card"
       ><text class="chain__title">配送人联系</text>
       <template v-if="chainRider || chainManager">
@@ -429,7 +428,7 @@ function backHome() {
       ></view
     ></view
   >
-  <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />
+  <ServiceSheet :contact="order?.support || { phone: '', qrcode: '', kfUrl: '', corpId: '' }" :visible="serviceOpen" @close="serviceOpen = false" />
   <!-- 未发货退款弹层（IKHZKA）：原因必填 -->
   <view v-if="refundSheet" class="sheet-mask" @tap="refundSheet = false">
     <view class="sheet" @tap.stop>

@@ -1,0 +1,26 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { createPinia, setActivePinia } = require('pinia');
+const compiled = ts.transpileModule(fs.readFileSync(new URL('../src/stores/session.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+test('昵称以当前用户服务端资料为准，历史全局缓存不串账号', async () => {
+  setActivePinia(createPinia()); const exports = {};
+  vm.runInNewContext(compiled, { exports, require(name) {
+    if (name === 'pinia') return require('pinia');
+    if (name === '../api') return { api: { updateProfile: async data => data } };
+    if (name === './cart') return { useCartStore: () => ({ setOwner() {} }) };
+    if (name === './nightCart') return { useNightCartStore: () => ({ setOwner() {} }) };
+    if (name === '../api/request' || name === '../utils/bootCampus') return {};
+    throw Error(name);
+  }, uni: { getStorageSync: () => '旧账号昵称', setStorageSync() {} } });
+  const store = exports.useSessionStore();
+  store.applyUser({ id: 'a', campusId: 'c', nickname: '甲' });
+  assert.equal(store.nickname, '甲');
+  await store.setNickname('甲的新昵称'); assert.equal(store.nickname, '甲的新昵称');
+  store.applyUser({ id: 'b', campusId: 'c', nickname: '微信用户' });
+  assert.equal(store.nickname, '微信用户'); assert.equal(store.needsNickname, true);
+});

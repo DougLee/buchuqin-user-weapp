@@ -27,7 +27,17 @@ export function openBannerTarget(banner: Banner): void {
   // 跳转优先：配置了站内页面就跳，detailImage 不再决定点击
   if (banner.linkType === "page" && banner.linkUrl?.trim()) {
     const url = banner.linkUrl.trim();
-    const path = url.startsWith("/") ? url : `/${url}`;
+    let path = url.startsWith("/") ? url : `/${url}`;
+    if (banner.businessType === 'night') {
+      const target = path.split('?')[0];
+      if (target === '/pages/orders/index') path = '/pages/night/orders';
+      else if (target === '/pages/coupons/index') path = '/pages/coupons/index?businessType=night';
+      else if (target === '/pages/campus/index') path = '/pages/night/buildings';
+      else if (target === '/pages/product/detail') {
+        uni.showToast({ title: '请从本楼夜宵店选择商品', icon: 'none' });
+        uni.navigateTo({ url: '/pages/night/buildings' }); return;
+      }
+    }
     if (TAB_PAGES.includes(path.split("?")[0])) {
       uni.switchTab({ url: path.split("?")[0] });
       return;

@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { api } from "../api";
+import { useCartStore } from "./cart";
 import { useNightCartStore } from "./nightCart";
 import { uploadImage } from "../api/request";
 import {
@@ -9,11 +10,6 @@ import {
   resolveLoginCampus,
 } from "../utils/bootCampus";
 import type { SessionUser } from "../types";
-/** 本地昵称覆盖（IK8W5Q：昵称编辑暂无后端接口，仅本地展示覆盖） */
-const NICKNAME_KEY = "localNickname";
-function readLocalNickname(): string {
-  return (uni.getStorageSync(NICKNAME_KEY) as string) || "";
-}
 // #ifdef MP-WEIXIN
 /** wx.login 取 code（小程序正式登录通道用） */
 function wxLoginCode(): Promise<string> {
@@ -44,7 +40,7 @@ export const useSessionStore = defineStore("session", {
     pendingCampus: "",
   }),
   getters: {
-    nickname: (state) => readLocalNickname() || state.user?.nickname || "",
+    nickname: (state) => state.user?.nickname || "",
     /** IKE3HT 强授权门：已登录但未绑定手机号 = 拦截（未登录时不拦，登录流程自己走） */
     needsPhone: (state) => !!state.user && !state.user.phone,
   },
@@ -94,10 +90,10 @@ export const useSessionStore = defineStore("session", {
     },
     /** 写入会话用户并完成初始化（登录 / token 换取资料两条路径共用） */
     applyUser(user: SessionUser) {
-      useNightCartStore().setOwner(user.id);
+      useNightCartStore().setOwner(user.id, user.campusId);
+      useCartStore().setOwner(user.id, user.campusId);
       this.user = user;
       this.needsNickname =
-        !readLocalNickname() &&
         (!user.nickname || user.nickname === "微信用户");
       this.ready = true;
     },
@@ -127,12 +123,11 @@ export const useSessionStore = defineStore("session", {
       this.pendingCampus = "";
       finishBootConfirm(campusId);
     },
-    /** 改昵称（IK9ROG）：落库为准，成功后本地 storage 双写做展示加速 */
+    /** 改昵称（IK9ROG）：落库为准，成功后同步当前会话展示 */
     async setNickname(name: string) {
       const value = name.trim().slice(0, 12);
       if (!value) return;
       const result = await api.updateProfile({ nickname: value });
-      uni.setStorageSync(NICKNAME_KEY, result.nickname);
       if (this.user) this.user = { ...this.user, nickname: result.nickname };
       this.needsNickname = false;
     },

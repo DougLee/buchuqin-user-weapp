@@ -35,8 +35,8 @@
         </template>
         <template v-else>
           <text class="sheet__phone">{{ phone }}</text>
-          <text class="sheet__tip">校区客服微信二维码未配置，可直接来电</text>
-          <button class="sheet__call" @tap="call">立即拨打</button>
+          <text class="sheet__tip">{{ phone ? '校区客服微信二维码未配置，可直接来电' : '该店铺暂未配置客服联系方式，请稍后重试' }}</text>
+          <button v-if="phone" class="sheet__call" @tap="call">立即拨打</button>
         </template>
       </template>
       <text class="sheet__close" @tap="close">取消</text>

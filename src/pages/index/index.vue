@@ -16,6 +16,7 @@ import WelcomeGift from "../../components/WelcomeGift.vue";
 import PhoneGate from "../../components/PhoneGate.vue";
 // IKSW1F 夜宵入口横幅：自持 /night/entry 拉取与显隐（inNightSession 才渲染）
 import NightEntryBanner from "../../components/NightEntryBanner.vue";
+import { nightStoreLink, nightTimelineQuery } from "../../utils/nightLink";
 import NightHomeMode from "../../components/NightHomeMode.vue";
 import { nightApi } from "../../api/night";
 import { useCartStore } from "../../stores/cart";
@@ -88,6 +89,10 @@ onLoad((q) => {
     // 校区门在列表返回后才读键（本行必然已执行），预选才能落到分享校区
     setSharedCampusId(c);
   }
+  if (q?.businessType === 'night') {
+    uni.navigateTo({ url: nightStoreLink({ campusId: c, buildingId: String(q?.buildingId || ''), catalogProductId: String(q?.catalogProductId || '') }) });
+    return;
+  }
   const cat = String(q?.cat || "");
   if (cat) {
     uni.setStorageSync("categoryPick", cat);
@@ -110,7 +115,7 @@ async function loadHome() {
   nightMode.value = entry.inNightSession === true;
   // 夜场中每次回首页都重拉本店数据（选楼栋返回/店页返回的刷新入口）
   if (nightMode.value) nightHomeRef.value?.load();
-  const [home, addresses] = await Promise.all([api.home(), nightApi.addresses()]);
+  const [home, addresses] = await Promise.all([api.home(nightMode.value ? "night" : "day"), nightApi.addresses()]);
   if (current !== homeGeneration) return;
   // 当前地址统一走 pickCurrentAddress（道哥 2026-09-09：切地址后首页跟随）
   defaultAddress.value = pickCurrentAddress(addresses);
@@ -122,7 +127,7 @@ async function loadHome() {
   banners.value = home.banners;
   products.value = home.hotProducts;
   promotions.value = home.promotions ?? [];
-  await cart.load();
+  if (!nightMode.value) await cart.load();
   loading.value = false;
   // IKD6FA：双版块数据静默拉取；IKDETO 迎新礼包内容同批拉取后判定弹窗
   await loadHomeBlocks();
@@ -314,13 +319,23 @@ const onPhoneBound = () => {
  *  IKGZSU：path 带分享者校区，新用户点开静默落同校区 */
 onShareAppMessage(() => {
   track("share", "index"); // IKRGLV
+  if (nightMode.value) {
+    const target = nightHomeRef.value?.shareTarget();
+    return { title: target?.name || '本楼夜宵店，好物送到寝室', path: nightStoreLink({ campusId: session.user?.campusId, buildingId: target?.buildingId, catalogProductId: target?.catalogProductId }) };
+  }
   const c = session.user?.campusId;
   return {
     title: "不出寝，零食送到寝室",
     path: c ? `/pages/index/index?campus=${c}` : "/pages/index/index",
   };
 });
-onShareTimeline(() => ({ title: "不出寝，零食送到寝室" }));
+onShareTimeline(() => {
+  if (nightMode.value) {
+    const target = nightHomeRef.value?.shareTarget();
+    return { title: target?.name || '本楼夜宵店，好物送到寝室', query: nightTimelineQuery({ campusId: session.user?.campusId, buildingId: target?.buildingId, catalogProductId: target?.catalogProductId }) };
+  }
+  return { title: '不出寝，零食送到寝室' };
+});
 /** 首页分类横滑条：与商品页侧栏同源同序，含「全部」（DB 配图）；
  *  横滑一行浏览全部分类（2026-08-22 需求），不再按 6 列折行，仅留防御上限 */
 const rowCategories = computed(() => categories.value.slice(0, 24));
@@ -401,7 +416,8 @@ function search() {
       <text class="home-error__hint">请检查网络后重试，楼栋选择和购物车已保留</text>
       <button @tap="loadHome">重新加载</button>
     </view>
-    <view v-show="!homeError">
+    <view v-if="loading" class="card" style="padding: 32px; text-align: center">正在准备店铺信息…</view>
+    <view v-show="!homeError && !loading">
     <NightHomeMode v-show="nightMode" ref="nightHomeRef"></NightHomeMode>
     <view v-show="!nightMode">
     <!-- IKG1C 打烊横幅：closedNow 服务端判定，文案随闭店原因切换（手动/时间窗） -->

@@ -56,7 +56,7 @@ const invalidLineIds = computed(() => {
   const invalid: string[] = [];
   for (const line of cartLines.value) {
     const product = products.value.find((p) => p.id === line.productId);
-    if (!product || line.quantity > product.stock)
+    if (!product || line.quantity > product.stock || (line.asSeckill && (!product.seckill || product.seckill.id !== line.promotionId || !line.promotionEndsAt || new Date(line.promotionEndsAt).getTime() <= Date.now() || new Date(product.seckill.endsAt).getTime() <= Date.now() || line.quantity > 1)))
       invalid.push(line.productId);
   }
   return invalid;
@@ -79,9 +79,11 @@ function eligibleAmount(coupon: { nightProductIds?: string[] }) {
     return sum + (p && coupon.nightProductIds!.includes(p.catalogProductId) ? line.price * line.quantity : 0);
   }, 0);
 }
+const hasPromotion = computed(() => cartLines.value.some(line => line.asSeckill || products.value.find(product => product.id === line.productId)?.promotion));
 const usableCoupons = computed(() =>
   mineCoupons.value.filter(
     (item) =>
+      !hasPromotion.value &&
       (item.status === "claimed" || item.status === "released") &&
       (!item.coupon.expiresAt ||
         new Date(item.coupon.expiresAt).getTime() > Date.now()) &&
@@ -95,6 +97,7 @@ const selectedCoupon = computed(
 );
 /** 不可用原因（门槛不够就地标差价；过期/已锁定直接隐藏不误导） */
 function couponReason(item: NightUserCoupon): string {
+  if (hasPromotion.value) return '活动价不可叠加优惠券';
   if (item.status === 'used') return '已使用';
   if (item.status === 'locked') return '已被待支付订单占用';
   if (
@@ -234,6 +237,8 @@ async function submit() {
       items: cartLines.value.map((line) => ({
         productId: line.productId,
         quantity: line.quantity,
+        asSeckill: !!line.asSeckill,
+        ...(line.asSeckill ? { promotionId: line.promotionId } : {}),
       })),
       couponId: selectedCoupon.value?.id || undefined,
       addressId: currentAddress.value.id,
@@ -257,7 +262,7 @@ async function submit() {
     }
     if (paid) {
       uni.redirectTo({
-        url: `/pages/night/order-detail?id=${created.id}`,
+        url: `/pages/checkout/success?id=${created.id}&businessType=night`,
       });
       return;
     }
@@ -321,7 +326,7 @@ function goStore() {
     <view v-if="hasInvalid" class="invalid card"
       ><view class="invalid__texts"
         ><text class="invalid__title">有 {{ invalidLineIds.length }} 件商品已失效</text
-        ><text class="muted">可能已下架或库存不足，请移除后再下单</text></view
+        ><text class="muted">可能已下架、库存不足或活动已结束，请移除后重新选购</text></view
       ><button class="invalid__btn" @tap="removeInvalid">移除失效商品</button></view
     ><!-- 店铺未营业软提示：可继续选地址/券，提交会被服务端拦截 -->
     <view v-if="store && store.state !== 'open'" class="window-tip"
@@ -339,7 +344,7 @@ function goStore() {
         class="goods__line"
         :class="{ 'goods__line--invalid': invalidLineIds.includes(line.productId) }"
         ><image :src="line.image" mode="aspectFit" /><text class="goods__name"
-          >{{ line.name }} × {{ line.quantity }}</text
+          >{{ line.asSeckill ? '秒杀 · ' : '' }}{{ line.name }} × {{ line.quantity }}</text
         ><text>¥{{ fenToYuan(line.price * line.quantity) }}</text></view
       ></view
     ><!-- 夜宵券选择器：可用券 + 不可用原因 + 领取入口（与白天券隔离） -->

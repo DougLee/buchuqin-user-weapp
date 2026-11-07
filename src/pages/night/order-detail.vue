@@ -7,9 +7,7 @@ import { fenToYuan } from "../../utils/money";
 import { startNightPayFlow } from "../../utils/nightPayment";
 import { setupDefaultShare } from "../../utils/share";
 import type { NightOrder } from "../../types/night";
-import { NIGHT_AFTER_SALE_TYPES } from "../../utils/nightAfterSale";
 import { nightDate } from '../../utils/nightDate';
-import ProofImagePicker from '../../components/ProofImagePicker.vue';
 import ServiceSheet from '../../components/ServiceSheet.vue';
 
 /**
@@ -72,7 +70,7 @@ async function payAgain() {
     const paid = await startNightPayFlow(order.value.id, order.value.store?.id);
     if (paid) {
       uni.showToast({ title: "支付成功", icon: "success" });
-      await refresh();
+      uni.redirectTo({ url: `/pages/checkout/success?id=${order.value.id}&businessType=night` });
     } else {
       uni.showToast({ title: "支付未完成，可稍后再试", icon: "none" });
       await refresh();
@@ -131,40 +129,8 @@ async function confirmReceipt() {
     confirming.value = false;
   }
 }
-/* ---------- 售后申请（一期轻量：类型 + 文字描述） ---------- */
-const sheetOpen = ref(false);
-const saleType = ref("missing");
-const saleDesc = ref("");
-const saleSubmitting = ref(false);
-const saleImages = ref<string[]>([]);
-const saleUploading = ref(false);
 function openAfterSale() {
-  saleType.value = "missing";
-  saleDesc.value = "";
-  saleImages.value = [];
-  sheetOpen.value = true;
-}
-async function submitAfterSale() {
-  if (!order.value || saleSubmitting.value || saleUploading.value) return;
-  if (saleDesc.value.trim().length < 5) {
-    uni.showToast({ title: "请简单描述遇到的问题", icon: "none" });
-    return;
-  }
-  saleSubmitting.value = true;
-  try {
-    await nightApi.applyAfterSale(order.value.id, {
-      type: saleType.value,
-      description: saleDesc.value.trim(),
-      images: saleImages.value,
-    });
-    sheetOpen.value = false;
-    uni.showToast({ title: "售后申请已提交", icon: "success" });
-    await refresh();
-  } catch {
-    // 请求层已提示原因，保留文字与照片供恢复网络后重试。
-  } finally {
-    saleSubmitting.value = false;
-  }
+  uni.navigateTo({ url: `/pages/after-sales/apply?orderId=${encodeURIComponent(orderId.value)}&businessType=night` });
 }
 function backHome() {
   uni.switchTab({
@@ -274,7 +240,7 @@ const canAfterSale = () =>
       <button v-if="order.deliveryContact" @tap="uni.makePhoneCall({ phoneNumber: order.deliveryContact.phone })">联系楼长 · {{ order.deliveryContact.name }}</button>
       <button @tap="serviceOpen = true">联系校区客服</button>
     </view>
-    <ServiceSheet :visible="serviceOpen" :contact="order.support" @close="serviceOpen = false" />
+    <ServiceSheet :visible="serviceOpen" :contact="order.support || { phone: '', qrcode: '', kfUrl: '', corpId: '' }" @close="serviceOpen = false" />
     <!-- 操作区吸底：语义配色沿用白天单（绿=推进/资金、白底描边=逆向、浅绿=导航） -->
     <view class="action-bar"
       ><view class="action-bar__row"
@@ -312,42 +278,7 @@ const canAfterSale = () =>
           ><view class="svc-icon" /><text>申请售后（缺货／破损等）</text></button
         ></view
       ></view
-    ><!-- 售后申请弹层（一期轻量：类型+文字，退款由服务端处理） -->
-    <view v-if="sheetOpen" class="sheet-mask" @tap="sheetOpen = false">
-      <view class="sheet" @tap.stop>
-        <text class="sheet__title">申请售后</text>
-        <text class="sheet__sub"
-          >楼长送到寝室后发现问题可申请，退款由平台核实后原路退回</text
-        >
-        <view class="sheet__options"
-          ><view
-            v-for="item in NIGHT_AFTER_SALE_TYPES"
-            :key="item[0]"
-            class="sheet__option"
-            :class="{ 'sheet__option--active': saleType === item[0] }"
-            @tap="saleType = item[0]"
-            >{{ item[1] }}</view
-          ></view
-        >
-        <textarea
-          v-model="saleDesc"
-          class="sheet__textarea"
-          :maxlength="300"
-          placeholder="请说明遇到的问题（缺货／破损／少送等），至少 5 个字"
-        />
-        <view class="sale-proofs">
-          <view v-for="(url, index) in saleImages" :key="url" class="sale-proof"><image :src="url" mode="aspectFill" @tap="uni.previewImage({ urls: saleImages, current: url })" /><button :disabled="saleSubmitting || saleUploading" @tap="saleImages.splice(index, 1)">移除</button></view>
-          <ProofImagePicker v-if="saleImages.length < 6" v-model="saleImages" :max="6" :disabled="saleSubmitting" label="上传问题照片（选填）" @busy="saleUploading = $event" />
-        </view>
-        <button
-          class="primary-btn sheet__submit"
-          :disabled="saleSubmitting || saleUploading || saleDesc.trim().length < 5"
-          @tap="submitAfterSale"
-        >
-          {{ saleSubmitting ? "提交中…" : "提交申请" }}
-        </button>
-      </view>
-    </view>
+    >
   </view>
 </template>
 

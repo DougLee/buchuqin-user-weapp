@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { readNightBuilding, clearNightBuilding, resolveBusinessType, createBusinessRequestScope } from "../../utils/businessContext";
 import { computed, onUnmounted, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
+import { useSessionStore } from "../../stores/session";
 import { useCartStore } from "../../stores/cart";
 import { fenToYuan } from "../../utils/money";
 import type { CartLine } from "../../types";
@@ -23,6 +25,9 @@ const booted = ref(false);
    夜宵车为客户端本地暂存（store 初始化即读 storage），无骨架诉求 ==================== */
 const nightCart = useNightCartStore();
 const nightMode = ref(false);
+const contextError = ref(false), contextPending = ref(true);
+let pageGeneration = 0;
+const nightLoadScope = createBusinessRequestScope();
 const nightStoreId = ref("");
 const nightBuildingId = ref("");
 const nightBuildingName = ref("");
@@ -34,8 +39,11 @@ const nightCount = computed(() => nightCart.countOf(nightStoreId.value));
 const nightAmount = computed(() => nightCart.amountOf(nightStoreId.value));
 const nightQty = (productId: string) =>
   nightCart.quantityOf(nightStoreId.value, productId);
-const nightStockOf = (productId: string) =>
-  nightProducts.value.find((p) => p.id === productId)?.stock ?? 999;
+const nightStockOf = (productId: string) => {
+  const product = nightProducts.value.find(product => product.id === productId);
+  const line = nightLines.value.find(line => line.productId === productId);
+  return line?.asSeckill ? Math.min(product?.stock || 0, product?.seckill ? 1 : 0) : product?.stock || 0;
+};
 /** 步进写入：需 NightProduct 全量（setQuantity 以最新 stock/price 快照为准） */
 function nightSet(productId: string, qty: number) {
   if (!nightOpen.value) return;
@@ -58,6 +66,7 @@ function goNightCheckout() {
   });
 }
 function goNightStore() {
+  if (!nightStoreId.value) { uni.navigateTo({ url: "/pages/night/buildings" }); return; }
   uni.navigateTo({
     url: `/pages/night/store?storeId=${nightStoreId.value}&buildingId=${nightBuildingId.value}`,
   });
@@ -65,15 +74,19 @@ function goNightStore() {
 /** 夜宵分支装载：解析楼栋记忆 → 店态 + 本店商品（库存上限用）；
  *  失败容忍本地快照行继续展示（结算页服务端全量重验兜底） */
 async function loadNight() {
+  const current = nightLoadScope.begin();
   booted.value = true;
-  const memo = String(uni.getStorageSync("nightBuildingId") || "");
+  const memo = readNightBuilding();
   try {
     const bundle = await nightApi.stores(memo);
+    if (!current()) return;
     const row = bundle.stores.find((r) => r.buildingId === memo);
     if (!row || !row.storeId) {
-      uni.removeStorageSync("nightBuildingId");
-      nightMode.value = false;
-      await cart.load();
+      clearNightBuilding();
+      nightStoreId.value = "";
+      nightBuildingName.value = "请选择楼栋";
+      nightProducts.value = [];
+      nightOpen.value = false;
       return;
     }
     nightStoreId.value = row.storeId;
@@ -83,28 +96,30 @@ async function loadNight() {
       nightApi.storeDetail(row.storeId),
       nightApi.storeProducts(row.storeId),
     ]);
+    if (!current()) return;
     nightOpen.value = detail.state === "open";
     nightProducts.value = goods;
+    nightCart.refreshProducts(row.storeId, goods);
   } catch {
-    /* 网络抖动不清楼栋记忆：下次 onShow 重试（首页/分类页同口径） */
+    if (current()) throw new Error("夜宵商品加载失败，请重试");
   }
 }
-onShow(async () => {
-  // IKSW1F 夜宵分支判定（同首页/分类页口径）：场次内+有楼栋记忆 → 夜宵车
+onShow(loadPage);
+async function loadPage() {
+  const generation = ++pageGeneration;
+  contextPending.value = true;
+  nightLoadScope.invalidate();
+  contextError.value = false;
   try {
-    const entry = await nightApi.entry();
-    nightMode.value =
-      entry.inNightSession === true && !!uni.getStorageSync("nightBuildingId");
-  } catch {
-    nightMode.value = false;
-  }
-  if (nightMode.value) {
-    await loadNight();
-    return;
-  }
-  await cart.load();
-  booted.value = true;
-});
+    await useSessionStore().ensureLogin();
+    const type = await resolveBusinessType();
+    if (generation !== pageGeneration) return;
+    nightMode.value = type === 'night';
+    if (nightMode.value) await loadNight();
+    else { await cart.load(); booted.value = true; }
+  } catch { if (generation === pageGeneration) contextError.value = true; }
+  finally { if (generation === pageGeneration) contextPending.value = false; }
+}
 /** 库存行内标注（ADR-0005/IKA00Q）：与悬浮窗同口径，就地提示不等结算报错 */
 function stockTag(line: CartLine): string {
   const { stock } = line.product;
@@ -189,7 +204,9 @@ function onClearCart() {
 }
 </script>
 <template>
-  <view class="page cart-page"
+  <view v-if="contextError" class="page"><view class="card" style="padding: 32px; text-align: center"><text>店铺信息加载失败，请重试</text><button @tap="loadPage">重新加载</button></view></view>
+  <view v-else-if="contextPending" class="page"><view class="card" style="padding: 32px; text-align: center">正在核对店铺信息…</view></view>
+  <view v-else class="page cart-page"
     ><!-- IKSW1F 夜宵模式：夜场整页换夜宵购物车（本地暂存车行编辑+去结算），
          白天购物车 v-show 隐藏零改动 -->
     <view v-if="nightMode" class="night-cart"

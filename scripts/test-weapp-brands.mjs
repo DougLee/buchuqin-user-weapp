@@ -13,7 +13,9 @@ test("each mini program has an independent app id", () => {
   const xiaoman = getWeappBrand("xiaoman");
 
   assert.equal(buchuqin.appId, "wxc814687e5ae26924");
-  assert.equal(xiaoman.appId, "wxf2e90f96bcc32dd1");
+  assert.equal(xiaoman.appId, "wx084a587b78b1074a");
+  assert.equal(getWeappBrand("daxiong").appId, "wxa02620aa3be08241");
+  assert.equal(new Set(['buchuqin', 'xiaoman', 'daxiong'].map(key => getWeappBrand(key).appId)).size, 3);
   assert.notEqual(buchuqin.appId, xiaoman.appId);
 });
 
@@ -48,5 +50,5 @@ test("brand metadata is applied before uni compiles the manifest", () => {
 
   assert.match(manifest, /"name":"小满优选"/);
   assert.equal(manifest.includes("wxc814687e5ae26924"), false);
-  assert.equal(manifest.match(/wxf2e90f96bcc32dd1/g)?.length, 2);
+  assert.equal(manifest.match(/wx084a587b78b1074a/g)?.length, 2);
 });

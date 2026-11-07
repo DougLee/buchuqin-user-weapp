@@ -1,27 +1,49 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useNightCartStore } from '../stores/nightCart';
 import { useSessionStore } from '../stores/session';
 import { fenToYuan } from '../utils/money';
 import type { NightProduct } from '../types/night';
 import PhoneGate from './PhoneGate.vue';
 
-const props = defineProps<{ products: NightProduct[]; storeId: string; buildingId: string; buildingName: string; open: boolean }>();
+const props = defineProps<{ products: NightProduct[]; storeId: string; buildingId: string; buildingName: string; open: boolean; initialCatalogProductId?: string }>();
+const emit = defineEmits<{ (event: 'detail-change', catalogProductId: string): void }>();
 const cart = useNightCartStore(), session = useSessionStore();
 const query = ref(''), category = ref(''), detailId = ref(''), phoneGate = ref(false);
-let pendingId = '';
+let pendingId = '', pendingSeckill = false, pendingPromotionId = '';
 const categoryKey = (p: NightProduct) => p.categoryId || p.categoryName || 'uncategorized';
 const categories = computed(() => [...new Map(props.products.map(p => [categoryKey(p), { id: categoryKey(p), name: p.categoryName || '其他好物' }])).values()]);
-const visible = computed(() => props.products.filter(p => (!category.value || categoryKey(p) === category.value) && (!query.value.trim() || `${p.name} ${p.subtitle} ${p.barcode || ''}`.toLowerCase().includes(query.value.trim().toLowerCase()))));
-const detail = computed(() => props.products.find(p => p.id === detailId.value));
-const qty = (p: NightProduct) => cart.quantityOf(props.storeId, p.id);
-function change(p: NightProduct, delta: number) {
-  if (delta > 0 && !props.open) { uni.showToast({ title: '店铺休息中，开门后再来选购', icon: 'none' }); return; }
-  if (delta > 0 && (p.soldOut || qty(p) >= Math.min(p.stock, 999))) { uni.showToast({ title: p.stock ? '已达到可购数量' : '这件商品暂时售罄', icon: 'none' }); return; }
-  if (delta > 0 && session.needsPhone) { pendingId = p.id; phoneGate.value = true; return; }
-  cart.setQuantity({ id: props.storeId, buildingId: props.buildingId, buildingName: props.buildingName }, p, qty(p) + delta);
+const detailMode = ref(false);
+function pricedProduct(product: NightProduct, seckill: boolean): NightProduct | undefined {
+  if (seckill && !product.seckill) return;
+  return seckill ? { ...product, asSeckill: true, price: product.seckill!.price, originalPrice: product.price, promotion: { ...product.seckill!, type: 'seckill' } } : { ...product, asSeckill: false };
 }
-function bound() { phoneGate.value = false; const p = props.products.find(p => p.id === pendingId); pendingId = ''; if (p) change(p, 1); }
+const visible = computed(() => props.products.filter(product => (!category.value || (category.value === 'featured' ? product.featured : category.value === 'seckill' ? product.seckill : categoryKey(product) === category.value)) && (!query.value.trim() || `${product.name} ${product.subtitle} ${product.barcode || ''}`.toLowerCase().includes(query.value.trim().toLowerCase()))).flatMap(product => { const priced = pricedProduct(product, category.value === 'seckill'); return priced ? [priced] : []; }));
+const detail = computed(() => { const product = props.products.find(product => product.id === detailId.value); return product ? pricedProduct(product, detailMode.value) : undefined; });
+const consumedLandingId = ref('');
+watch(() => [props.initialCatalogProductId, props.products] as const, ([id, products]) => {
+  if (!id || consumedLandingId.value === id) return;
+  const product = products.find(product => product.catalogProductId === id);
+  if (product) { consumedLandingId.value = id; detailId.value = product.id; detailMode.value = false; }
+}, { immediate: true });
+watch(detail, value => emit('detail-change', value?.catalogProductId || ''), { immediate: true });
+function openDetail(product: NightProduct) { detailMode.value = !!product.asSeckill; detailId.value = product.id; }
+const detailImages = computed(() => {
+  const product = detail.value;
+  const images = product && Array.isArray(product.images) ? product.images.filter((url): url is string => typeof url === 'string' && !!url) : [];
+  return images.length ? images : product && product.image ? [product.image] : [];
+});
+function previewImage(current: string) { uni.previewImage({ current, urls: detailImages.value }); }
+const qty = (p: NightProduct) => cart.quantityOf(props.storeId, p.id, !!p.asSeckill, p.asSeckill ? p.seckill?.id : undefined);
+function change(p: NightProduct, delta: number) {
+  if (delta > 0 && p.asSeckill && (!p.seckill || new Date(p.seckill.endsAt).getTime() <= Date.now())) { uni.showToast({ title: '秒杀活动已结束，请刷新店铺', icon: 'none' }); return; }
+  if (delta > 0 && !props.open) { uni.showToast({ title: '店铺休息中，开门后再来选购', icon: 'none' }); return; }
+  if (delta > 0 && (p.soldOut || qty(p) >= Math.min(p.stock, p.asSeckill ? 1 : 999, p.purchaseLimitMeta?.qty ?? 999))) { uni.showToast({ title: p.stock ? '已达到可购数量' : '这件商品暂时售罄', icon: 'none' }); return; }
+  if (delta > 0 && session.needsPhone) { pendingId = p.id; pendingSeckill = !!p.asSeckill; pendingPromotionId = p.seckill?.id || ''; phoneGate.value = true; return; }
+  const result = cart.setQuantity({ id: props.storeId, buildingId: props.buildingId, buildingName: props.buildingName }, p, qty(p) + delta);
+  if (result === false) uni.showToast({ title: p.asSeckill && cart.linesOf(props.storeId).some(line => line.asSeckill && line.productId !== p.id) ? '每单仅支持一种秒杀商品' : '请先移除购物车中的该商品，再切换购买方式', icon: 'none' });
+}
+function bound() { phoneGate.value = false; const raw = props.products.find(p => p.id === pendingId); const p = raw && (!pendingSeckill || raw.seckill?.id === pendingPromotionId) ? pricedProduct(raw, pendingSeckill) : undefined; pendingId = ''; if (p) change(p, 1); }
 function reset() { query.value = ''; category.value = ''; }
 </script>
 
@@ -35,6 +57,8 @@ function reset() { query.value = ''; category.value = ''; }
     <scroll-view scroll-x class="shelf__categories" :show-scrollbar="false">
       <view class="shelf__chips">
         <button class="shelf__chip" :class="{ 'shelf__chip--active': !category }" @tap="category = ''">全部好物</button>
+        <button v-if="products.some(product => product.seckill)" class="shelf__chip" :class="{ 'shelf__chip--active': category === 'seckill' }" @tap="category = 'seckill'">限时秒杀</button>
+        <button v-if="products.some(product => product.featured)" class="shelf__chip" :class="{ 'shelf__chip--active': category === 'featured' }" @tap="category = 'featured'">精选推荐</button>
         <button v-for="c in categories" :key="c.id" class="shelf__chip" :class="{ 'shelf__chip--active': category === c.id }" @tap="category = c.id">{{ c.name }}</button>
       </view>
     </scroll-view>
@@ -45,8 +69,8 @@ function reset() { query.value = ''; category.value = ''; }
       <button v-if="products.length" class="shelf__reset" @tap="reset">查看全部商品</button>
     </view>
     <view v-else class="shelf__grid">
-      <view v-for="p in visible" :key="p.id" class="shelf__goods" :class="{ 'shelf__goods--sold': p.soldOut }" @tap="detailId = p.id">
-        <view class="shelf__picture"><image v-if="p.image" :src="p.image" mode="aspectFit" /><text v-else class="shelf__fallback">夜宵好物</text><text v-if="p.soldOut" class="shelf__stock">暂时售罄</text><text v-else-if="p.stock <= 5" class="shelf__stock">仅剩 {{ p.stock }} {{ p.retailUnit || '件' }}</text></view>
+      <view v-for="p in visible" :key="p.id" class="shelf__goods" :class="{ 'shelf__goods--sold': p.soldOut }" @tap="openDetail(p)">
+        <view class="shelf__picture"><image v-if="p.image" :src="p.image" mode="aspectFit" /><text v-else class="shelf__fallback">夜宵好物</text><text v-if="p.soldOut" class="shelf__stock">暂时售罄</text><text v-else-if="p.promotion" class="shelf__stock">{{ p.asSeckill ? '限时秒杀' : '限时特惠' }}</text><text v-else-if="p.stock <= 5" class="shelf__stock">仅剩 {{ p.stock }} {{ p.retailUnit || '件' }}</text></view>
         <view class="shelf__copy"><text class="shelf__name">{{ p.name }}</text><text class="shelf__subtitle">{{ p.subtitle || p.categoryName || '今晚犒劳一下自己' }}</text>
           <view class="shelf__bottom"><text class="shelf__price"><text>¥</text>{{ fenToYuan(p.price) }}</text>
             <view class="shelf__stepper" @tap.stop>
@@ -60,11 +84,13 @@ function reset() { query.value = ''; category.value = ''; }
     <view v-if="detail" class="shelf__mask" @tap="detailId = ''">
       <view class="shelf__detail" @tap.stop>
         <button class="shelf__close" aria-label="关闭商品详情" @tap="detailId = ''">×</button>
-        <image v-if="detail.image" class="shelf__detail-img" :src="detail.image" mode="aspectFit" />
+        <swiper v-if="detailImages.length" class="shelf__detail-img" :indicator-dots="detailImages.length > 1"><swiper-item v-for="url in detailImages" :key="url"><image class="shelf__gallery-image" :src="url" mode="aspectFit" @tap="previewImage(url)" /></swiper-item></swiper>
         <text class="shelf__detail-category">{{ detail.categoryName || '夜宵好物' }}</text><text class="shelf__detail-name">{{ detail.name }}</text>
         <text class="shelf__detail-sub">{{ detail.subtitle || '本楼楼长备货，直接送到寝室' }}</text>
+        <text v-if="detail.description" class="shelf__description">{{ detail.description }}</text>
+        <text v-if="detail.purchaseLimitMeta" class="shelf__description">{{ ({ once: '每人终身', weekly: '每人每周', monthly: '每人每月' } as Record<string, string>)[detail.purchaseLimitMeta.kind] || '每人' }}限购 {{ detail.purchaseLimitMeta.qty }} 件（含待支付订单）</text>
         <view class="shelf__detail-meta"><text>单位：{{ detail.retailUnit || '件' }}</text><text>可购库存：{{ detail.stock }}</text></view>
-        <view class="shelf__detail-footer"><text class="shelf__price">¥{{ fenToYuan(detail.price) }}</text><view class="shelf__stepper"><button class="shelf__quantity" aria-label="减少数量" @tap="change(detail, -1)">−</button><text class="shelf__number">{{ qty(detail) }}</text><button class="shelf__quantity shelf__quantity--add" aria-label="增加数量" @tap="change(detail, 1)">＋</button></view></view>
+        <view class="shelf__detail-footer"><view><text class="shelf__price">¥{{ fenToYuan(detail.price) }}</text><text v-if="detail.originalPrice && detail.originalPrice > detail.price" class="shelf__original">¥{{ fenToYuan(detail.originalPrice) }}</text></view><view class="shelf__stepper"><button class="shelf__quantity" aria-label="减少数量" @tap="change(detail, -1)">−</button><text class="shelf__number">{{ qty(detail) }}</text><button class="shelf__quantity shelf__quantity--add" aria-label="增加数量" @tap="change(detail, 1)">＋</button></view></view>
         <text v-if="!open" class="shelf__closed">店铺休息中，可以先浏览，开门后下单</text>
       </view>
     </view>
@@ -112,6 +138,9 @@ button::after { border: 0; }
 .shelf__detail { position: relative; width: 100%; max-height: 86vh; overflow-y: auto; background: #fbfcf7; box-sizing: border-box; padding: 36rpx 36rpx calc(36rpx + env(safe-area-inset-bottom)); border-radius: 40rpx 40rpx 0 0; }
 .shelf__close { position: absolute; top: 12rpx; right: 12rpx; z-index: 1; }
 .shelf__detail-img { display: block; width: 100%; height: 360rpx; margin: 18rpx 0 28rpx; }
+.shelf__gallery-image { width: 100%; height: 100%; }
+.shelf__description { display: block; margin-top: 24rpx; white-space: pre-wrap; line-height: 1.7; color: #4b6250; font-size: 27rpx; overflow-wrap: anywhere; }
+.shelf__original { margin-left: 14rpx; color: #7d897c; font-size: 24rpx; text-decoration: line-through; }
 .shelf__detail-category { display: block; color: #65815e; font-size: 23rpx; letter-spacing: 2rpx; }
 .shelf__detail-name { display: block; color: #203e2a; font-size: 40rpx; font-weight: 800; margin: 12rpx 0; line-height: 1.4; }
 .shelf__detail-sub { display: block; color: #6f806f; font-size: 27rpx; line-height: 1.6; }

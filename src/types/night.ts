@@ -52,6 +52,7 @@ export interface NightStoreRow {
 
 /** GET /night/stores/:id/products 行（引夜宵统一售价主档） */
 export interface NightProduct {
+  purchaseLimitMeta?: { kind: string; qty: number };
   categoryId?: string;
   categoryName?: string;
   retailUnit?: string;
@@ -59,6 +60,14 @@ export interface NightProduct {
   /** NightProduct 楼栋行 id（下单用的 productId） */
   id: string;
   catalogProductId: string;
+  images?: string[] | null;
+  description?: string | null;
+  originalPrice?: number;
+  featured?: boolean;
+  featuredSort?: number;
+  promotion?: { id: string; type: string; endsAt: string } | null;
+  seckill?: { id: string; price: number; endsAt: string } | null;
+  asSeckill?: boolean;
   name: string;
   image: string;
   subtitle: string;
@@ -71,6 +80,8 @@ export interface NightProduct {
 /** 夜宵订单行快照（服务端 items JSON 透传） */
 export interface NightOrderLine {
   nightProductId: string;
+  asSeckill?: boolean;
+  promotionId?: string;
   catalogProductId: string;
   name: string;
   image: string;
@@ -91,7 +102,7 @@ export interface NightTimelineStep {
 
 /** 夜宵订单视图（orderView 全量口径） */
 export interface NightOrder {
-  support?: { phone: string; qrcode: string; kfUrl: string; corpId: string } | null;
+  support?: { phone: string; qrcode: string; kfUrl: string; corpId: string; groupQrcode?: string; groupTip?: string } | null;
   deliveryContact?: { name: string; phone: string } | null;
   id: string;
   orderNo: string;
@@ -128,7 +139,7 @@ export interface NightOrder {
   cancelReason: string | null;
   /** null 无售后 / requested 申请中 / resolved 已处理 */
   afterSaleStatus: string | null;
-  refund?: { id: string; status: string; amount: number; message: string; completedAt: string | null } | null;
+  refund?: { id: string; status: string; amount: number; message: string; reason?: string; createdAt?: string; completedAt: string | null } | null;
   store: { id: string; buildingName: string } | null;
 }
 
@@ -159,6 +170,7 @@ export interface NightPayStatus {
 
 /** GET /night/coupons 行（可领） */
 export interface NightClaimableCoupon {
+  featuredAfterPay?: boolean;
   nightProductIds?: string[];
   id: string;
   name: string;

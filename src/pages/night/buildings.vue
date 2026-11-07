@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { readNightBuilding, rememberNightBuilding, createBusinessRequestScope } from "../../utils/businessContext";
 import { computed, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { nightApi } from "../../api/night";
 import { useSessionStore } from "../../stores/session";
 import type { NightStoreRow } from "../../types/night";
+import { setSharedCampusId } from "../../utils/bootCampus";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
 
@@ -14,6 +16,8 @@ setupDefaultShare();
  * - 三态：营业中可进店；休息中可进店浏览（禁下单）；无楼长=招募中不可进店。
  */
 const session = useSessionStore();
+const catalogProductId = ref("");
+const requestScope = createBusinessRequestScope();
 const stores = ref<NightStoreRow[]>([]);
 const campusName = ref("");
 /** 场次态（营业窗口外进店只能浏览） */
@@ -25,13 +29,13 @@ const prefillBuildingId = ref("");
 /** 预填来源文案（上次去过 / 来自分享） */
 const prefillTag = ref("");
 /** 历史选择 storage 键：选完楼栋写回，下次进页预填 */
-const LAST_BUILDING_KEY = "nightBuildingId";
 
 const prefillRow = computed(() =>
   stores.value.find((b) => b.buildingId === prefillBuildingId.value),
 );
 
 async function load() {
+  const ticket = requestScope.begin();
   loading.value = true;
   error.value = false;
   try {
@@ -39,6 +43,7 @@ async function load() {
       nightApi.entry(),
       nightApi.stores(),
     ]);
+    if (!ticket()) return;
     campusName.value = entry.campusName;
     sessionInfo.value = {
       nightEnabled: entry.nightEnabled,
@@ -50,12 +55,15 @@ async function load() {
     };
     stores.value = list.stores;
   } catch {
-    error.value = true;
+    if (ticket()) error.value = true;
   } finally {
-    loading.value = false;
+    if (ticket()) loading.value = false;
   }
 }
 onLoad((q) => {
+  catalogProductId.value = String(q?.catalogProductId || "");
+  const campus = String(q?.campus || "");
+  if (campus) { session.pendingCampus = campus; setSharedCampusId(campus); }
   // 分享深链（店铺/商品分享带店铺参数 → 落本页过楼栋确认）：
   // buildingId 高亮预填，用户点选才算确认进店
   const shared = String(q?.buildingId || "");
@@ -69,7 +77,7 @@ onShow(async () => {
   catch { loading.value = false; error.value = true; return; }
   // 无分享参数时读历史选择（分享优先级更高，不覆盖）
   if (!prefillBuildingId.value) {
-    const last = String(uni.getStorageSync(LAST_BUILDING_KEY) || "");
+    const last = readNightBuilding();
     if (last) {
       prefillBuildingId.value = last;
       prefillTag.value = "上次去过";
@@ -89,9 +97,9 @@ function pick(row: NightStoreRow) {
     uni.navigateTo({ url: `/pages/recruit/index?intent=night&campusId=${encodeURIComponent(session.user?.campusId || '')}&buildingId=${encodeURIComponent(row.buildingId)}` });
     return;
   }
-  uni.setStorageSync(LAST_BUILDING_KEY, row.buildingId);
+  rememberNightBuilding(row.buildingId);
   uni.navigateTo({
-    url: `/pages/night/store?storeId=${row.storeId}&buildingId=${row.buildingId}`,
+    url: `/pages/night/store?storeId=${row.storeId}&buildingId=${row.buildingId}${catalogProductId.value ? `&catalogProductId=${encodeURIComponent(catalogProductId.value)}` : ''}`,
   });
 }
 /** 夜宵订单列表（与白天订单页隔离） */

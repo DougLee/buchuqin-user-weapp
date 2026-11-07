@@ -98,7 +98,7 @@ async function pay(order: NightOrder) {
     const paid = await startNightPayFlow(order.id, order.store?.id);
     if (paid) {
       uni.showToast({ title: "支付成功", icon: "success" });
-      await load(active.value);
+      uni.navigateTo({ url: `/pages/checkout/success?id=${order.id}&businessType=night` });
     } else {
       // 取消/失败：跳详情页提供"继续支付"入口，不留死路
       uni.showToast({ title: "支付未完成，可继续支付", icon: "none" });

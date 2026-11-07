@@ -1,60 +1,61 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { onReachBottom, onShow } from "@dcloudio/uni-app";
+import { onLoad, onReachBottom, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import type { Notification } from "../../types";
+import BusinessModeTabs from "../../components/BusinessModeTabs.vue";
+import { businessUrl, resolveBusinessType, type BusinessType } from "../../utils/businessContext";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
-const items = ref<Notification[]>([]),
-  loading = ref(true),
-  error = ref(false),
-  page = ref(1),
-  total = ref(0),
-  loadingMore = ref(false);
+const items = ref<Notification[]>([]), loading = ref(true), error = ref(false),
+  page = ref(1), total = ref(0), loadingMore = ref(false), moreError = ref(false),
+  businessType = ref<BusinessType>("day"), marking = ref(false);
+let requestedType: unknown, generation = 0;
+onLoad(query => { requestedType = query?.businessType; });
+function selectBusiness(type: BusinessType) { requestedType = type; void load(); }
 async function load(reset = true) {
-  if (reset) {
-    loading.value = true;
-    page.value = 1;
-  }
-  error.value = false;
+  if (!reset && (loading.value || loadingMore.value || items.value.length >= total.value)) return;
+  const current = reset ? ++generation : generation;
+  const identity = uni.getStorageSync('token');
+  if (reset) { loading.value = true; error.value = false; }
+  else { loadingMore.value = true; moreError.value = false; }
   try {
-    const res = await api.notificationsPage(page.value);
-    items.value = reset ? res.items : [...items.value, ...res.items];
-    total.value = res.total;
+    const type = reset ? await resolveBusinessType(requestedType) : businessType.value;
+    const result = await api.notificationsPage(reset ? 1 : page.value + 1, 20, type);
+    if (current !== generation || identity !== uni.getStorageSync('token')) return;
+    const seen = new Set(items.value.map(row => row.id));
+    items.value = reset ? result.items : [...items.value, ...result.items.filter(row => !seen.has(row.id))];
+    businessType.value = type;
+    page.value = result.page;
+    total.value = result.total;
   } catch {
-    error.value = true;
+    if (current === generation) { if (reset) error.value = true; else moreError.value = true; }
   } finally {
-    loading.value = false;
+    if (current === generation) { loading.value = false; loadingMore.value = false; }
   }
 }
 onShow(() => load());
-onReachBottom(async () => {
-  if (loadingMore.value || loading.value || error.value) return;
-  if (items.value.length >= total.value) return;
-  loadingMore.value = true;
-  try {
-    page.value += 1;
-    await load(false);
-  } finally {
-    loadingMore.value = false;
-  }
-});
+onReachBottom(() => load(false));
 async function read(item: Notification) {
+  const current = generation;
   try {
-  if (!item.read) {
-    await api.readNotification(item.id);
-    item.read = true;
-  }
-  } catch { /* 保留未读状态，请求层已提示失败。 */ }
+    if (!item.read) { await api.readNotification(item.id); if (current !== generation) return; item.read = true; }
+    if (item.orderId) uni.navigateTo({ url: item.businessType === 'night'
+      ? `/pages/night/order-detail?id=${encodeURIComponent(item.orderId)}`
+      : businessUrl(`/pages/orders/detail?id=${encodeURIComponent(item.orderId)}`, 'day') });
+  } catch { /* Keep unread state when the server rejects the operation. */ }
 }
-/** 全部已读（IK9AWO）：POST /notifications/read-all 后本地全标 */
 async function readAll() {
-  if (!items.value.some((item) => !item.read)) return;
+  if (marking.value || !items.value.some(item => !item.read)) return;
+  const current = generation, identity = uni.getStorageSync('token');
+  marking.value = true;
   try {
-  await api.readAllNotifications();
-  items.value = items.value.map((item) => ({ ...item, read: true }));
-  uni.showToast({ title: "已全部标为已读", icon: "success" });
-  } catch { /* 失败时不提前清除未读标记。 */ }
+    await api.readAllNotifications(businessType.value);
+    if (current !== generation || identity !== uni.getStorageSync('token')) return;
+    items.value = items.value.map(item => ({ ...item, read: true }));
+    uni.showToast({ title: '已全部标为已读', icon: 'success' });
+  } catch { /* Preserve state on failure. */ }
+  finally { marking.value = false; }
 }
 function messageTime(iso: string) {
   const time = new Date(iso).getTime();
@@ -63,7 +64,7 @@ function messageTime(iso: string) {
 </script>
 <template>
   <view class="page"
-    ><view v-if="error" class="msg-retry card" @tap="load()"
+    ><BusinessModeTabs :model-value="businessType" :disabled="loading || marking" @change="selectBusiness" /><view v-if="error" class="msg-retry card" @tap="load()"
       ><text class="msg-retry__title">消息加载失败</text
       ><text class="muted">网络异常，点击重试</text></view
     ><view v-else-if="loading" class="msg-skeleton"
@@ -85,7 +86,7 @@ function messageTime(iso: string) {
           }}</text></view
         ></view
       ><view v-if="!items.length" class="empty">暂时没有新消息</view
-      ><view v-else-if="items.length < total" class="list-foot">{{
+      ><view v-if="moreError" class="list-foot" @tap="load(false)">加载失败，点击重试</view><view v-else-if="items.length < total" class="list-foot">{{
         loadingMore ? "加载中…" : "上拉加载更多"
       }}</view
       ><view v-else class="list-foot">没有更多了</view

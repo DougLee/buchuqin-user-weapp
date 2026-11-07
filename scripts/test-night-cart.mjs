@@ -58,3 +58,38 @@ test('支付只扣除该单已选数量，保留新加商品，重查支付与�
   const again = fixture([...storage]); again.cart.consumeOrder(store.id, 'paid-order', lines);
   assert.equal(again.cart.countOf(store.id), 4);
 });
+
+test('同一用户跨校区购物车隔离，切回原校区保留商品', () => {
+  const { cart } = fixture();
+  cart.setOwner('buyer', 'campus-a'); cart.setQuantity(store, product, 2);
+  cart.setOwner('buyer', 'campus-b'); assert.equal(cart.countOf(store.id), 0);
+  cart.setQuantity(store, product, 1);
+  cart.setOwner('buyer', 'campus-a'); assert.equal(cart.countOf(store.id), 2);
+});
+
+test('秒杀行锁定渠道与数量，过期不悄悄改成原价，原单支付不清掉新换的普通行', () => {
+  const { cart } = fixture(); cart.setOwner('buyer', 'campus');
+  const seckill = { ...product, asSeckill: true, seckill: { id: 'promo', price: 200, endsAt: new Date(Date.now() + 60000).toISOString() } };
+  cart.setQuantity(store, seckill, 2);
+  assert.equal(cart.countOf(store.id), 1); assert.equal(cart.amountOf(store.id), 200);
+  assert.equal(cart.setQuantity(store, { ...product, asSeckill: false }, 1), false);
+  cart.refreshProducts(store.id, [{ ...product, seckill: null }]);
+  assert.equal(cart.linesOf(store.id)[0].asSeckill, true); assert.equal(cart.amountOf(store.id), 200);
+  cart.clear(store.id); cart.setQuantity(store, product, 1);
+  cart.consumeOrder(store.id, 'paid-seckill', [{ nightProductId: product.id, quantity: 1, asSeckill: true }]);
+  assert.equal(cart.countOf(store.id), 1);
+});
+
+test('旧秒杀活动不会迁移到下一场，新活动车行也不会被旧订单支付清除', () => {
+  const { cart } = fixture(); cart.setOwner('buyer', 'campus');
+  const old = { ...product, asSeckill: true, seckill: { id: 'old-promo', price: 200, endsAt: new Date(Date.now() + 60000).toISOString() } };
+  const next = { ...old, seckill: { ...old.seckill, id: 'next-promo', price: 300 } };
+  cart.setQuantity(store, old, 1);
+  cart.refreshProducts(store.id, [next]);
+  assert.equal(cart.linesOf(store.id)[0].promotionId, 'old-promo');
+  assert.equal(cart.amountOf(store.id), 200);
+  assert.equal(cart.setQuantity(store, next, 1), false);
+  cart.clear(store.id); cart.setQuantity(store, next, 1);
+  cart.consumeOrder(store.id, 'old-paid', [{ nightProductId: product.id, quantity: 1, asSeckill: true, promotionId: 'old-promo' }]);
+  assert.equal(cart.countOf(store.id), 1); assert.equal(cart.amountOf(store.id), 300);
+});

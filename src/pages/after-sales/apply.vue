@@ -2,6 +2,13 @@
 import { computed, reactive, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { nightApi } from "../../api/night";
+import { businessUrl, resolveBusinessType, type BusinessType } from "../../utils/businessContext";
+import ProofImagePicker from "../../components/ProofImagePicker.vue";
+const businessType = ref<BusinessType>('day');
+const orderLoaded = ref(false), loadError = ref(false);
+const contact = ref<{ phone: string; qrcode: string; kfUrl: string; corpId: string }>({ phone: '', qrcode: '', kfUrl: '', corpId: '' });
+let requestedType: unknown = 'day', loadGeneration = 0;
 import { AFTER_SALE_TYPES } from "../../utils/afterSale";
 import ServiceSheet from "../../components/ServiceSheet.vue";
 import { setupDefaultShare } from "../../utils/share";
@@ -23,35 +30,32 @@ const orderId = ref(""),
   });
 onLoad((q) => {
   orderId.value = String(q?.orderId || "");
+  requestedType = q?.businessType || "day";
 });
-onShow(async () => {
+onShow(loadOrder);
+async function loadOrder() {
+  const generation = ++loadGeneration;
+  const identity = uni.getStorageSync('token');
+  orderLoaded.value = false; loadError.value = false;
   try {
-    const order = await api.order(orderId.value);
-    lines.value = (order.items ?? []).map((l) => ({
-      id: l.product.id,
-      name: l.product.name,
-      price: l.product.price,
-      quantity: l.quantity,
-    }));
-    // 可退上限 = 实付 − 配送费 − 已退（IKHZKA v2 硬上限口径）
-    refundableMax.value = Math.max(
-      0,
-      order.payableAmount - (order.deliveryFee ?? 0) - (await refundedSum()),
-    );
-  } catch {
-    /* 商品行拉不到时不阻塞表单（不勾=整单退） */
-  }
-});
-/** 本单已退金额（历史部分退/整单退合计，分） */
-async function refundedSum(): Promise<number> {
-  try {
-    const list = await api.refunds();
-    return list
-      .filter((r) => r.orderId === orderId.value && r.status === "refunded")
-      .reduce((sum, r) => sum + r.amount, 0);
-  } catch {
-    return 0;
-  }
+    if (!orderId.value) throw Error('缺少订单信息');
+    const type = await resolveBusinessType(requestedType);
+    businessType.value = type;
+    if (type === 'night') {
+      const order = await nightApi.order(orderId.value);
+      if (generation !== loadGeneration || identity !== uni.getStorageSync('token')) return;
+      lines.value = order.items.map(line => ({ id: line.nightProductId, name: line.name, price: line.price, quantity: line.quantity }));
+      refundableMax.value = Math.max(0, order.payableAmount - order.deliveryFee - (order.refund?.status === 'succeeded' ? order.refund.amount : 0));
+      contact.value = order.support || { phone: '', qrcode: '', kfUrl: '', corpId: '' };
+    } else {
+      const [order, refunds] = await Promise.all([api.order(orderId.value), api.refunds()]);
+      if (generation !== loadGeneration || identity !== uni.getStorageSync('token')) return;
+      contact.value = order.support || { phone: '', qrcode: '', kfUrl: '', corpId: '' };
+      lines.value = order.items.map(line => ({ id: line.product.id, name: line.product.name, price: line.product.price, quantity: line.quantity }));
+      refundableMax.value = Math.max(0, order.payableAmount - (order.deliveryFee || 0) - refunds.filter(record => record.orderId === order.id && record.status === 'refunded').reduce((amount, record) => amount + record.amount, 0));
+    }
+    orderLoaded.value = true;
+  } catch { if (generation === loadGeneration) loadError.value = true; }
 }
 const refundableMax = ref(0);
 /** 勾选金额是否超可退上限（超限禁止提交，道哥 2026-09-28） */
@@ -76,26 +80,8 @@ const partTotal = computed(() =>
     .filter((l) => selected.value.includes(l.id))
     .reduce((sum, l) => sum + l.price * l.quantity, 0),
 );
-async function chooseProof() {
-  if (uploading.value) return;
-  const result = await uni.chooseImage({
-    count: 3 - form.images.length,
-    sizeType: ["compressed"],
-    sourceType: ["album", "camera"],
-  });
-  const paths = Array.isArray(result.tempFilePaths)
-    ? result.tempFilePaths
-    : [result.tempFilePaths];
-  uploading.value = true;
-  try {
-    // 选中即上传，提交时只发送已持久化的 URL
-    const urls = await Promise.all(paths.map((p) => api.uploadImage(p)));
-    form.images = [...form.images, ...urls];
-  } finally {
-    uploading.value = false;
-  }
-}
 async function submit() {
+  if (submitting.value || !orderLoaded.value) return;
   if (uploading.value) {
     uni.showToast({ title: "凭证还在上传中，稍等一下", icon: "none" });
     return;
@@ -117,13 +103,14 @@ async function submit() {
       });
       return;
     }
-    await api.createAfterSale(orderId.value, {
+    const submitAfterSale = businessType.value === "night" ? nightApi.applyAfterSale : api.createAfterSale;
+    await submitAfterSale(orderId.value, {
       ...form,
       // v2 部分退款：单品退传勾选行；整单退不传（兼容 v1 口径）
       productIds: refundAll.value ? undefined : [...selected.value],
     });
     uni.showToast({ title: "售后申请已提交", icon: "success" });
-    setTimeout(() => uni.redirectTo({ url: "/pages/after-sales/index" }), 600);
+    setTimeout(() => uni.redirectTo({ url: businessUrl("/pages/after-sales/index", businessType.value) }), 600);
   } finally {
     submitting.value = false;
   }
@@ -131,7 +118,7 @@ async function submit() {
 </script>
 <template>
   <view class="page"
-    ><view class="tip">请在送达后 24 小时内提交，平台审核后处理退款。</view
+    ><view v-if="loadError" class="tip" @tap="loadOrder">订单加载失败，点击重试</view><view v-else-if="!orderLoaded" class="tip">正在核对订单与可退金额…</view><view class="tip">请在送达后 24 小时内提交，平台审核后处理退款。</view
     ><!-- v2 退款商品：默认整单退，点商品行切单品退（道哥 2026-09-28） -->
     <view v-if="lines.length" class="form card"
       ><text class="label">退款商品</text
@@ -205,18 +192,12 @@ async function submit() {
         maxlength="300"
         placeholder="请说明商品出现了什么问题"
       /><text class="label">问题凭证</text
-      ><view class="proof" @tap="chooseProof"
-        ><template v-if="form.images.length"
-          ><image
-            v-for="image in form.images"
-            :key="image"
-            :src="api.toAbsoluteUrl(image)"
-            mode="aspectFill" /></template
-        ><text v-else>{{ uploading ? "凭证上传中…" : "拍照或从相册选择（至少 1 张）" }}</text></view
-      ></view
+      ><view class="proof"><view v-for="image in form.images" :key="image" class="proof-item"><image :src="api.toAbsoluteUrl(image)" mode="aspectFill" @tap="uni.previewImage({ current: image, urls: form.images.map(api.toAbsoluteUrl) })" /><button :disabled="uploading || submitting" @tap="form.images = form.images.filter(url => url !== image)">移除</button></view></view>
+      <ProofImagePicker v-model="form.images" :max="3" :disabled="submitting || !orderLoaded" label="上传问题凭证（至少1张）" @busy="uploading = $event" />
+      </view
     ><button
       class="primary-btn"
-      :disabled="submitting || uploading"
+      :disabled="submitting || uploading || !orderLoaded"
       @tap="submit"
     >
       {{ submitting ? "正在提交…" : uploading ? "凭证上传中…" : "提交售后申请" }}
@@ -233,7 +214,7 @@ async function submit() {
       ></view
     ></view
   >
-  <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />
+  <ServiceSheet :contact="contact" :visible="serviceOpen" @close="serviceOpen = false" />
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";

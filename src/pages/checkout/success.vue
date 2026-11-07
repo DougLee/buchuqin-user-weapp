@@ -2,6 +2,8 @@
 import { computed, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { nightApi } from "../../api/night";
+import type { NightOrder } from "../../types/night";
 import { fenToYuan } from "../../utils/money";
 import type { Banner, Order } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
@@ -9,8 +11,10 @@ import { useCampusStore } from "../../stores/campus";
 const campusStore = useCampusStore();
 import { openBannerTarget } from "../../utils/bannerLink";
 setupDefaultShare();
+const businessType = ref<"day" | "night">("day");
+const loadError = ref(false);
 const orderId = ref(""),
-  order = ref<Order>(),
+  order = ref<Order | NightOrder>(),
   cancelling = ref(false),
   /** 订单卡加载中（2026-08-24）：拉单期间给同构占位，卡片不突兀弹入 */
   loading = ref(true),
@@ -22,7 +26,7 @@ const orderId = ref(""),
   groupOpen = ref(false),
   /** 支付后推荐券（道哥 2026-09-08）：featured 券中面额最大的一张，
    *  一键领取复用券中心 claimCoupon；无推荐/已领取 → 不渲染 */
-  featuredCoupon = ref<Awaited<ReturnType<typeof api.coupons>>["claimable"][number]>(),
+  featuredCoupon = ref<{ id: string; name: string; amount: number; threshold: number }>(),
   couponClaimed = ref(false);
   // 营销位总量 2（道哥 2026-09-08：广告+券合计最多两个）：
   // 推荐券存在且未领 → 券占 1 槽、广告 1 条；无券/已领 → 广告 2 条
@@ -30,33 +34,39 @@ const orderId = ref(""),
     featuredCoupon.value && !couponClaimed.value ? 1 : 2,
   );
   const marketingAds = computed(() => ads.value.slice(0, marketingAdCount.value));
+const resultTitle = computed(() => loading.value ? '正在核对支付结果' : loadError.value ? '暂时无法核对订单' : order.value?.status === 'pending-payment' ? '支付尚未完成' : order.value?.status === 'cancelled' ? '订单已关闭' : '支付成功');
 onLoad(async (q) => {
+  businessType.value = q?.businessType === "night" ? "night" : "day";
   orderId.value = String(q?.id || "");
   // 广告位拉取失败静默（不影响支付结果展示）
   api
-    .paySuccessBanners()
+    .paySuccessBanners(businessType.value)
     .then((list) => (ads.value = (list ?? []).slice(0, 2)))
     .catch(() => {});
   // 群码拉取失败静默：卡片不渲染即可，不影响支付结果展示
   // （拉取移至订单加载后，带订单楼栋参数——见 onLoad 尾部）
   // 支付后推荐券：featured 且可领的取面额最大一张；拉取失败静默
-  api
-    .coupons()
+  (businessType.value === "night" ? nightApi.coupons() : api.coupons())
     .then((bundle) => {
-      const picks = bundle.claimable
+      const picks: Array<{ id: string; name: string; amount: number; threshold: number; featuredAfterPay?: boolean }> = [...bundle.claimable];
+      const featured = picks
         .filter((c) => c.featuredAfterPay)
         .sort((a, b) => b.amount - a.amount);
-      featuredCoupon.value = picks[0];
+      featuredCoupon.value = featured[0];
     })
     .catch(() => {});
-  try {
-    if (orderId.value) order.value = await api.order(orderId.value);
-  } finally {
-    loading.value = false;
-  }
-  // IKQXSD 统一：福利群=校区售后福利群码（campus store，与首页/售后页同源）
-  group.value = campusStore.afterSalesGroupQrcode;
+  await loadOrder();
 });
+async function loadOrder() {
+  loading.value = true; loadError.value = false;
+  try {
+    if (!orderId.value) throw new Error('缺少订单编号');
+    order.value = businessType.value === 'night' ? await nightApi.order(orderId.value) : await api.order(orderId.value);
+  } catch { loadError.value = true; }
+  finally { loading.value = false; uni.setNavigationBarTitle({ title: resultTitle.value }); }
+  // Old-campus orders must not inherit the currently selected campus's group code.
+  group.value = order.value?.support?.groupQrcode || '';
+}
 /** 广告点击（IKE4FR→IKE9YC）：配置了站内跳转优先，否则图文详情——与首页 banner 同一分发 */
 function openAd(banner: Banner) {
   openBannerTarget(banner);
@@ -68,7 +78,7 @@ async function claimFeaturedCoupon() {
   if (!c || claimingCoupon.value) return;
   claimingCoupon.value = true;
   try {
-    await api.claimCoupon(c.id);
+    await (businessType.value === "night" ? nightApi.claimCoupon(c.id) : api.claimCoupon(c.id));
     couponClaimed.value = true;
     uni.showToast({ title: `已领取 ¥${fenToYuan(c.amount)} 券`, icon: "none" });
   } catch (err) {
@@ -102,10 +112,10 @@ function openCancel() {
       if (!m.confirm || !order.value || cancelling.value) return;
       cancelling.value = true;
       try {
-        await api.cancelOrder(order.value.id);
+        await (businessType.value === "night" ? nightApi.cancelOrder(order.value.id) : api.cancelOrder(order.value.id));
         uni.showToast({ title: "订单已取消", icon: "success" });
         // IKAHBQ：订单已非 tab 页，改 navigateTo
-        setTimeout(() => uni.navigateTo({ url: "/pages/orders/index" }), 600);
+        setTimeout(() => uni.navigateTo({ url: businessType.value === "night" ? "/pages/night/orders" : "/pages/orders/index" }), 600);
       } finally {
         cancelling.value = false;
       }
@@ -114,17 +124,18 @@ function openCancel() {
 }
 </script>
 <template>
-  <view class="page success"
+  <view class="page success" :class="{ 'success--night': businessType === 'night' }"
     ><view class="banner"
       ><view class="banner__check">✓</view
-      ><text class="banner__title">支付成功</text
+      ><text class="banner__title">{{ resultTitle }}</text
       ><text class="banner__sub"
-        >这一袋已经从校园仓出发接力，留意消息通知</text
+        >{{ order && !['pending-payment', 'cancelled'].includes(order.status) ? (businessType === "night" ? "订单已交给本楼夜宵店，请留意配送消息" : "订单已交给校园仓，请留意配送消息") : "请进入订单详情核对当前状态" }}</text
       ></view
     ><!-- 订单卡骨架（2026-08-24）：三行同构占位 --><view
       v-if="loading"
       class="order success-skeleton"
       ><view v-for="n in 3" :key="n" class="success-skeleton__row" /></view
+    ><view v-else-if="loadError" class="order card"><text>订单暂时加载失败，请重试核对支付状态</text><button @tap="loadOrder">重新加载</button></view
     ><view v-else-if="order" class="order card"
       ><view class="order__row"
         ><text class="muted">订单编号</text
@@ -159,7 +170,7 @@ function openCancel() {
       </view>
     </view><!-- 支付后推荐券（道哥 2026-09-08）：featured 券一键领取，
          领取后变已领态（券额大字左、按钮右），无推荐不占位 -->
-    <view v-if="featuredCoupon && !couponClaimed" class="pay-coupon card">
+    <view v-if="!loadError && order && featuredCoupon && !couponClaimed" class="pay-coupon card">
       <!-- 金额条通底（券中心 IKA08W 同款三列：金额/信息/按钮） -->
       <view class="pay-coupon__money"
         ><view class="pay-coupon__money-inner"
@@ -191,7 +202,7 @@ function openCancel() {
       >已放入你的优惠券账户，下单立减</view
     >
     <!-- 支付成功页广告位（IKA57E→IKB87P 大卡版）：图上文下，最多 2 条，未配置不占位 -->
-    <view v-if="marketingAds.length" class="ads">
+    <view v-if="!loadError && order && marketingAds.length" class="ads">
       <text class="ads__caption">为你推荐</text>
       <view
         v-for="banner in marketingAds"
@@ -213,6 +224,7 @@ function openCancel() {
         ></view
       >
     </view><view class="actions safe-bottom"
+      ><button v-if="orderId" class="primary-btn" @tap="uni.redirectTo({ url: businessType === 'night' ? `/pages/night/order-detail?id=${orderId}` : `/pages/orders/detail?id=${orderId}` })">查看订单</button
       ><button class="primary-btn actions__home" @tap="goHome"
         >返回首页</button
       ><button
@@ -239,7 +251,7 @@ function openCancel() {
       </button></view
     ></view
   >
-  <CartOverlay />
+  <CartOverlay v-if="businessType === 'day'" />
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
@@ -588,4 +600,18 @@ function openCancel() {
 .actions__cancel::after {
   border: none;
 }
+</style>
+
+<style scoped>
+.success--night .banner { background: linear-gradient(140deg, #173e2d, #0c241c); color: #fff0c0; }
+.success--night .banner__check { background: rgba(255, 224, 150, .16); color: #ffe09a; }
+.success--night .order__amount { color: #247454; }
+</style>
+<style scoped>
+.success--night .banner { position: relative; overflow: hidden; border: 1px solid rgba(255, 222, 155, .22); border-radius: 26px; margin-bottom: 16px; background: radial-gradient(ellipse at 100% 0%, rgba(217, 193, 119, .17), transparent 65%), linear-gradient(145deg, #1b4532, #0c241c); }
+.success--night .banner__sub { color: #c0d3c5; text-align: center; line-height: 1.6; font-size: 14px; }
+.success--night .banner__check { box-shadow: 0 10px 24px rgba(0, 0, 0, .12); }
+.success--night .actions > .primary-btn:first-child { color: #fff0c0; background: linear-gradient(140deg, #24543c, #143625); box-shadow: 0 6px 16px rgba(24, 62, 43, .14); }
+.success--night .actions__home { color: #214e38; background: #eef3ec; border: 1px solid #d8e2d6; box-shadow: none; }
+.success--night button:focus-visible { outline: 2px solid #ae8b3f; outline-offset: 3px; }
 </style>

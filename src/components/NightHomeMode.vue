@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { readNightBuilding, clearNightBuilding, createBusinessRequestScope } from "../utils/businessContext";
 import { computed, onMounted, ref } from "vue";
 import { nightApi } from "../api/night";
 import { useNightCartStore } from "../stores/nightCart";
@@ -18,12 +19,12 @@ const cart = useNightCartStore();
 const session = useSessionStore();
 const error = ref(false);
 let generation = 0;
-const LOADING_BUILDING_KEY = "nightBuildingId"; // 与楼栋页「上次去过」同一键（agent C 既有体系）
 
 const store = ref<NightStoreRow>();
 const storeId = ref("");
 const sessionInfo = ref<NightStoreRow["session"]>();
 const products = ref<NightProduct[]>([]);
+const selectedCatalogId = ref("");
 const loading = ref(true);
 const buildingId = ref("");
 const buildingName = ref("");
@@ -35,55 +36,34 @@ const cartAmount = computed(() => cart.amountOf(storeId.value));
 
 /** 加载本店数据（挂载方 onShow 可复用——首页 tabbar 页不销毁，
  *  返回首页/进店后回首页需刷新楼栋店状态） */
+const loadScope = createBusinessRequestScope();
 async function load() {
-  const current = ++generation;
-  error.value = false;
-  const memo = String(uni.getStorageSync(LOADING_BUILDING_KEY) || "");
-  if (!memo) {
-    store.value = undefined;
-    storeId.value = "";
-    products.value = [];
-    loading.value = false;
-    return;
-  }
-  loading.value = true;
+  const invocation = ++generation;
+  loadScope.invalidate();
+  let current = () => invocation === generation;
+  error.value = false; loading.value = true;
+  store.value = undefined; storeId.value = ''; products.value = [];
   try {
     await session.ensureLogin();
-    // 楼栋列表接口按楼栋找店（列表行含 storeId+状态）——无店=引导选楼栋
-    // stores 接口返回 { session, stores }——夜主档/楼栋行均在 stores 数组
+    if (invocation !== generation) return;
+    current = loadScope.begin();
+    const memo = readNightBuilding();
+    if (!memo) return;
     const bundle = await nightApi.stores(memo);
-    if (current !== generation) return;
-    const row = bundle.stores.find(r => r.buildingId === memo);
-    if (!row || !row.storeId) {
-      store.value = undefined;
-      products.value = [];
-      uni.removeStorageSync(LOADING_BUILDING_KEY);
-      loading.value = false;
-      return;
-    }
-    storeId.value = row.storeId;
-    buildingId.value = row.buildingId;
-    buildingName.value = row.buildingName;
-    const [detail, goods] = await Promise.all([
-      nightApi.storeDetail(row.storeId),
-      nightApi.storeProducts(row.storeId),
-    ]);
-    if (current !== generation) return;
-    store.value = detail;
-    sessionInfo.value = detail.session;
-    products.value = goods;
+    if (!current()) return;
+    const row = bundle.stores.find(row => row.buildingId === memo);
+    if (!row || !row.storeId) { clearNightBuilding(); return; }
+    const [detail, goods] = await Promise.all([nightApi.storeDetail(row.storeId), nightApi.storeProducts(row.storeId)]);
+    if (!current()) return;
+    storeId.value = row.storeId; buildingId.value = row.buildingId; buildingName.value = row.buildingName;
+    store.value = detail; sessionInfo.value = detail.session; products.value = goods;
     cart.refreshProducts(row.storeId, goods);
-  } catch {
-    if (current === generation) error.value = true;
-    // 加载失败（网络抖动等）不清楼栋记忆：保留用户选择，下次进首页重试
-    // （清记忆仅发生在组件判定「该楼无店」时，见上方分支）
-    loading.value = false;
-  } finally {
-    loading.value = false;
-  }
+  } catch { if (current()) error.value = true; }
+  finally { if (current()) loading.value = false; }
 }
 onMounted(load);
-defineExpose({ load });
+function shareTarget() { return { buildingId: buildingId.value, catalogProductId: selectedCatalogId.value, name: products.value.find(product => product.catalogProductId === selectedCatalogId.value)?.name || `${buildingName.value}夜宵店` }; }
+defineExpose({ load, shareTarget });
 
 function goBuildings() {
   uni.navigateTo({ url: "/pages/night/buildings" });
@@ -126,7 +106,7 @@ function goCheckout() {
           <text class="nhm__head-link" @tap="goBuildings">切换楼栋</text>
         </view>
       </view>
-      <NightProductShelf :products="products" :store-id="storeId" :building-id="buildingId" :building-name="buildingName" :open="isOpen" />
+      <NightProductShelf @detail-change="selectedCatalogId = $event" :products="products" :store-id="storeId" :building-id="buildingId" :building-name="buildingName" :open="isOpen" />
       <!-- 购物车条 -->
       <view v-if="cartCount" class="nhm__cartbar" @tap="goCheckout">
         <text class="nhm__cartbar-badge">{{ cartCount }}</text>

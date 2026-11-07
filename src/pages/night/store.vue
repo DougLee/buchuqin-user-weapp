@@ -10,6 +10,8 @@ import type {
   NightProduct,
   NightStoreRow,
 } from "../../types/night";
+import { nightStoreLink } from "../../utils/nightLink";
+import { createBusinessRequestScope } from "../../utils/businessContext";
 import NightProductShelf from "../../components/NightProductShelf.vue";
 
 /**
@@ -24,6 +26,9 @@ import NightProductShelf from "../../components/NightProductShelf.vue";
 const cart = useNightCartStore();
 const session = useSessionStore();
 const storeId = ref("");
+const catalogProductId = ref("");
+const selectedCatalogId = ref("");
+const requestScope = createBusinessRequestScope();
 const buildingId = ref("");
 const store = ref<NightStoreRow>();
 const sessionInfo = ref<NightStoreRow["session"]>();
@@ -53,6 +58,7 @@ const cartCount = computed(() => cart.countOf(storeId.value));
 const cartAmount = computed(() => cart.amountOf(storeId.value));
 
 async function load() {
+  const ticket = requestScope.begin();
   if (!storeId.value) { error.value = true; loading.value = false; return; }
   loading.value = !store.value;
   error.value = false;
@@ -62,6 +68,7 @@ async function load() {
       nightApi.storeDetail(storeId.value),
       nightApi.storeProducts(storeId.value),
     ]);
+    if (!ticket()) return;
     store.value = detail;
     sessionInfo.value = detail.session;
     if (detail.buildingId) buildingId.value = detail.buildingId;
@@ -69,9 +76,9 @@ async function load() {
     cart.refreshProducts(storeId.value, goods);
     void loadCoupons();
   } catch {
-    error.value = true;
+    if (ticket()) error.value = true;
   } finally {
-    loading.value = false;
+    if (ticket()) loading.value = false;
   }
 }
 async function loadCoupons() {
@@ -86,6 +93,7 @@ async function loadCoupons() {
   }
 }
 onLoad((q) => {
+  catalogProductId.value = String(q?.catalogProductId || "");
   storeId.value = String(q?.storeId || "");
   buildingId.value = String(q?.buildingId || "");
   uni.setNavigationBarTitle({ title: "夜宵店" });
@@ -126,8 +134,8 @@ function goCheckout() {
 onShareAppMessage(() => {
   const name = store.value?.buildingName ?? "夜宵店";
   return {
-    title: `🌙 ${name}夜宵店开业中，零食送到寝室`,
-    path: `/pages/night/buildings?buildingId=${buildingId.value}`,
+    title: selectedCatalogId.value ? `${products.value.find(product => product.catalogProductId === selectedCatalogId.value)?.name || '夜宵好物'} · ${name}` : `${name}夜宵店，零食送到寝室`,
+    path: nightStoreLink({ campusId: session.user?.campusId, buildingId: buildingId.value, catalogProductId: selectedCatalogId.value || catalogProductId.value }),
   };
 });
 </script>
@@ -187,7 +195,8 @@ onShareAppMessage(() => {
         </button></view
       ></view
     >
-    <NightProductShelf :products="products" :store-id="storeId" :building-id="buildingId" :building-name="store.buildingName" :open="isOpen" />
+    <view v-if="catalogProductId && products.length && !products.some(product => product.catalogProductId === catalogProductId)" class="card"><text>这件好物本楼暂未备货，看看店内其他商品吧</text></view>
+    <NightProductShelf :initial-catalog-product-id="catalogProductId" @detail-change="selectedCatalogId = $event" :products="products" :store-id="storeId" :building-id="buildingId" :building-name="store.buildingName" :open="isOpen" />
     </template
     ><!-- 底部购物车条：件数+金额+去结算（未开业置灰并给开门时间） -->
     <view v-if="store" class="cart-bar safe-bottom"

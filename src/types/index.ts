@@ -46,6 +46,7 @@ export interface Category {
 }
 /** 首页 Banner（IK9RX2）：后台营销板块管理，/home 返回启用列表。 */
 export interface Banner {
+  businessType?: "day" | "night";
   id: string;
   title: string;
   subtitle: string;
@@ -71,6 +72,7 @@ export interface CartLine {
   asSeckill?: boolean;
 }
 export interface Cart {
+  version?: string;
   items: CartLine[];
   /** 单位：分 */
   productAmount: number;
@@ -128,6 +130,7 @@ export interface Room {
 /** 订单聚合阶段（后端 statusPhase，前端 tab 直接映射；IK93GQ 12 态状态机） */
 export type OrderStatusPhase = "payment" | "fulfillment" | "done" | "exception";
 export interface Order {
+  support?: { phone: string; qrcode: string; kfUrl: string; corpId: string; groupQrcode?: string; groupTip?: string };
   id: string;
   orderNo: string;
   status: string;
@@ -243,6 +246,8 @@ export interface CouponBundle {
   mine: UserCoupon[];
 }
 export interface Notification {
+  businessType: "day" | "night";
+  orderId?: string | null;
   id: string;
   type: string;
   title: string;

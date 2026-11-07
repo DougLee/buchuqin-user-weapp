@@ -1,3 +1,4 @@
+import { useSessionStore } from "../stores/session";
 import type { ApiResult, LoginResult } from "../types";
 import { WECHAT_APP_ID } from "../config/app";
 import { BASE_URL } from "./base";
@@ -58,8 +59,9 @@ function post(
     }),
   );
 }
-function tokenFrom(body: unknown): string {
-  if (isApiResult<LoginResult>(body)) return body.data.token;
+type ResolvedLogin = Pick<LoginResult, "token"> & Partial<Pick<LoginResult, "user">>;
+function loginResultFrom(body: unknown): ResolvedLogin {
+  if (isApiResult<LoginResult>(body) && typeof body.data?.token === "string" && body.data.token) return body.data;
   throw new Error("登录失败");
 }
 // #ifdef MP-WEIXIN
@@ -77,7 +79,7 @@ function wxLoginCode(): Promise<string> {
     }),
   );
 }
-async function wechatLogin(campusId?: string): Promise<string> {
+async function wechatLogin(campusId?: string): Promise<ResolvedLogin> {
   const code = await wxLoginCode();
   // 双小程序凭证路由（IK8W5Q）：带上本端 appid，后端挑对应 secret；
   // campusId（IKSN19）：新用户首建档落确认过的校区，老用户后端忽略
@@ -88,14 +90,14 @@ async function wechatLogin(campusId?: string): Promise<string> {
   });
   if (status === 501) throw new WechatLoginNotConfigured();
   if (status >= 300) throw new Error("微信登录失败");
-  return tokenFrom(body);
+  return loginResultFrom(body);
 }
 // #endif
 /** 登录通道：小程序只走微信登录（正式通道，失败不回退；test-login 已随 ADR-0004 下线）。
  *  H5 等非小程序环境无登录通道，直接拒绝。
  *  allowConfirmPage（IKSN19 校区门）：仅全新首登允许弹确认页；
  *  401 过期静默重登是老用户，只读缓存校区、绝不弹页（老用户现状不变）。 */
-function loginFlow(allowConfirmPage: boolean): Promise<string> {
+function loginFlow(allowConfirmPage: boolean): Promise<ResolvedLogin> {
   // #ifndef MP-WEIXIN
   return Promise.reject(new Error("请在微信小程序中打开"));
   // #endif
@@ -105,7 +107,7 @@ function loginFlow(allowConfirmPage: boolean): Promise<string> {
     // 确认页内登录成功时 storage 已落 token，这里复查直接复用，不再二次打登录接口
     const campusId = await resolveLoginCampus({ allowConfirmPage });
     const existing = uni.getStorageSync("token") as string;
-    if (existing) return existing;
+    if (existing) return { token: existing };
     // 兜底登录（列表拉取失败/未经确认离开）：分享校区仍按 IKGZSU 语义带上
     return wechatLogin(campusId || readSharedCampusId() || undefined);
   })().catch((error) => {
@@ -133,8 +135,14 @@ async function ensureToken(path: string, force = false) {
     throw new ApiError("登录失败，请稍后重试", "network");
   }
   if (force) uni.removeStorageSync("token");
-  loginPromise ??= loginFlow(!force).then((token) => {
-    uni.setStorageSync("token", token);
+  const expectedToken = String(uni.getStorageSync("token") || "");
+  loginPromise ??= loginFlow(!force).then((login) => {
+    const token = login.token;
+    const currentToken = String(uni.getStorageSync("token") || "");
+    // The campus confirmation gate may already have saved this exact login result.
+    if (currentToken !== expectedToken && currentToken !== token) throw new ApiError("身份或校区已变化，请重试", "network");
+    if (currentToken !== token) uni.setStorageSync("token", token);
+    if (login.user) useSessionStore().applyUser(login.user);
     return token;
   }).catch((error) => {
     loginFailedAt = Date.now();
@@ -149,6 +157,7 @@ export async function request<T>(
   // silent 是本层约定，不透传给 uni.request（IKD6FH）
   const { silent, ...rest } = options;
   const token = await ensureToken(path);
+  if (String(uni.getStorageSync("token") || "") !== String(token || "")) throw new ApiError("身份或校区已变化，请重试", "network");
   const send = (authToken: string, retried: boolean) =>
     new Promise<T>((resolve, reject) => {
       uni.request({
@@ -160,6 +169,10 @@ export async function request<T>(
           ...(rest.header || {}),
         },
         success: async (res) => {
+          if (String(uni.getStorageSync('token') || '') !== String(authToken || '')) {
+            reject(new ApiError('身份或校区已变化，请重试', 'network'));
+            return;
+          }
           // token 过期/失效：清缓存强制重登一次后重试
           if (
             res.statusCode === 401 &&
@@ -239,6 +252,7 @@ export async function uploadImage(filePath: string): Promise<string> {
   const url = `${BASE_URL}/files/images`;
   // #ifdef H5
   const blob = await (await fetch(filePath)).blob();
+  if (String(uni.getStorageSync("token") || "") !== String(token || "")) throw new ApiError("身份或校区已变化，请重试", "network");
   const form = new FormData();
   form.append("file", blob, "proof.jpg");
   const response = await fetch(url, {
@@ -247,6 +261,7 @@ export async function uploadImage(filePath: string): Promise<string> {
     body: form,
   });
   const body = (await response.json()) as ApiResult<UploadResult>;
+  if (String(uni.getStorageSync("token") || "") !== String(token || "")) throw new ApiError("身份或校区已变化，请重试", "network");
   if (!response.ok || body.code !== 0) {
     uni.showToast({ title: body.message || "图片上传失败", icon: "none" });
     throw new Error(body.message || "图片上传失败");
@@ -261,6 +276,9 @@ export async function uploadImage(filePath: string): Promise<string> {
       name: "file",
       header: token ? { Authorization: `Bearer ${token}` } : {},
       success(res) {
+        if (String(uni.getStorageSync('token') || '') !== String(token || '')) {
+          reject(new ApiError('身份或校区已变化，请重试', 'network')); return;
+        }
         try {
           const body = JSON.parse(res.data) as ApiResult<UploadResult>;
           if (

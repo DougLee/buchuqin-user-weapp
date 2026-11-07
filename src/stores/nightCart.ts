@@ -13,6 +13,9 @@ import type { NightProduct } from "../types/night";
 export interface NightCartLine {
   /** NightProduct 楼栋行 id */
   productId: string;
+  asSeckill?: boolean;
+  promotionId?: string;
+  promotionEndsAt?: string;
   name: string;
   image: string;
   /** 夜宵售价，单位：分 */
@@ -48,7 +51,7 @@ function loadStorage(): Record<string, NightCartBucket> {
       return b.storeId === key && typeof b.buildingId === "string" && typeof b.buildingName === "string" && Array.isArray(b.items);
     }).map(([key, value]) => {
       const b = value as NightCartBucket;
-      return [key, { ...b, items: b.items.filter(line => line && typeof line.productId === "string" && typeof line.name === "string" && typeof line.image === "string" && Number.isInteger(line.price) && line.price >= 0 && Number.isInteger(line.quantity) && line.quantity > 0) }];
+      return [key, { ...b, items: b.items.filter(line => line && (line.asSeckill === undefined || typeof line.asSeckill === "boolean") && typeof line.productId === "string" && typeof line.name === "string" && typeof line.image === "string" && Number.isInteger(line.price) && line.price >= 0 && Number.isInteger(line.quantity) && line.quantity > 0) }];
     }));
   } catch {
     return {};
@@ -82,10 +85,11 @@ export const useNightCartStore = defineStore("nightCart", {
     },
   },
   actions: {
-    setOwner(userId: string) {
-      if (this.ownerId === userId) return;
-      this.ownerId = userId;
-      uni.setStorageSync(OWNER_KEY, userId);
+    setOwner(userId: string, campusId?: string) {
+      const scope = campusId ? `${userId}:${campusId}` : userId;
+      if (this.ownerId === scope) return;
+      this.ownerId = scope;
+      uni.setStorageSync(OWNER_KEY, scope);
       this.carts = loadStorage();
     },
     persist() {
@@ -96,9 +100,9 @@ export const useNightCartStore = defineStore("nightCart", {
       }
     },
     /** 某商品当前数量（加购按钮展开态用） */
-    quantityOf(storeId: string, productId: string) {
+    quantityOf(storeId: string, productId: string, asSeckill?: boolean, promotionId?: string) {
       return (
-        this.carts[storeId]?.items.find((l) => l.productId === productId)
+        this.carts[storeId]?.items.find((l) => l.productId === productId && (asSeckill === undefined || Boolean(l.asSeckill) === asSeckill) && (promotionId === undefined || l.promotionId === promotionId))
           ?.quantity ?? 0
       );
     },
@@ -118,29 +122,26 @@ export const useNightCartStore = defineStore("nightCart", {
           savedAt: 0,
         });
       const requested = Number.isFinite(quantity) ? Math.floor(quantity) : 0;
-      const qty = Math.max(0, Math.min(requested, product.stock, 999));
-      const index = bucket.items.findIndex(
-        (l) => l.productId === product.id,
-      );
+      const index = bucket.items.findIndex(line => line.productId === product.id);
+      const previous = bucket.items[index];
+      const mode = product.asSeckill ?? previous?.asSeckill ?? false;
+      const qty = Math.max(0, Math.min(requested, product.stock, mode ? 1 : 999, product.purchaseLimitMeta?.qty ?? 999));
+      if (qty > 0 && previous && Boolean(previous.asSeckill) !== mode) return false;
+      if (qty > 0 && mode && bucket.items.some(line => line.asSeckill && line.productId !== product.id)) return false;
+      const seckill = product.seckill && new Date(product.seckill.endsAt).getTime() > Date.now() ? product.seckill : null;
+      if (mode && !seckill && qty > (previous?.quantity || 0)) return false;
+      if (mode && qty > 0 && previous && (previous.promotionId !== seckill?.id || !previous.promotionEndsAt || new Date(previous.promotionEndsAt).getTime() <= Date.now())) return false;
+      const price = mode ? seckill?.price ?? previous?.price ?? product.price : product.price;
       if (qty <= 0) {
         if (index >= 0) bucket.items.splice(index, 1);
       } else if (index >= 0) {
-        bucket.items[index].quantity = qty;
-        // 价格以最新快照为准（后台调价后旧行跟随）
-        bucket.items[index].price = product.price;
-        bucket.items[index].name = product.name;
-        bucket.items[index].image = product.image;
+        Object.assign(previous, { quantity: qty, price, name: product.name, image: product.image, asSeckill: mode, ...(mode ? { promotionId: previous.promotionId, promotionEndsAt: previous.promotionEndsAt } : {}) });
       } else {
-        bucket.items.push({
-          productId: product.id,
-          name: product.name,
-          image: product.image,
-          price: product.price,
-          quantity: qty,
-        });
+        bucket.items.push({ productId: product.id, name: product.name, image: product.image, price, quantity: qty, asSeckill: mode, ...(mode && seckill ? { promotionId: seckill.id, promotionEndsAt: seckill.endsAt } : {}) });
       }
       bucket.savedAt = Date.now();
       this.persist();
+      return true;
     },
     /** 重验结算快照，保留数量供用户核对缺货，不静默减少已选数量。 */
     refreshProducts(storeId: string, products: NightProduct[]) {
@@ -150,8 +151,10 @@ export const useNightCartStore = defineStore("nightCart", {
       for (const line of bucket.items) {
         const product = products.find(p => p.id === line.productId);
         if (!product) continue;
-        if (line.price !== product.price) changed = true;
-        Object.assign(line, { price: product.price, name: product.name, image: product.image });
+        const sameActivity = line.promotionId && line.promotionId === product.seckill?.id && line.promotionEndsAt && new Date(line.promotionEndsAt).getTime() > Date.now();
+        const price = line.asSeckill ? sameActivity ? product.seckill!.price : line.price : product.price;
+        if (line.price !== price) changed = true;
+        Object.assign(line, { price, name: product.name, image: product.image });
       }
       this.persist();
       return changed;
@@ -167,7 +170,7 @@ export const useNightCartStore = defineStore("nightCart", {
       this.persist();
     },
     /** 清空某店铺购物车（下单成功后调） */
-    consumeOrder(storeId: string, orderId: string, lines: Array<{ nightProductId: string; quantity: number }>) {
+    consumeOrder(storeId: string, orderId: string, lines: Array<{ nightProductId: string; quantity: number; asSeckill?: boolean; promotionId?: string }>) {
       if (!this.ownerId) return;
       const key = `nightCartConsumed:${this.ownerId}`;
       let consumed: string[] = [];
@@ -177,7 +180,7 @@ export const useNightCartStore = defineStore("nightCart", {
       if (bucket) {
         for (const line of lines) {
           const selected = bucket.items.find(item => item.productId === line.nightProductId);
-          if (selected) selected.quantity = Math.max(0, selected.quantity - line.quantity);
+          if (selected && Boolean(selected.asSeckill) === Boolean(line.asSeckill) && (!line.asSeckill || selected.promotionId === line.promotionId)) selected.quantity = Math.max(0, selected.quantity - line.quantity);
         }
         bucket.items = bucket.items.filter(item => item.quantity > 0);
         bucket.savedAt = Date.now();

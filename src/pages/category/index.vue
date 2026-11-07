@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { nightStoreLink, nightTimelineQuery } from "../../utils/nightLink";
+import { readNightBuilding, clearNightBuilding, resolveBusinessType, createBusinessRequestScope } from "../../utils/businessContext";
 import { computed, nextTick, ref } from "vue";
-import { onPageScroll, onShow } from "@dcloudio/uni-app";
+import { onLoad, onPageScroll, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { track } from "../../utils/track";
 import { isRetryable } from "../../api/request";
@@ -9,6 +11,7 @@ import { useCampusStore } from "../../stores/campus";
 import { fenToYuan } from "../../utils/money";
 import { categoryImage } from "../../utils/categoryImage";
 import type { Category, Product } from "../../types";
+import { setSharedCampusId } from "../../utils/bootCampus";
 import { useSessionStore } from "../../stores/session";
 import { APP_NAME } from "../../config/app";
 import { nightApi } from "../../api/night";
@@ -20,6 +23,7 @@ import { onShareAppMessage, onShareTimeline } from "@dcloudio/uni-app";
  *  switchTab 回本页并选中该分类）；all/秒杀回落默认品牌分享。
  *  imageUrl 用分类图（无图不传，微信截流首屏）。 */
 onShareAppMessage(() => {
+  if (nightMode.value) return { title: nightProducts.value.find(product => product.catalogProductId === selectedNightCatalogId.value)?.name || `${nightBuildingName.value}夜宵店`, path: nightStoreLink({ campusId: useSessionStore().user?.campusId, buildingId: nightBuildingId.value, catalogProductId: selectedNightCatalogId.value }) };
   const id = active.value;
   track("share", id === "all" || id === "seckill" ? "category" : id); // IKRGLV
   const cat =
@@ -43,6 +47,7 @@ onShareAppMessage(() => {
 /** IKQXK6 朋友圈分享：tab 页朋友圈落地=小程序首页+query 拼接——首页
  *  onLoad 的 ?cat= 消费逻辑天然兼容，query 同款即可。 */
 onShareTimeline(() => {
+  if (nightMode.value) return { title: nightProducts.value.find(product => product.catalogProductId === selectedNightCatalogId.value)?.name || `${nightBuildingName.value}夜宵店`, query: nightTimelineQuery({ campusId: useSessionStore().user?.campusId, buildingId: nightBuildingId.value, catalogProductId: selectedNightCatalogId.value }) };
   const id = active.value;
   const cat =
     id !== "all" && id !== "seckill"
@@ -55,6 +60,12 @@ onShareTimeline(() => {
     query: `cat=${cat.id}${campusId ? `&campus=${campusId}` : ""}`,
     imageUrl: cat.image || undefined,
   };
+});
+onLoad(query => {
+  if (query?.businessType !== 'night') return;
+  const campus = String(query?.campus || '');
+  if (campus) { useSessionStore().pendingCampus = campus; setSharedCampusId(campus); }
+  uni.navigateTo({ url: nightStoreLink({ campusId: campus, buildingId: String(query?.buildingId || ''), catalogProductId: String(query?.catalogProductId || '') }) });
 });
 /**
  * 分类页（IKG8PC 终版·美团式完整流；IKH0H9 去「全部」+秒杀进流首段）：
@@ -100,7 +111,12 @@ const closedNow = computed(() => campusStore.closedNow);
    单项（夜主档无分类体系，将来扩分类自动多段）；加购与购物车条走夜宵
    购物车；搜索/秒杀/推荐等白天专属入口隐藏；场次外回白天零痕迹 ==================== */
 const nightMode = ref(false);
+const contextError = ref(false), contextPending = ref(true);
+let pendingInvocation = 0;
+let contextGeneration = 0;
+const nightLoadScope = createBusinessRequestScope();
 const nightStoreId = ref("");
+const selectedNightCatalogId = ref("");
 const nightBuildingId = ref("");
 const nightBuildingName = ref("");
 const nightOpen = ref(false);
@@ -114,19 +130,23 @@ const addDisabled = computed(() =>
 );
 /** 夜宵使用与首页一致的商品货架；白天的渐进分类流保持独立。 */
 async function loadNight() {
-  const memo = String(uni.getStorageSync("nightBuildingId") || "");
+  const current = nightLoadScope.begin();
+  const memo = readNightBuilding();
   loading.value = true;
   error.value = false;
   renderSegs.value = 1;
   sections.value = [];
   try {
     const bundle = await nightApi.stores(memo);
+    if (!current()) return;
     const row = bundle.stores.find((r) => r.buildingId === memo);
     if (!row || !row.storeId) {
       // 该楼无店：清记忆回白天（与首页夜宵形态同口径）
-      uni.removeStorageSync("nightBuildingId");
-      nightMode.value = false;
-      await load();
+      clearNightBuilding();
+      nightStoreId.value = "";
+      nightProducts.value = [];
+      nightBuildingName.value = "请选择楼栋";
+      nightOpen.value = false;
       return;
     }
     nightStoreId.value = row.storeId;
@@ -135,16 +155,16 @@ async function loadNight() {
       nightApi.storeDetail(row.storeId),
       nightApi.storeProducts(row.storeId),
     ]);
+    if (!current()) return;
     nightBuildingName.value = row.buildingName;
     nightOpen.value = detail.state === "open";
     nightProducts.value = goods;
     nightCart.refreshProducts(row.storeId, goods);
   } catch {
     // 网络抖动不清楼栋记忆（首页夜宵形态同口径）：保留选择下次 onShow 重试
-    error.value = true;
+    if (current()) error.value = true;
   } finally {
-    loading.value = false;
-    if (!nightMode.value) void ensureScrollable();
+    if (current()) { loading.value = false; if (!nightMode.value) void ensureScrollable(); }
   }
 }
 /** 加购数量/写入分流：白天=day cart；夜宵=nightCart（按店分桶）。
@@ -280,6 +300,7 @@ async function load() {
         ? Promise.resolve([])
         : featuredPrefetch ?? (featuredPrefetch = api.featuredProducts().catch(() => [] as Product[]));
       const [rows, secs, feats] = await Promise.all([rowsP, secsP, featP]);
+      if (seq !== loadSeq) return;
       const order = categories.value.filter(
         (c) => c.id !== "all" && c.id !== "seckill",
       );
@@ -305,11 +326,9 @@ async function load() {
     }
   } catch (e) {
     // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
-    if (isRetryable(e)) error.value = true;
+    if (seq === loadSeq && isRetryable(e)) error.value = true;
   } finally {
-    syncSeckillSide();
-    loading.value = false;
-    void ensureScrollable();
+    if (seq === loadSeq) { syncSeckillSide(); loading.value = false; void ensureScrollable(); }
   }
 }
 
@@ -427,19 +446,26 @@ let backFromDetail = false;
  *  分类里搜不到。点「限时秒杀/推荐」不算分类意图（伪分类无搜索语义）。 */
 let userPickedCat = false;
 
-onShow(async () => {
-  track("page_view", "category"); // IKRGLV 转化漏斗（PV 口径，tab 切换计入）
-  // IKSW1F 夜宵分支判定：场次内 + 有楼栋记忆 → 本页整体换夜宵数据源；
-  // 判定失败/场次外回白天（每次 onShow 重判，tab 切换/返回都自动跟随）
+onShow(enterPage);
+async function enterPage() {
+  const invocation = ++pendingInvocation;
+  contextPending.value = true;
+  try { await loadCategoryPage(); }
+  catch { if (invocation === pendingInvocation) contextError.value = true; }
+  finally { if (invocation === pendingInvocation) contextPending.value = false; }
+}
+async function loadCategoryPage() {
+  const generation = ++contextGeneration;
+  nightLoadScope.invalidate();
+  ++loadSeq;
+  contextError.value = false;
+  track('page_view', 'category');
   try {
-    const entry = await nightApi.entry();
-    nightMode.value =
-      entry.inNightSession === true &&
-      !!uni.getStorageSync("nightBuildingId");
-  } catch {
-    // 场次查询失败时保留已选夜宵楼栋，显示夜宵重试，避免误切白天数据。
-    nightMode.value = !!uni.getStorageSync('nightBuildingId');
-  }
+    await useSessionStore().ensureLogin();
+    const type = await resolveBusinessType();
+    if (generation !== contextGeneration) return;
+    nightMode.value = type === 'night';
+  } catch { if (generation === contextGeneration) contextError.value = true; return; }
   if (nightMode.value) {
     await loadNight();
     return;
@@ -477,25 +503,32 @@ onShow(async () => {
   const pickCat = (uni.getStorageSync("categoryPick") as string) || "";
   uni.removeStorageSync("categoryPick");
   await cart.load();
+  if (generation !== contextGeneration) return;
   void campusStore.refresh();
   // 秒杀与分类接口并行预取——侧栏秒杀项与分类项同拍出现（IKH0H9 体验修复）
   seckillPrefetch = api.seckillProducts().catch(() => [] as Product[]);
   // 推荐专区预取（同秒杀模式，道哥 2026-09-24）：拉不到不插段
   featuredPrefetch = api.featuredProducts().catch(() => [] as Product[]);
   try {
-    categories.value = await api.categories();
+    const loadedCategories = await api.categories();
+    if (generation !== contextGeneration) return;
+    categories.value = loadedCategories;
   } catch {
+    if (generation !== contextGeneration) return;
     try {
-      categories.value = (await api.home()).categories;
+      const home = await api.home();
+      if (generation !== contextGeneration) return;
+      categories.value = home.categories;
     } catch {
       // IKH0H9：双败不再伪造「全部」项——侧栏空、流按 categoryId 分组，错误态另由 load 兜
-      categories.value = [];
+      if (generation === contextGeneration) categories.value = [];
     }
   }
   // 预取已到则秒杀项即刻注入（与分类项同帧渲染）；未到则等 load 尾部 syncSeckillSide 兜
   const secsEarly = seckillPrefetch;
   if (secsEarly) {
     void secsEarly.then((rows) => {
+      if (generation !== contextGeneration) return;
       if (rows.length && !categories.value.some((c) => c.id === "seckill"))
         categories.value.unshift({ id: "seckill", name: seckillName.value });
     });
@@ -503,6 +536,7 @@ onShow(async () => {
   const featEarly = featuredPrefetch;
   if (featEarly) {
     void featEarly.then((rows) => {
+      if (generation !== contextGeneration) return;
       if (rows.length && !categories.value.some((c) => c.id === "featured")) {
         const at = categories.value.findIndex((c) => c.id === "seckill");
         categories.value.splice(at >= 0 ? at + 1 : 0, 0, {
@@ -533,7 +567,7 @@ onShow(async () => {
   ) {
     active.value = sections.value[0].catId;
   }
-});
+}
 
 /** 侧栏点击：直达分类段头（秒杀=流内首段，同款直达/扩配额；「all」哨兵仅兜底回顶） */
 async function pick(id: string) {
@@ -716,7 +750,9 @@ const open = (id: string) => {
 };
 </script>
 <template>
-  <view class="page"
+  <view v-if="contextError" class="page"><view class="cat-retry card" @tap="enterPage"><text class="cat-retry__title">店铺信息加载失败</text><text class="muted">点击重试</text></view><TabBar :current="1" /></view>
+  <view v-else-if="contextPending" class="page"><view class="cat-retry card"><text class="muted">正在核对店铺信息…</text></view><TabBar :current="1" /></view>
+  <view v-else class="page"
     ><!-- IKSW1F 夜宵模式：搜索框隐藏换夜宵店头（楼栋名/营业状态/切换楼栋） -->
     <view v-if="nightMode" class="night-head card"
       ><text class="night-head__name">🌙 {{ nightBuildingName }}·夜宵店</text
@@ -726,7 +762,7 @@ const open = (id: string) => {
         >{{ nightOpen ? "营业中" : "未营业" }}</text
       ><text class="night-head__link" @tap="goNightBuildings">切换楼栋</text
     ></view
-    ><template v-if="nightMode"><view v-if="error" class="cat-retry card" role="button" @tap="loadNight"><text class="cat-retry__title">夜宵商品加载失败</text><text class="muted">点击重试，已保留楼栋与购物车</text></view><view v-else-if="loading" class="cat-skeleton"><view v-for="n in 4" :key="n" class="cat-skeleton__block" /></view><NightProductShelf v-else :products="nightProducts" :store-id="nightStoreId" :building-id="nightBuildingId" :building-name="nightBuildingName" :open="nightOpen" /></template><template v-else><view class="search card"
+    ><template v-if="nightMode"><view v-if="error" class="cat-retry card" role="button" @tap="loadNight"><text class="cat-retry__title">夜宵商品加载失败</text><text class="muted">点击重试，已保留楼栋与购物车</text></view><view v-else-if="loading" class="cat-skeleton"><view v-for="n in 4" :key="n" class="cat-skeleton__block" /></view><view v-else-if="!nightStoreId" class="cat-retry card" @tap="goNightBuildings"><text class="cat-retry__title">选择你的夜宵楼栋</text><text class="muted">查看本楼商品与购物车</text></view><NightProductShelf v-else @detail-change="selectedNightCatalogId = $event" :products="nightProducts" :store-id="nightStoreId" :building-id="nightBuildingId" :building-name="nightBuildingName" :open="nightOpen" /></template><template v-else><view class="search card"
       ><view class="search__field"
         ><input
           v-model="draft"

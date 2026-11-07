@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
-import { isRetryable } from "../../api/request";
+import { nightApi } from "../../api/night";
+import BusinessModeTabs from "../../components/BusinessModeTabs.vue";
+import { resolveBusinessType, type BusinessType } from "../../utils/businessContext";
 import { fenToYuan } from "../../utils/money";
-import type { Coupon, UserCoupon, UserCouponStatus } from "../../types";
+import type { Coupon, UserCouponStatus } from "../../types";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
-const claimable = ref<Coupon[]>([]),
-  mine = ref<UserCoupon[]>([]),
+type CouponCard = Pick<Coupon, "id" | "name" | "amount" | "threshold" | "expiresAt"> & Partial<Pick<Coupon, "kind" | "remark">>;
+type Holding = { id: string; status: string; coupon: CouponCard };
+const businessType = ref<BusinessType>("day");
+let requestedType: unknown;
+let generation = 0;
+onLoad((query) => { requestedType = query?.businessType; });
+function selectBusiness(type: BusinessType) { requestedType = type; void load(); }
+const claimable = ref<CouponCard[]>([]),
+  mine = ref<Holding[]>([]),
   claiming = ref(""),
   loading = ref(true),
   error = ref(false);
@@ -21,34 +30,34 @@ const statusLabels: Record<UserCouponStatus, string> = {
 /** 券不可用行内标注（ADR-0005/IKA00Q）：过期置灰 + 状态改「已过期」，
  *  不再显示「未使用/去使用」误导；门槛原因在结算页券列表就地标差价。
  *  IKDCVO：长期券 expiresAt=null 永不过期 */
-function expired(c: UserCoupon) {
+function expired(c: Holding) {
   return (
     !!c.coupon.expiresAt &&
     new Date(c.coupon.expiresAt).getTime() <= Date.now()
   );
 }
 /** IKDCVO：有效期文案——null = 长期有效 */
-function expiryText(c: Coupon) {
+function expiryText(c: CouponCard) {
   return c.expiresAt ? `有效期至 ${c.expiresAt.slice(0, 10)}` : "长期有效";
 }
 /** IKDCVO：异业券到店展示，暂不核销不参与下单 */
-function isPartner(c: Coupon) {
+function isPartner(c: CouponCard) {
   return c.kind === "partner";
 }
 function showPartnerTip() {
   uni.showToast({ title: "到店出示即可享受优惠", icon: "none" });
 }
 /** IKA57M：卡面右侧只留按钮——可用=「去使用」，不可用=置灰按钮显状态 */
-function usable(c: UserCoupon) {
+function usable(c: Holding) {
   return (
     (c.status === "claimed" || c.status === "released") && !expired(c)
   );
 }
-function deadLabel(c: UserCoupon) {
+function deadLabel(c: Holding) {
   if (expired(c)) return "已过期";
   if (c.status === "used") return "已使用";
   if (c.status === "locked") return "下单锁定";
-  return statusLabels[c.status];
+  return statusLabels[c.status as UserCouponStatus] || "暂不可用";
 }
 onShow(load);
 /**
@@ -56,26 +65,33 @@ onShow(load);
  * 消除整页闪断；状态仍以服务端返回为准（IK9SO0 原则不变）
  */
 async function load(silent = false) {
+  const requestGeneration = ++generation;
+  const identity = uni.getStorageSync("token");
   if (!silent) {
     loading.value = true;
     error.value = false;
   }
   try {
-    const bundle = await api.coupons();
+    const type = await resolveBusinessType(requestedType);
+    if (requestGeneration === generation) businessType.value = type;
+    const bundle = await (type === "night" ? nightApi.coupons() : api.coupons());
+    if (requestGeneration !== generation || identity !== uni.getStorageSync("token")) return;
+    businessType.value = type;
     claimable.value = bundle.claimable;
     mine.value = bundle.mine;
   } catch (e) {
     // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
-    if (isRetryable(e) && !silent) error.value = true;
+    if (requestGeneration === generation && !silent) error.value = true;
   } finally {
-    if (!silent) loading.value = false;
+    if (requestGeneration === generation && !silent) loading.value = false;
   }
 }
-async function claim(coupon: Coupon) {
+async function claim(coupon: CouponCard) {
   if (claiming.value) return;
   claiming.value = coupon.id;
   try {
-    await api.claimCoupon(coupon.id);
+    const type = businessType.value;
+    await (type === "night" ? nightApi.claimCoupon(coupon.id) : api.claimCoupon(coupon.id));
     uni.showToast({ title: "领取成功", icon: "success" });
     // IK9SO0：领取成功后整页重拉，两列状态以服务端为准——
     // 旧写法本地挪数组，任何偏差都会让卡片停留「领取中…」观感
@@ -90,7 +106,7 @@ async function claim(coupon: Coupon) {
 </script>
 <template>
   <view class="page"
-    ><view v-if="error" class="cp-retry card" @tap="load"
+    ><BusinessModeTabs :model-value="businessType" :disabled="loading || !!claiming" @change="selectBusiness" /><view v-if="error" class="cp-retry card" @tap="load()"
       ><text class="cp-retry__title">优惠券加载失败</text
       ><text class="muted">网络异常，点击重试</text></view
     ><view v-else-if="loading" class="cp-skeleton"
@@ -154,7 +170,7 @@ async function claim(coupon: Coupon) {
         ><!-- IKA57M：右侧只显示按钮；不可用置灰 + 按钮文字显状态；
              异业券（IKDCVO）不参与下单，可用态按钮「到店出示」 --><button
           v-if="usable(c) && !isPartner(c.coupon)"
-          @tap="uni.switchTab({ url: '/pages/category/index' })"
+          @tap="businessType === 'night' ? uni.navigateTo({ url: '/pages/night/buildings' }) : uni.switchTab({ url: '/pages/category/index' })"
         >
           去使用
         </button>
@@ -177,7 +193,7 @@ async function claim(coupon: Coupon) {
     ><view class="rules"
       ><text class="rules__title">使用说明</text
       ><text>· 每笔订单最多使用一张优惠券</text
-      ><text>· 优惠券仅限本校区校园仓商品</text
+      ><text>{{ businessType === 'night' ? '· 仅限本校区夜宵店适用商品' : '· 仅限本校区白天店适用商品' }}</text
       ><text>· 退款是否返券以活动规则为准</text></view
     ></template
     ></view

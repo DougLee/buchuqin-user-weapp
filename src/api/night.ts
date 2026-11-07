@@ -35,7 +35,7 @@ export const nightApi = {
     expectedProductAmount?: number;
     expectedDeliveryFee?: number;
     storeId: string;
-    items: Array<{ productId: string; quantity: number }>;
+    items: Array<{ productId: string; quantity: number; asSeckill?: boolean; promotionId?: string }>;
     couponId?: string;
     addressId: string;
     remark?: string;
@@ -57,12 +57,14 @@ export const nightApi = {
   /** 售后申请（一期轻量：类型+文字描述） */
   applyAfterSale: (
     id: string,
-    data: { type: string; description: string; images?: string[] },
+    data: { type: string; description: string; images?: string[]; productIds?: string[] },
   ) =>
     request<{ id: string; afterSaleStatus: string }>(
       `/night/orders/${id}/after-sale`,
       { method: "POST", data },
     ),
+  afterSales: (page = 1) => request<{ items: NightOrder[]; refundedAmount: number; total: number; page: number; pageSize: number }>(`/night/after-sales?page=${page}&pageSize=20`),
+  withdrawAfterSale: (id: string) => request<{ id: string; afterSaleStatus: string }>(`/night/orders/${id}/after-sale/withdraw`, { method: 'POST' }),
   /** 夜宵订单微信支付下单（YX 业务标记） */
   prepay: (orderId: string) =>
     request<NightPrepayResult>(`/night/orders/${orderId}/pay`, {

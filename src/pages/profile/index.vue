@@ -2,6 +2,15 @@
 import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
+import { nightApi } from "../../api/night";
+import { businessUrl, resolveBusinessType, type BusinessType } from "../../utils/businessContext";
+import BusinessModeTabs from "../../components/BusinessModeTabs.vue";
+const businessType = ref<BusinessType>("day");
+const contextError = ref(false), contextPending = ref(true), partialError = ref(false), couponReady = ref(false), orderReady = ref(false);
+let selectionOwner = "";
+let selectedBusiness: BusinessType | undefined;
+let loadGeneration = 0;
+function selectBusiness(type: BusinessType) { selectionOwner = String(uni.getStorageSync("nightCartOwner") || ""); selectedBusiness = type; void loadProfile(); }
 import { pickCurrentAddress } from "../../utils/currentAddress";
 import { useSessionStore } from "../../stores/session";
 import { useCampusStore } from "../../stores/campus";
@@ -35,24 +44,41 @@ const roomSummary = computed(() =>
     ? `${defaultAddress.value.buildingName} · ${defaultAddress.value.room}`
     : "",
 );
-onShow(async () => {
+onShow(loadProfile);
+async function loadProfile() {
+  const generation = ++loadGeneration;
+  loaded.value = false; contextError.value = false; contextPending.value = true; partialError.value = false; couponReady.value = false; orderReady.value = false;
+  serviceOpen.value = false; groupOpen.value = false;
+  try {
   await session.ensureLogin();
+  const identity = uni.getStorageSync("token");
+  const owner = String(uni.getStorageSync("nightCartOwner") || "");
+  if (selectionOwner !== owner) { selectedBusiness = undefined; selectionOwner = owner; }
+  const type = await resolveBusinessType(selectedBusiness);
   // 各请求独立容错（IK9AWK）：部分失败不清零其他栏位
   // （IK9SO5：消息中心入口已隐藏，notifications 不再拉取）
   const [a, b, o, c] = await Promise.allSettled([
     api.addresses(),
-    api.coupons(),
-    api.orders(),
+    type === "night" ? nightApi.coupons() : api.coupons(),
+    type === "night" ? nightApi.orders().then(result => result.total) : api.ordersPage().then(result => result.total),
     // IKAJT2：当前校区名（切换后 onShow 重拉即刷新）
     api.currentCampus(),
   ]);
+  if (generation !== loadGeneration || identity !== uni.getStorageSync("token")) return;
+  businessType.value = type;
+  usableCouponCount.value = 0;
+  claimableCouponCount.value = 0;
+  orderCount.value = 0;
   if (a.status === "fulfilled") addresses.value = a.value;
   if (c.status === "fulfilled") campusName.value = c.value.name;
   // IKQXSD 统一：进群码=校区售后福利群（campus store 随 currentCampus 刷新）
   group.value = campusStore.afterSalesGroupQrcode;
+  partialError.value = [a, b, o, c].some(result => result.status === "rejected");
   if (b.status === "fulfilled") {
+    couponReady.value = true;
     const now = Date.now();
-    usableCouponCount.value = b.value.mine.filter(
+    const holdings: Array<{ status: string; coupon: { expiresAt: string | null } }> = b.value.mine;
+    usableCouponCount.value = holdings.filter(
       (item) =>
         (item.status === "claimed" || item.status === "released") &&
         (!item.coupon.expiresAt || new Date(item.coupon.expiresAt).getTime() > now),
@@ -60,14 +86,16 @@ onShow(async () => {
     // 2026-09-08 道哥：优惠券行同时显示「可领」数——引导去券中心领取
     claimableCouponCount.value = b.value.claimable.length;
   }
-  if (o.status === "fulfilled") orderCount.value = o.value.length;
+  if (o.status === "fulfilled") { orderCount.value = o.value; orderReady.value = true; }
   loaded.value = true;
-});
-const go = (url: string) => uni.navigateTo({ url });
+  } catch { if (generation === loadGeneration) contextError.value = true; }
+  finally { if (generation === loadGeneration) contextPending.value = false; }
+}
+const go = (url: string) => { if (!contextError.value && !contextPending.value) uni.navigateTo({ url }); };
 /** IKAHBQ：订单降级普通页（购物车让位 Tab），改 navigateTo 进栈可返回 */
-const goOrders = () => uni.navigateTo({ url: "/pages/orders/index" });
+const goOrders = () => go(businessType.value === "night" ? "/pages/night/orders" : businessUrl("/pages/orders/index", "day"));
 /** 优惠券/售后列表入口（IK9AWH：原为无入口孤儿页） */
-const goCoupons = () => go("/pages/coupons/index");
+const goCoupons = () => go(businessUrl("/pages/coupons/index", businessType.value));
 const goSettings = () => go("/pages/profile/settings");
 /** 客服电话（IK9AWJ→IKHMF1）：校区自定义，store 无值回落本地常量 */
 const callService = () =>
@@ -99,7 +127,9 @@ async function onGetPhone(e: { detail: { code?: string } }) {
 }
 </script>
 <template>
-  <view class="page profile"
+  <view v-if="contextError" class="page"><view class="card" style="padding: 32px; text-align: center"><text>店铺信息加载失败，请重试</text><button @tap="loadProfile">重新加载</button></view></view>
+  <view v-else-if="contextPending" class="page"><view class="card" style="padding: 32px; text-align: center">正在核对店铺信息…</view></view>
+  <view v-else class="page profile"
     ><view class="profile__top"
       ><view class="avatar" @tap="goSettings"
         ><image
@@ -129,12 +159,12 @@ async function onGetPhone(e: { detail: { code?: string } }) {
         ></view
       ></view
     ><view class="motto">“ 今天不出寝，<br />想吃的照样有。 ”</view
-    ><view class="stats card"
+    ><text class="muted" style="display: block; margin-bottom: 10px; font-size: 12px">按店铺查看我的记录</text><BusinessModeTabs :model-value="businessType" @change="selectBusiness" /><view v-if="partialError" class="card muted" style="padding: 16px; margin-bottom: 16px" @tap="loadProfile">部分信息暂未加载，点击重试</view><view class="stats card"
       ><view @tap="goCoupons"
-        ><text class="stats__value">{{ loaded ? usableCouponCount : "—" }}</text
+        ><text class="stats__value">{{ couponReady ? usableCouponCount : "—" }}</text
         ><text class="muted">可用优惠券</text></view
       ><view @tap="goOrders"
-        ><text class="stats__value">{{ loaded ? orderCount : "—" }}</text
+        ><text class="stats__value">{{ orderReady ? orderCount : "—" }}</text
         ><text class="muted">我的订单</text></view
       ></view
     ><view class="menu card"
@@ -161,7 +191,7 @@ async function onGetPhone(e: { detail: { code?: string } }) {
         ><text>优惠券</text
         ><view class="menu__cell"
           ><text>{{
-            loaded
+            couponReady
               ? `${usableCouponCount} 张可用` +
                 (claimableCouponCount
                   ? ` · ${claimableCouponCount} 张待领取`
@@ -170,12 +200,14 @@ async function onGetPhone(e: { detail: { code?: string } }) {
           }}</text
           ></view
         ></view
-      ><!-- IKAJT2：当前校区/切换入口，商品价格按校区生效 --><view @tap="go('/pages/campus/index')"
+      ><view @tap="go(businessUrl('/pages/after-sales/index', businessType))"><text>售后与退款</text><view class="menu__cell"><text>查看申请与处理进度</text></view></view>
+      <view @tap="go(businessUrl('/pages/messages/index', businessType))"><text>消息中心</text><view class="menu__cell"><text>订单与服务通知</text></view></view>
+      <!-- IKAJT2：当前校区/切换入口，商品价格按校区生效 --><view @tap="go('/pages/campus/index')"
         ><text>当前校区</text
         ><view class="menu__cell"
           ><text>{{ campusName || (loaded ? "去选择" : "—") }}</text></view
         ></view
-      ><!-- ADR-0004：试点期不退款，售后入口隐藏，走下方在线/电话客服 --><view @tap="go('/pages/address/index')"
+      ><view @tap="go('/pages/address/index')"
         ><text>寝室地址</text
         ><view class="menu__cell"
           ><text>{{ roomSummary || (loaded ? "去添加" : "—") }}</text
@@ -233,7 +265,7 @@ async function onGetPhone(e: { detail: { code?: string } }) {
     ></view
   >
   <TabBar :current="3" />
-  <CartOverlay />
+  <CartOverlay v-if="businessType === 'day' && !contextError && !contextPending" />
   <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />
 </template>
 <style scoped lang="scss">
