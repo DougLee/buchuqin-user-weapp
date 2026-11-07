@@ -190,6 +190,7 @@ export interface NightUserCoupon {
   status: string;
   claimedAt: string;
   coupon: {
+    trigger?: string;
     nightProductIds?: string[];
     id: string;
     name: string;

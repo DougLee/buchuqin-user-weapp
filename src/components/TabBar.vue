@@ -67,7 +67,7 @@ onShow(async () => {
           :src="`/static/tabbar/tab-${tab.icon}${index === current ? '-active' : ''}.png`"
         />
         <view
-          v-if="tab.icon === 'profile' && businessType === 'day' && session.hasUsableSignupCoupon"
+          v-if="tab.icon === 'profile' && businessType && session.hasSignupCouponFor(businessType)"
           class="tabbar__dot"
         ></view>
         <text

@@ -1,22 +1,22 @@
 <script setup lang="ts">
 import { fenToYuan } from "../utils/money";
-import type { UserCoupon } from "../types";
+import type { SignupGiftRow } from "../utils/signupGifts";
 
 /**
  * 新人礼包弹窗（IKDETO）：注册当次弹一次（storage 防重由调用方控制）。
  * 营销导向红金礼包风——与抽奖弹层同一视觉语言；面额实拉（coupons 过滤
  * trigger=signup 未使用），单券面额大字、多券迷你券条。
  */
-defineProps<{ coupons: UserCoupon[] }>();
+defineProps<{ coupons: SignupGiftRow[]; night?: boolean }>();
 const emit = defineEmits<{ use: []; close: [] }>();
 /** 面额展示：整数元去掉小数（¥1 而非 ¥1.00） */
-function yuan(c: UserCoupon) {
+function yuan(c: SignupGiftRow) {
   return Number(fenToYuan(c.coupon.amount));
 }
 </script>
 <template>
   <view class="gift-mask" @tap="emit('close')"
-    ><view class="gift" @tap.stop
+    ><view class="gift" :class="{ 'gift--night': night }" @tap.stop
       ><!-- CSS 礼盒：盒盖 + 十字缎带 -->
       <view class="gift__box"
         ><view class="gift__lid"></view><view class="gift__ribbon-v"></view
@@ -269,4 +269,8 @@ function yuan(c: UserCoupon) {
   align-items: center;
   justify-content: center;
 }
+</style>
+
+<style scoped>
+.gift--night { background: radial-gradient(ellipse at 100% 0%, rgba(214, 188, 118, .2), transparent 65%), linear-gradient(145deg, #254c36, #102c20); border: 1px solid #6a7953; color: #ffe3a7; }
 </style>

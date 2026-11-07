@@ -2,6 +2,7 @@
 import { computed, getCurrentInstance, onUnmounted, ref } from "vue";
 import {
   onLoad,
+  onHide,
   onShareAppMessage,
   onShareTimeline,
   onShow,
@@ -17,6 +18,7 @@ import PhoneGate from "../../components/PhoneGate.vue";
 // IKSW1F 夜宵入口横幅：自持 /night/entry 拉取与显隐（inNightSession 才渲染）
 import NightEntryBanner from "../../components/NightEntryBanner.vue";
 import { nightStoreLink, nightTimelineQuery } from "../../utils/nightLink";
+import { usableSignupGifts, scopedUiKey, type SignupGiftRow } from "../../utils/signupGifts";
 import NightHomeMode from "../../components/NightHomeMode.vue";
 import { nightApi } from "../../api/night";
 import { useCartStore } from "../../stores/cart";
@@ -33,7 +35,6 @@ import type {
   Category,
   HomePromotion,
   Product,
-  UserCoupon,
 } from "../../types";
 
 const session = useSessionStore(); // IKE3HT 强授权门模板绑定
@@ -102,6 +103,8 @@ onLoad((q) => {
 });
 async function loadHome() {
   const current = ++homeGeneration;
+  closeHomeOverlays();
+  signupCoupons.value = []; signupLoaded.value = false;
   homeError.value = false;
   loading.value = true;
   try {
@@ -128,9 +131,11 @@ async function loadHome() {
   products.value = home.hotProducts;
   promotions.value = home.promotions ?? [];
   if (!nightMode.value) await cart.load();
+  if (current !== homeGeneration) return;
   loading.value = false;
   // IKD6FA：双版块数据静默拉取；IKDETO 迎新礼包内容同批拉取后判定弹窗
-  await loadHomeBlocks();
+  await loadHomeBlocks(current, nightMode.value);
+  if (current !== homeGeneration) return;
   maybeShowWelcomeGift();
   // IKQYUD：迎新弹窗在场时群码让位（避免叠加双弹），当日标记由 maybe 内部守卫
   if (!giftOpen.value) maybeShowGroupAd();
@@ -143,6 +148,10 @@ async function loadHome() {
   }
 }
 onShow(loadHome);
+onHide(() => { homeGeneration++; closeHomeOverlays(); });
+function closeHomeOverlays() {
+  giftOpen.value = false; groupOpen.value = false; groupAdOpen.value = false; wheelOpen.value = false;
+}
 /* ---------- 首页双版块（IKD6FA）：左「天天抽奖」入口 + 右「楼栋福利群」 ---------- */
 /** 转盘配置：active=false（未配置/已下线）时不渲染左卡 */
 const wheelActive = ref(false);
@@ -151,51 +160,44 @@ const wheelActive = ref(false);
  * （与售后页同一张码）；原 wechatGroup（楼栋群）通道下线首页。 */
 const group = computed(() => campusStore.afterSalesGroupQrcode);
 const groupOpen = ref(false);
-async function loadHomeBlocks() {
-  // 静默降级：任一失败只隐藏对应入口，不影响首页主流程
+const homeBlocksError = ref(false), signupLoaded = ref(false);
+async function loadHomeBlocks(generation: number, night: boolean) {
+  homeBlocksError.value = false; signupLoaded.value = false;
+  const current = () => generation === homeGeneration && night === nightMode.value;
   try {
-    wheelActive.value = (await api.wheel()).active;
-  } catch {
-    wheelActive.value = false;
-  }
-  // IKDETO：signup 券一次拉取两用——迎新弹窗内容 +「我的」tab 红点
+    const active = night ? false : (await api.wheel()).active;
+    if (current()) wheelActive.value = active;
+  } catch { if (current()) wheelActive.value = false; }
   try {
-    const bundle = await api.coupons();
-    const now = Date.now();
-    signupCoupons.value = bundle.mine.filter(
-      (item) =>
-        item.coupon.trigger === "signup" &&
-        (item.status === "claimed" || item.status === "released") &&
-        (!item.coupon.expiresAt ||
-          new Date(item.coupon.expiresAt).getTime() > now),
-    );
-    useSessionStore().hasUsableSignupCoupon = signupCoupons.value.length > 0;
-  } catch {
-    signupCoupons.value = [];
-  }
+    const bundle = await (night ? nightApi.coupons() : api.coupons());
+    if (!current()) return;
+    signupCoupons.value = usableSignupGifts([...bundle.mine]);
+    signupLoaded.value = true;
+    session.setSignupCouponState(night ? 'night' : 'day', signupCoupons.value.length > 0);
+  } catch { if (current()) { signupCoupons.value = []; homeBlocksError.value = true; session.setSignupCouponState(night ? 'night' : 'day'); } }
 }
 /* ---------- IKDETO 迎新礼包：注册当次弹一次（storage 防重） ---------- */
-const signupCoupons = ref<UserCoupon[]>([]),
+const signupCoupons = ref<SignupGiftRow[]>([]),
   giftOpen = ref(false),
-  GIFT_SHOWN_KEY = "welcomeGiftShown";
+  giftScopeKey = () => scopedUiKey("welcomeGiftShown", session.user?.id, session.user?.campusId, nightMode.value ? "night" : "day");
 function maybeShowWelcomeGift() {
   const session = useSessionStore();
-  if (!session.justSignedUp) return;
-  session.justSignedUp = false; // 一次性：当次消费即清，重登不弹
-  if (uni.getStorageSync(GIFT_SHOWN_KEY)) return;
+  if (!session.justSignedUp || !signupLoaded.value) return;
+  if (uni.getStorageSync(giftScopeKey())) { session.justSignedUp = false; return; }
   if (!signupCoupons.value.length) return;
-  uni.setStorageSync(GIFT_SHOWN_KEY, true);
+  uni.setStorageSync(giftScopeKey(), true);
   giftOpen.value = true;
+  session.justSignedUp = false;
 }
 /* ---------- IKQYUD 每日福利群弹窗（道哥 2026-10-27）：当日首进弹一次 ---------- */
 const groupAdOpen = ref(false);
-const GROUP_AD_SHOWN_KEY = "groupAdShownDate";
+const groupScopeKey = () => scopedUiKey("groupAdShownDate", session.user?.id, session.user?.campusId);
 function maybeShowGroupAd() {
   // 校区配了码才弹；当日已弹过不再弹
   if (!campusStore.afterSalesGroupQrcode) return;
-  const today = new Date().toISOString().slice(0, 10);
-  if (uni.getStorageSync(GROUP_AD_SHOWN_KEY) === today) return;
-  uni.setStorageSync(GROUP_AD_SHOWN_KEY, today);
+  const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+  if (uni.getStorageSync(groupScopeKey()) === today) return;
+  uni.setStorageSync(groupScopeKey(), today);
   groupAdOpen.value = true;
 }
 function onGiftUse() {
@@ -397,7 +399,7 @@ function search() {
 </script>
 
 <template>
-  <view class="page home">
+  <view class="page home" :class="{ 'home--night': nightMode }">
     <view class="brand-row"
       ><text class="brand">{{ APP_NAME }}</text><view class="brand-dot"
     /></view>
@@ -418,6 +420,7 @@ function search() {
     </view>
     <view v-if="loading" class="card" style="padding: 32px; text-align: center">正在准备店铺信息…</view>
     <view v-show="!homeError && !loading">
+    <view v-if="homeBlocksError" class="card" style="padding: 16px; margin-bottom: 16px"><text>优惠券暂时加载失败，购物车已保留</text><button @tap="loadHome">重新加载优惠信息</button></view>
     <NightHomeMode v-show="nightMode" ref="nightHomeRef"></NightHomeMode>
     <view v-show="!nightMode">
     <!-- IKG1C 打烊横幅：closedNow 服务端判定，文案随闭店原因切换（手动/时间窗） -->
@@ -518,7 +521,7 @@ function search() {
         class="homeblocks__card homeblocks__card--skeleton"
       ></view
     ></view>
-    <view v-else class="homeblocks"
+    <view v-else class="homeblocks" :class="{ 'homeblocks--single': !wheelActive }"
       ><view
         v-if="wheelActive"
         class="homeblocks__card homeblocks__card--wheel"
@@ -722,11 +725,12 @@ function search() {
   <WelcomeGift
     v-if="giftOpen"
     :coupons="signupCoupons"
+    :night="nightMode"
     @use="onGiftUse"
     @close="giftOpen = false"
   />
   <!-- IKDB7W：天天抽奖原地弹层（WheelPanel 公共组件，pages/wheel 仅作分享落地） -->
-  <view v-if="wheelOpen" class="wheel-sheet-mask" @tap="wheelOpen = false">
+  <view v-if="wheelOpen && !nightMode" class="wheel-sheet-mask" @tap="wheelOpen = false">
     <view class="wheel-sheet" @tap.stop>
       <view class="wheel-sheet__close" @tap="wheelOpen = false">✕</view>
       <view class="wheel-sheet__inner">
@@ -1680,4 +1684,12 @@ function search() {
 .gad__btn::after {
   border: none;
 }
+</style>
+
+<style scoped>
+.home--night { padding-bottom: calc(260rpx + env(safe-area-inset-bottom)); }
+.homeblocks--single { grid-template-columns: minmax(0, 1fr); }
+.home--night .homeblocks__card--group { min-height: 156rpx; background: radial-gradient(circle at 95% 0%, rgba(223, 194, 121, .18), transparent 50%), #eff3e9; border-color: #d8e2cd; box-shadow: 0 4px 14px rgba(31, 67, 44, .04); }
+.home--night .homeblocks__card--group .homeblocks__title, .home--night .homeblocks__card--group .homeblocks__cta { color: #285238; }
+.home--night .homeblocks__card--group .homeblocks__sub { color: #65745f; }
 </style>

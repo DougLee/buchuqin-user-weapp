@@ -36,16 +36,23 @@ export const useSessionStore = defineStore("session", {
     /** IKDETO 迎新礼包：当次登录即注册（isNewUser）——首页据此弹一次礼包弹窗 */
     justSignedUp: false,
     /** IKDETO 红点：存在未使用的新人（signup）券，「我的」tab 常亮 */
-    hasUsableSignupCoupon: false,
+    signupCouponsByScope: {} as Record<string, boolean>,
     /** IKGZSU 跨校区分享：分享链接带来的校区 id，首登时采用（详情页/首页 onLoad 写入） */
     pendingCampus: "",
   }),
   getters: {
     nickname: (state) => state.user?.nickname || "",
+    hasSignupCouponFor: state => (channel: 'day' | 'night') => !!state.user && state.signupCouponsByScope[`${state.user.id}:${state.user.campusId}:${channel}`] === true,
     /** IKE3HT 强授权门：已登录但未绑定手机号 = 拦截（未登录时不拦，登录流程自己走） */
     needsPhone: (state) => !!state.user && !state.user.phone,
   },
   actions: {
+    setSignupCouponState(channel: 'day' | 'night', hasCoupons?: boolean) {
+      if (!this.user) return;
+      const key = `${this.user.id}:${this.user.campusId}:${channel}`;
+      if (hasCoupons === undefined) delete this.signupCouponsByScope[key];
+      else this.signupCouponsByScope[key] = hasCoupons;
+    },
     async ensureLogin() {
       if (this.ready) return;
       if (loginInFlight) return loginInFlight;
@@ -91,6 +98,7 @@ export const useSessionStore = defineStore("session", {
     },
     /** 写入会话用户并完成初始化（登录 / token 换取资料两条路径共用） */
     applyUser(user: SessionUser) {
+      if (this.user?.id !== user.id || this.user?.campusId !== user.campusId) this.signupCouponsByScope = {};
       useNightCartStore().setOwner(user.id, user.campusId);
       useCartStore().setOwner(user.id, user.campusId);
       this.user = user;

@@ -58,8 +58,8 @@ async function load() {
     storeId.value = row.storeId; buildingId.value = row.buildingId; buildingName.value = row.buildingName;
     store.value = detail; sessionInfo.value = detail.session; products.value = goods;
     cart.refreshProducts(row.storeId, goods);
-  } catch { if (current()) error.value = true; }
-  finally { if (current()) loading.value = false; }
+  } catch { if (invocation === generation) error.value = true; }
+  finally { if (invocation === generation) { if (!current()) error.value = true; loading.value = false; } }
 }
 onMounted(load);
 function shareTarget() { return { buildingId: buildingId.value, catalogProductId: selectedCatalogId.value, name: products.value.find(product => product.catalogProductId === selectedCatalogId.value)?.name || `${buildingName.value}夜宵店` }; }
@@ -119,7 +119,7 @@ function goCheckout() {
 <style scoped>
 .nhm {
   display: block;
-  padding-bottom: 160rpx;
+  padding-bottom: 0;
 }
 .nhm__head {
   background: linear-gradient(135deg, #10381f, #0d6b3a);

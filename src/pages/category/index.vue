@@ -162,9 +162,9 @@ async function loadNight() {
     nightCart.refreshProducts(row.storeId, goods);
   } catch {
     // 网络抖动不清楼栋记忆（首页夜宵形态同口径）：保留选择下次 onShow 重试
-    if (current()) error.value = true;
+    if (current.isLatest()) error.value = true;
   } finally {
-    if (current()) { loading.value = false; if (!nightMode.value) void ensureScrollable(); }
+    if (current.isLatest()) { if (!current()) error.value = true; loading.value = false; if (!nightMode.value) void ensureScrollable(); }
   }
 }
 /** 加购数量/写入分流：白天=day cart；夜宵=nightCart（按店分桶）。

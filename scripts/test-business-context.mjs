@@ -45,3 +45,12 @@ test('旧楼栋请求返回无店时，不能清除新校区的楼栋记忆', as
   finish(); await old;
   assert.equal(exports.readNightBuilding(), 'building-b');
 });
+
+ test('身份刷新后拒绝旧数据，但最新加载仍能结束并呈现重试状态', () => {
+ storage.set('token', 'expired'); storage.set('nightCartOwner', 'buyer:campus-a');
+ const scope = exports.createBusinessRequestScope(); const ticket = scope.begin();
+ storage.set('token', 'renewed');
+ assert.equal(ticket(), false); assert.equal(ticket.isLatest(), true);
+ const next = scope.begin(); assert.equal(ticket.isLatest(), false); assert.equal(next(), true);
+ scope.invalidate(); assert.equal(next.isLatest(), false);
+ });

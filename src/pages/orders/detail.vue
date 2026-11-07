@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { businessDate, businessTime } from "../../utils/businessDisplay";
 import { computed, onUnmounted, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
@@ -62,10 +63,12 @@ async function refresh() {
  *  整体移除（原「本会话记忆可收起」方案废弃），二维码常驻展示 */
 /** 送货照片凭证（道哥 2026-10-16）：后端 package 整行透传，送达照/交接照
  *  两组分开渲染；图片为 COS 完整 URL，toAbsoluteUrl 兜底老的相对路径 */
+const ended = computed(() => ["cancelled", "refunded", "completed"].includes(order.value?.status || ""));
+const shownTimeline = computed(() => ended.value ? (order.value?.timeline || []).filter(step => step.done) : order.value?.timeline || []);
 const proofGroups = computed(() => {
   const pkg = order.value?.package;
   const fmt = (iso?: string) =>
-    iso ? `${Number(iso.slice(5, 7))}月${Number(iso.slice(8, 10))}日 ${iso.slice(11, 16)}` : "";
+    iso ? `${Number(businessDate(iso).slice(5, 7))}月${Number(businessDate(iso).slice(8, 10))}日 ${businessTime(iso)}` : "";
   const groups: Array<{ label: string; images: string[]; remark: string; time: string }> = [];
   const proof = pkg?.proof;
   if (proof?.images?.length)
@@ -214,10 +217,13 @@ function backHome() {
   ></view>
   <view v-else-if="order" class="page detail"
     ><view class="status" :class="{ 'status--exception': order.status === 'exception' }"
-      ><text class="status__eyebrow">{{ order.estimatedArrival }}</text
+      ><text v-if="!ended" class="status__eyebrow">{{ order.estimatedArrival }}</text
       ><text class="status__title">{{ order.statusText }}</text
       ><text class="status__sub">{{
-        order.status === "exception"
+        order.status === "refunded" ? "退款已完成，可在退款与售后查看明细"
+          : order.status === "cancelled" ? "订单已取消，欢迎下次再来"
+          : order.status === "completed" ? "感谢信任，祝你用餐愉快"
+          : order.status === "exception"
           ? `别担心，客服正在跟进处理，可来电 ${order.support?.phone || '未配置'}`
           : order.status === "pending-payment"
             ? "15 分钟内完成支付，超时订单将自动关闭"
@@ -254,20 +260,20 @@ function backHome() {
     ></view
     ><view class="timeline card"
       ><view
-        v-for="(step, i) in order.timeline"
+        v-for="(step, i) in shownTimeline"
         :key="step.key"
         class="step"
         :class="{ 'step--done': step.done }"
         ><view class="step__rail"
           ><view class="step__dot">{{ i + 1 }}</view
           ><view
-            v-if="i < order.timeline.length - 1"
+            v-if="i < shownTimeline.length - 1"
             class="step__line" /></view
         ><view
           ><text class="step__title">{{ step.title }}</text
           ><text class="step__desc">{{ step.description }}</text
           ><text v-if="step.time" class="step__time">{{
-            step.time.slice(11, 16)
+            businessTime(step.time)
           }}</text></view
         ></view
       ></view

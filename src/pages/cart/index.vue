@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { readNightBuilding, clearNightBuilding, resolveBusinessType, createBusinessRequestScope } from "../../utils/businessContext";
+import { useVisibleNow } from "../../utils/visibleNow";
+import { nightCartIssue } from "../../utils/nightCartValidation";
+import type { NightCartLine } from "../../stores/nightCart";
 import { computed, onUnmounted, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { useSessionStore } from "../../stores/session";
@@ -37,6 +40,9 @@ const nightProducts = ref<NightProduct[]>([]);
 const nightLines = computed(() => nightCart.linesOf(nightStoreId.value));
 const nightCount = computed(() => nightCart.countOf(nightStoreId.value));
 const nightAmount = computed(() => nightCart.amountOf(nightStoreId.value));
+const expiryNow = useVisibleNow();
+const nightIssue = (line: NightCartLine) => nightCartIssue(line, nightProducts.value.find(p => p.id === line.productId), expiryNow.value);
+const removeNightLine = (id: string) => nightCart.removeLines(nightStoreId.value, [id]);
 const nightQty = (productId: string) =>
   nightCart.quantityOf(nightStoreId.value, productId);
 const nightStockOf = (productId: string) => {
@@ -46,6 +52,7 @@ const nightStockOf = (productId: string) => {
 };
 /** 步进写入：需 NightProduct 全量（setQuantity 以最新 stock/price 快照为准） */
 function nightSet(productId: string, qty: number) {
+  if (qty <= 0) { removeNightLine(productId); return; }
   if (!nightOpen.value) return;
   const product = nightProducts.value.find((p) => p.id === productId);
   if (!product) return; // 已下架/列表未就绪：不动行，结算页服务端重验兜底
@@ -61,6 +68,8 @@ function nightSet(productId: string, qty: number) {
 }
 function goNightCheckout() {
   if (!nightCount.value) return;
+  expiryNow.value = Date.now();
+  if (nightLines.value.some(line => nightIssue(line))) { uni.showToast({ title: "请先处理失效或缺货商品", icon: "none" }); return; }
   uni.navigateTo({
     url: `/pages/night/checkout?storeId=${nightStoreId.value}&buildingId=${nightBuildingId.value}`,
   });
@@ -79,7 +88,7 @@ async function loadNight() {
   const memo = readNightBuilding();
   try {
     const bundle = await nightApi.stores(memo);
-    if (!current()) return;
+    if (!current()) { if (current.isLatest()) throw new Error("身份或校区已变化，请重试"); return; }
     const row = bundle.stores.find((r) => r.buildingId === memo);
     if (!row || !row.storeId) {
       clearNightBuilding();
@@ -96,12 +105,12 @@ async function loadNight() {
       nightApi.storeDetail(row.storeId),
       nightApi.storeProducts(row.storeId),
     ]);
-    if (!current()) return;
+    if (!current()) { if (current.isLatest()) throw new Error("身份或校区已变化，请重试"); return; }
     nightOpen.value = detail.state === "open";
     nightProducts.value = goods;
     nightCart.refreshProducts(row.storeId, goods);
   } catch {
-    if (current()) throw new Error("夜宵商品加载失败，请重试");
+    if (current.isLatest()) throw new Error("夜宵商品加载失败，请重试");
   }
 }
 onShow(loadPage);
@@ -233,6 +242,8 @@ function onClearCart() {
               :alt="line.name"
             /><view class="line__main"
               ><text class="line__name">{{ line.name }}</text
+              ><text v-if="nightIssue(line)" class="stock-tag stock-tag--soldout">{{ nightIssue(line) }}</text
+              ><button v-if="nightIssue(line)" class="night-remove" @tap="removeNightLine(line.productId)">移除失效商品</button
               ><view class="line__bottom"
                 ><text class="price"
                   ><text class="price__symbol">¥</text
@@ -382,6 +393,7 @@ function onClearCart() {
   <TabBar :current="2" />
 </template>
 <style scoped lang="scss">
+.night-remove { min-height: 44px; margin: 8px 0; padding: 8px 12px; font-size: 13px; color: #24573c; background: #edf3e8; border-radius: 12px; }
 @import "../../styles/theme.scss";
 .cart-page {
   /* 底部补偿（IKAHBQ）：让出固定结算条 + 自绘 TabBar(≈118rpx)；

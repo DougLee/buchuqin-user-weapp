@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useVisibleNow } from "../../utils/visibleNow";
+import { nightCartIssue } from "../../utils/nightCartValidation";
 import { computed, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { ApiError } from "../../api/request";
@@ -49,6 +51,7 @@ const gateDismissed = ref(false);
 const cartLines = computed(() => cart.linesOf(storeId.value));
 const productAmount = computed(() => cart.amountOf(storeId.value));
 /** 本地重验：商品已下架/停售/不在可购清单 = 失效；数量超当前库存 = 失效 */
+const expiryNow = useVisibleNow();
 const invalidLineIds = computed(() => {
   // 商品清单未就绪（加载中/失败）时不做本地预检：服务端提交时全量重验兜底，
   // 避免误标全行失效阻塞下单（2026-11-05 H5 实测竞态）
@@ -56,7 +59,7 @@ const invalidLineIds = computed(() => {
   const invalid: string[] = [];
   for (const line of cartLines.value) {
     const product = products.value.find((p) => p.id === line.productId);
-    if (!product || line.quantity > product.stock || (line.asSeckill && (!product.seckill || product.seckill.id !== line.promotionId || !line.promotionEndsAt || new Date(line.promotionEndsAt).getTime() <= Date.now() || new Date(product.seckill.endsAt).getTime() <= Date.now() || line.quantity > 1)))
+    if (nightCartIssue(line, product, expiryNow.value))
       invalid.push(line.productId);
   }
   return invalid;
@@ -218,6 +221,7 @@ async function submit() {
     uni.navigateTo({ url: "/pages/address/edit" });
     return;
   }
+  expiryNow.value = Date.now();
   if (hasInvalid.value) {
     uni.showToast({ title: "有商品已失效，请先移除后再下单", icon: "none" });
     return;

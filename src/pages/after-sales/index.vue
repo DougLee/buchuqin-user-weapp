@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { businessDate, afterSaleDescription } from "../../utils/businessDisplay";
 import { onLoad, onReachBottom, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { nightApi } from "../../api/night";
@@ -113,9 +114,9 @@ async function load(reset = true) {
       ><text class="muted">订单送达后，可在订单详情申请质量售后</text></view
     ><view v-for="item in refunds" :key="item.id" class="case card" @tap="openRecord(item)"
       ><view
-        ><text class="case__title">{{ item.description || item.reason || "退款申请" }}</text
+        ><text class="case__title">{{ afterSaleDescription(item.description || item.reason || "退款申请") }}</text
         ><text class="muted"
-          >订单 {{ item.orderId.slice(-8) }} · {{ item.createdAt.slice(0, 10) }}</text
+          >订单 {{ item.orderId.slice(-8) }} · {{ businessDate(item.createdAt) }}</text
         ></view
       ><view class="case__right"
         ><text class="case__status">{{ statusText(item.status) }}</text

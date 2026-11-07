@@ -39,13 +39,13 @@ export async function preloadPayTemplates(): Promise<void> {
  * 内所有 await 之前；用户拒绝或环境不支持一律静默，绝不阻塞支付。
  */
 function requestSubscribeAuth(): void {
-  if (!cachedTemplateIds.length) return;
-  uni.requestSubscribeMessage({
+  if (!cachedTemplateIds.length || typeof uni.requestSubscribeMessage !== "function") return;
+  try { uni.requestSubscribeMessage({
     tmplIds: cachedTemplateIds.slice(0, 3),
     fail: () => {
       /* 拒绝授权/低版本基础库：静默跳过 */
     },
-  });
+  }); } catch { /* Unsupported platform APIs must never block payment. */ }
 }
 
 /**
@@ -63,6 +63,14 @@ export async function startPayFlow(orderId: string): Promise<boolean> {
   if (prepay.subscribeTemplates?.length)
     cachedTemplateIds = prepay.subscribeTemplates.filter(Boolean);
   try {
+    // #ifdef H5
+    if (import.meta.env.DEV && import.meta.env.VITE_NIGHT_LOCAL_PREVIEW === 'true' && prepay.payParams.appId === 'LOCAL_PREVIEW_ONLY') {
+      const choice = await uni.showModal({ title: '本机模拟支付', content: '仅验证测试数据的白天店订单流程，不会真实扣款。确认模拟支付？', confirmText: '模拟支付', cancelText: '取消' });
+      if (!choice.confirm) return false;
+      const response = await fetch('/__night-preview/day-pay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId }) });
+      if (!response.ok) throw new Error('测试组织模拟确认失败');
+    } else
+    // #endif
     await requestPayment(prepay.payParams);
   } catch {
     // 用户取消收银台或支付失败：订单仍为待支付，详情页可继续支付

@@ -21,7 +21,12 @@ test('昵称以当前用户服务端资料为准，历史全局缓存不串账�
   const store = exports.useSessionStore();
   store.applyUser({ id: 'a', campusId: 'c', nickname: '甲' });
   assert.equal(store.nickname, '甲');
+  store.setSignupCouponState('day', true);
+  assert.equal(store.hasSignupCouponFor('day'), true); assert.equal(store.hasSignupCouponFor('night'), false);
+  store.setSignupCouponState('night', true); store.setSignupCouponState('night');
+  assert.equal(store.hasSignupCouponFor('night'), false);
   await store.setNickname('甲的新昵称'); assert.equal(store.nickname, '甲的新昵称');
   store.applyUser({ id: 'b', campusId: 'c', nickname: '微信用户' });
+  assert.equal(store.hasSignupCouponFor('day'), false);
   assert.equal(store.nickname, '微信用户'); assert.equal(store.needsNickname, true);
 });

@@ -55,9 +55,9 @@ async function load() {
     };
     stores.value = list.stores;
   } catch {
-    if (ticket()) error.value = true;
+    if (ticket.isLatest()) error.value = true;
   } finally {
-    if (ticket()) loading.value = false;
+    if (ticket.isLatest()) { if (!ticket()) error.value = true; loading.value = false; }
   }
 }
 onLoad((q) => {

@@ -52,7 +52,10 @@ export function createBusinessRequestScope() {
   return {
     begin() {
       const current = ++generation, owner = identity();
-      return () => current === generation && owner === identity();
+      return Object.assign(() => current === generation && owner === identity(), {
+        // A refreshed token invalidates data, but must not leave the latest loader spinning.
+        isLatest: () => current === generation,
+      });
     },
     invalidate() { generation++; },
   };

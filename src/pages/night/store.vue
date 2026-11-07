@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { onLoad, onShareAppMessage, onShow } from "@dcloudio/uni-app";
+import { onLoad, onShareAppMessage, onShareTimeline, onShow } from "@dcloudio/uni-app";
 import { nightApi } from "../../api/night";
 import { useNightCartStore } from "../../stores/nightCart";
 import { useSessionStore } from "../../stores/session";
@@ -10,7 +10,7 @@ import type {
   NightProduct,
   NightStoreRow,
 } from "../../types/night";
-import { nightStoreLink } from "../../utils/nightLink";
+import { nightStoreLink, nightTimelineQuery } from "../../utils/nightLink";
 import { createBusinessRequestScope } from "../../utils/businessContext";
 import NightProductShelf from "../../components/NightProductShelf.vue";
 
@@ -26,6 +26,7 @@ import NightProductShelf from "../../components/NightProductShelf.vue";
 const cart = useNightCartStore();
 const session = useSessionStore();
 const storeId = ref("");
+const shareLanding = ref(false);
 const catalogProductId = ref("");
 const selectedCatalogId = ref("");
 const requestScope = createBusinessRequestScope();
@@ -76,9 +77,9 @@ async function load() {
     cart.refreshProducts(storeId.value, goods);
     void loadCoupons();
   } catch {
-    if (ticket()) error.value = true;
+    if (ticket.isLatest()) error.value = true;
   } finally {
-    if (ticket()) loading.value = false;
+    if (ticket.isLatest()) { if (!ticket()) error.value = true; loading.value = false; }
   }
 }
 async function loadCoupons() {
@@ -93,12 +94,18 @@ async function loadCoupons() {
   }
 }
 onLoad((q) => {
+  if (q?.businessType === "night") {
+    shareLanding.value = true;
+    uni.redirectTo({ url: nightStoreLink({ campusId: String(q.campus || ""), buildingId: String(q.buildingId || ""), catalogProductId: String(q.catalogProductId || "") }) });
+    return;
+  }
   catalogProductId.value = String(q?.catalogProductId || "");
   storeId.value = String(q?.storeId || "");
   buildingId.value = String(q?.buildingId || "");
   uni.setNavigationBarTitle({ title: "夜宵店" });
 });
 onShow(async () => {
+  if (shareLanding.value) return;
   try { await session.ensureLogin(); await load(); }
   catch { loading.value = false; error.value = true; }
 });
@@ -131,6 +138,10 @@ function goCheckout() {
   });
 }
 /* ---------- 分享：带店铺参数，接收者落楼栋页过楼栋确认 ---------- */
+onShareTimeline(() => ({
+  title: `${store.value?.buildingName || "本楼"}夜宵店，零食送到寝室`,
+  query: nightTimelineQuery({ campusId: session.user?.campusId, buildingId: buildingId.value, catalogProductId: selectedCatalogId.value || catalogProductId.value }),
+}));
 onShareAppMessage(() => {
   const name = store.value?.buildingName ?? "夜宵店";
   return {
