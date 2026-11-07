@@ -8,7 +8,7 @@ function fixture() {
   let token = 'owner-a-campus-a', callback, removals = 0;
   const exports = {};
   vm.runInNewContext(source, { exports, require(name) {
-    if (name === '../stores/session') return { useSessionStore: () => ({ applyUser() {} }) };
+    if (name === '../utils/authSession') return { applyAuthenticatedUser() {} };
     if (name === './base') return { BASE_URL: 'http://localhost/api/v1' };
     if (name === '../config/app') return { WECHAT_APP_ID: 'wx-test' };
     if (name === '../utils/bootCampus') return {};

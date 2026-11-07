@@ -1,4 +1,4 @@
-import { useSessionStore } from "../stores/session";
+import { applyAuthenticatedUser } from "../utils/authSession";
 import type { ApiResult, LoginResult } from "../types";
 import { WECHAT_APP_ID } from "../config/app";
 import { BASE_URL } from "./base";
@@ -142,7 +142,7 @@ async function ensureToken(path: string, force = false) {
     // The campus confirmation gate may already have saved this exact login result.
     if (currentToken !== expectedToken && currentToken !== token) throw new ApiError("身份或校区已变化，请重试", "network");
     if (currentToken !== token) uni.setStorageSync("token", token);
-    if (login.user) useSessionStore().applyUser(login.user);
+    if (login.user) applyAuthenticatedUser(login.user);
     return token;
   }).catch((error) => {
     loginFailedAt = Date.now();

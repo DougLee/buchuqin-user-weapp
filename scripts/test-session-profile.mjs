@@ -10,6 +10,7 @@ const compiled = ts.transpileModule(fs.readFileSync(new URL('../src/stores/sessi
 test('昵称以当前用户服务端资料为准，历史全局缓存不串账号', async () => {
   setActivePinia(createPinia()); const exports = {};
   vm.runInNewContext(compiled, { exports, require(name) {
+    if (name === '../utils/authSession') return { registerAuthSession() {} };
     if (name === 'pinia') return require('pinia');
     if (name === '../api') return { api: { updateProfile: async data => data } };
     if (name === './cart') return { useCartStore: () => ({ setOwner() {} }) };

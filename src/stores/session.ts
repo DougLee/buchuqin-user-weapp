@@ -1,3 +1,4 @@
+import { registerAuthSession } from "../utils/authSession";
 import { defineStore } from "pinia";
 import { api } from "../api";
 import { useCartStore } from "./cart";
@@ -149,4 +150,9 @@ export const useSessionStore = defineStore("session", {
       return result.phone;
     },
   },
+});
+
+registerAuthSession({
+  applyUser: user => useSessionStore().applyUser(user),
+  ensureLogin: () => useSessionStore().ensureLogin(),
 });

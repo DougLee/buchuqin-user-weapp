@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { api } from "../api";
 import { track } from "../utils/track";
 import type { Cart, Product } from "../types";
-import { useSessionStore } from "./session";
+import { ensureAuthenticatedSession } from "../utils/authSession";
 export const useCartStore = defineStore("cart", {
   state: () => ({
     cart: {
@@ -44,7 +44,7 @@ export const useCartStore = defineStore("cart", {
       this.pending = {}; this._pendingVersions = {}; this.clearedAt = 0; this.loading = false; this._chain = Promise.resolve();
     },
     async load() {
-      await useSessionStore().ensureLogin();
+      await ensureAuthenticatedSession();
       if (this._loadPromise) return this._loadPromise;
       if (this.clearedAt && Date.now() - this.clearedAt < 60_000 && !this.cart.items.length) return;
       const revision = this.revision, token = uni.getStorageSync('token'), intent = this._intentVersion;

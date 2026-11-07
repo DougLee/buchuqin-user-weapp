@@ -14,7 +14,7 @@ function fixture(api) {
     if (name === 'pinia') return require('pinia');
     if (name === '../api') return { api };
     if (name === '../utils/track') return { track() {} };
-    if (name === './session') return { useSessionStore: () => ({ ensureLogin: async () => {} }) };
+    if (name === '../utils/authSession') return { ensureAuthenticatedSession: async () => {} };
     throw Error(name);
   }, uni: { getStorageSync: () => token } });
   return { cart: exports.useCartStore(), switchToken() { token = 'user-b'; } };

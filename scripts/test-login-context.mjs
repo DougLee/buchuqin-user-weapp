@@ -16,7 +16,7 @@ function fixture(resolveCampus) {
   let token = '', loginCallback; const requests = [], applied = []; const exports = {};
   const state = { setToken(value) { token = value; }, replyLogin(value, user = { id: 'auto-user', campusId: 'campus', nickname: '自动登录用户' }) { loginCallback({ statusCode: 200, data: { code: 0, data: { token: value, user } } }); } };
   vm.runInNewContext(compiled, { exports, require(name) {
-    if (name === '../stores/session') return { useSessionStore: () => ({ applyUser(user) { applied.push(user); } }) };
+    if (name === '../utils/authSession') return { applyAuthenticatedUser(user) { applied.push(user); } };
     if (name === './base') return { BASE_URL: 'http://localhost/api/v1' };
     if (name === '../config/app') return { WECHAT_APP_ID: 'wx-test' };
     if (name === '../utils/bootCampus') return { resolveLoginCampus: () => resolveCampus(state), readSharedCampusId: () => '' };
