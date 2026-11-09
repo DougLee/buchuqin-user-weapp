@@ -32,10 +32,10 @@ export function openBannerTarget(banner: Banner): void {
       const target = path.split('?')[0];
       if (target === '/pages/orders/index') path = '/pages/night/orders';
       else if (target === '/pages/coupons/index') path = '/pages/coupons/index?businessType=night';
-      else if (target === '/pages/campus/index') path = '/pages/night/buildings';
-      else if (target === '/pages/product/detail') {
-        uni.showToast({ title: '请从本楼夜宵店选择商品', icon: 'none' });
-        uni.navigateTo({ url: '/pages/night/buildings' }); return;
+      // IKTZ7J：地址定楼——校区/商品类 banner 落分类页（当前地址夜店货架），
+      // 不再拦去选楼页
+      else if (target === '/pages/campus/index' || target === '/pages/product/detail') {
+        uni.switchTab({ url: '/pages/category/index' }); return;
       }
     }
     if (TAB_PAGES.includes(path.split("?")[0])) {

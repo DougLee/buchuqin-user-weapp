@@ -4,13 +4,12 @@ import { onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { nightApi } from "../../api/night";
 import { businessUrl, resolveBusinessType, type BusinessType } from "../../utils/businessContext";
-import BusinessModeTabs from "../../components/BusinessModeTabs.vue";
 const businessType = ref<BusinessType>("day");
 const contextError = ref(false), contextPending = ref(true), partialError = ref(false), couponReady = ref(false), orderReady = ref(false);
+/** IKTZ7J：日夜双 Tab 移除——渠道唯一来源=服务端当前业务态（onShow 判定） */
 let selectionOwner = "";
 let selectedBusiness: BusinessType | undefined;
 let loadGeneration = 0;
-function selectBusiness(type: BusinessType) { selectionOwner = String(uni.getStorageSync("nightCartOwner") || ""); selectedBusiness = type; void loadProfile(); }
 import { pickCurrentAddress } from "../../utils/currentAddress";
 import { useSessionStore } from "../../stores/session";
 import { useCampusStore } from "../../stores/campus";
@@ -159,7 +158,7 @@ async function onGetPhone(e: { detail: { code?: string } }) {
         ></view
       ></view
     ><view class="motto">“ 今天不出寝，<br />想吃的照样有。 ”</view
-    ><text class="muted" style="display: block; margin-bottom: 10px; font-size: 12px">按店铺查看我的记录</text><BusinessModeTabs :model-value="businessType" @change="selectBusiness" /><view v-if="partialError" class="card muted" style="padding: 16px; margin-bottom: 16px" @tap="loadProfile">部分信息暂未加载，点击重试</view><view class="stats card"
+    ><view v-if="partialError" class="card muted" style="padding: 16px; margin-bottom: 16px" @tap="loadProfile">部分信息暂未加载，点击重试</view><view class="stats card"
       ><view @tap="goCoupons"
         ><text class="stats__value">{{ couponReady ? usableCouponCount : "—" }}</text
         ><text class="muted">可用优惠券</text></view

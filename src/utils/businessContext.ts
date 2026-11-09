@@ -1,4 +1,7 @@
 import { nightApi } from '../api/night';
+import { fetchAddresses } from '../api/addresses';
+import { pickCurrentAddress } from './currentAddress';
+import type { Address } from '../types';
 
 export type BusinessType = 'day' | 'night';
 
@@ -43,6 +46,32 @@ export function rememberNightBuilding(id: string) {
 export function clearNightBuilding() {
   const key = buildingKey();
   if (key) uni.removeStorageSync(key);
+}
+
+/**
+ * IKTZ7J 道哥 2026-11-09：地址定楼栋——不再有选楼页，当前收货地址的
+ * buildingId 是夜宵店唯一事实源（选中 → isDefault → 第一条，与全 App
+ * 「当前地址」同源）；storage 楼栋记忆降级为缓存，仅在地址接口失败时
+ * 兜底（失败不授权换渠道，也不清缓存留待下次 onShow 重试）。
+ * 返回空串 = 当前校区无地址 / 地址缺楼栋（旧数据），调用方引导添加地址。
+ */
+export async function resolveNightBuildingId(pre?: Address[]): Promise<string> {
+  let list: Address[] = pre ?? [];
+  if (!pre) {
+    try {
+      list = await fetchAddresses();
+    } catch {
+      return readNightBuilding();
+    }
+  }
+  const current = pickCurrentAddress(list);
+  const buildingId = current?.buildingId || '';
+  if (buildingId) {
+    if (buildingId !== readNightBuilding()) rememberNightBuilding(buildingId);
+    return buildingId;
+  }
+  clearNightBuilding();
+  return '';
 }
 
 /** Each loader owns a scope; identity changes and a newer load invalidate its ticket. */

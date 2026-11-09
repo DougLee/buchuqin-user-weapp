@@ -4,14 +4,13 @@ import { businessDate, afterSaleDescription } from "../../utils/businessDisplay"
 import { onLoad, onReachBottom, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { nightApi } from "../../api/night";
-import BusinessModeTabs from "../../components/BusinessModeTabs.vue";
 import { businessUrl, resolveBusinessType, type BusinessType } from "../../utils/businessContext";
 import type { NightOrder } from "../../types/night";
 const businessType = ref<BusinessType>('day');
 let requestedType: unknown, generation = 0;
 const page = ref(1), total = ref(0), refundedAmount = ref(0), loadingMore = ref(false), moreError = ref(false), withdrawing = ref('');
 onLoad(query => { requestedType = query?.businessType; });
-function selectBusiness(type: BusinessType) { requestedType = type; void load(); }
+/** IKTZ7J：日夜双 Tab 移除——渠道唯一来源=服务端当前业务态（onShow 判定），深链 businessType 仍显式生效 */
 function openRecord(item: CaseRow) { uni.navigateTo({ url: businessType.value === 'night' ? `/pages/night/order-detail?id=${encodeURIComponent(item.orderId)}` : businessUrl(`/pages/orders/detail?id=${encodeURIComponent(item.orderId)}`, 'day') }); }
 async function withdraw(item: CaseRow) {
   if (withdrawing.value) return;
@@ -75,7 +74,7 @@ async function load(reset = true) {
 </script>
 <template>
   <view class="page"
-    ><BusinessModeTabs :model-value="businessType" :disabled="loading || !!withdrawing" @change="selectBusiness" /><view v-if="error" class="as-retry card" @tap="load()"
+    ><view v-if="error" class="as-retry card" @tap="load()"
       ><text class="as-retry__title">加载失败</text
       ><text class="muted">网络异常，点击重试</text></view
     ><!-- 加载骨架（2026-08-24）：loading 变量早已存在，此处补接线（汇总卡+记录行） --><view

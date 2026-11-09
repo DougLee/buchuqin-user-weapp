@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nightStoreLink, nightTimelineQuery } from "../../utils/nightLink";
-import { readNightBuilding, clearNightBuilding, resolveBusinessType, createBusinessRequestScope } from "../../utils/businessContext";
+import { resolveNightBuildingId, resolveBusinessType, createBusinessRequestScope } from "../../utils/businessContext";
 import { computed, nextTick, ref } from "vue";
 import { onLoad, onPageScroll, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
@@ -65,7 +65,8 @@ onLoad(query => {
   if (query?.businessType !== 'night') return;
   const campus = String(query?.campus || '');
   if (campus) { useSessionStore().pendingCampus = campus; setSharedCampusId(campus); }
-  uni.navigateTo({ url: nightStoreLink({ campusId: campus, buildingId: String(query?.buildingId || ''), catalogProductId: String(query?.catalogProductId || '') }) });
+  // IKTZ7J：夜宵深链落首页（地址定店），楼栋/商品参数弃用
+  uni.switchTab({ url: "/pages/index/index" });
 });
 /**
  * 分类页（IKG8PC 终版·美团式完整流；IKH0H9 去「全部」+秒杀进流首段）：
@@ -121,6 +122,9 @@ const nightBuildingId = ref("");
 const nightBuildingName = ref("");
 const nightOpen = ref(false);
 const nightProducts = ref<NightProduct[]>([]);
+/** IKTZ7J：无地址 / 该楼无店（招募中）引导态 */
+const nightNoAddress = ref(false);
+const nightMissing = ref(false);
 const nightCart = useNightCartStore();
 const nightCartCount = computed(() => nightCart.countOf(nightStoreId.value));
 const nightCartAmount = computed(() => nightCart.amountOf(nightStoreId.value));
@@ -131,21 +135,33 @@ const addDisabled = computed(() =>
 /** 夜宵使用与首页一致的商品货架；白天的渐进分类流保持独立。 */
 async function loadNight() {
   const current = nightLoadScope.begin();
-  const memo = readNightBuilding();
   loading.value = true;
   error.value = false;
+  nightNoAddress.value = false;
+  nightMissing.value = false;
   renderSegs.value = 1;
   sections.value = [];
   try {
+    // IKTZ7J：地址定楼栋——当前收货地址的 buildingId 是夜宵店事实源
+    const memo = await resolveNightBuildingId();
+    if (!current()) return;
+    if (!memo) {
+      nightNoAddress.value = true;
+      nightStoreId.value = "";
+      nightProducts.value = [];
+      nightBuildingName.value = "";
+      nightOpen.value = false;
+      return;
+    }
     const bundle = await nightApi.stores(memo);
     if (!current()) return;
     const row = bundle.stores.find((r) => r.buildingId === memo);
     if (!row || !row.storeId) {
-      // 该楼无店：清记忆回白天（与首页夜宵形态同口径）
-      clearNightBuilding();
+      // 该楼无店（楼长招募中）：筹备态，不再有选楼页
+      nightMissing.value = true;
       nightStoreId.value = "";
       nightProducts.value = [];
-      nightBuildingName.value = "请选择楼栋";
+      nightBuildingName.value = row?.buildingName || "";
       nightOpen.value = false;
       return;
     }
@@ -195,8 +211,13 @@ function openCard(p: Product) {
   if (nightMode.value) return;
   open(p.id);
 }
-function goNightBuildings() {
-  uni.navigateTo({ url: "/pages/night/buildings" });
+/** IKTZ7J：地址定楼栋——无地址引导去地址页（不再有选楼页） */
+function goNightAddress() {
+  uni.navigateTo({ url: "/pages/address/index" });
+}
+/** 筹备态（本楼无店）：去楼长招募报名 */
+function goRecruitNight() {
+  uni.navigateTo({ url: "/pages/recruit/index?intent=night" });
 }
 function goNightCheckout() {
   if (!nightCartCount.value) return;
@@ -753,16 +774,8 @@ const open = (id: string) => {
   <view v-if="contextError" class="page"><view class="cat-retry card" @tap="enterPage"><text class="cat-retry__title">店铺信息加载失败</text><text class="muted">点击重试</text></view><TabBar :current="1" /></view>
   <view v-else-if="contextPending" class="page"><view class="cat-retry card"><text class="muted">正在核对店铺信息…</text></view><TabBar :current="1" /></view>
   <view v-else class="page"
-    ><!-- IKSW1F 夜宵模式：搜索框隐藏换夜宵店头（楼栋名/营业状态/切换楼栋） -->
-    <view v-if="nightMode" class="night-head card"
-      ><text class="night-head__name">🌙 {{ nightBuildingName }}·夜宵店</text
-      ><text
-        class="night-head__badge"
-        :class="{ 'night-head__badge--open': nightOpen }"
-        >{{ nightOpen ? "营业中" : "未营业" }}</text
-      ><text class="night-head__link" @tap="goNightBuildings">切换楼栋</text
-    ></view
-    ><template v-if="nightMode"><view v-if="error" class="cat-retry card" role="button" @tap="loadNight"><text class="cat-retry__title">夜宵商品加载失败</text><text class="muted">点击重试，已保留楼栋与购物车</text></view><view v-else-if="loading" class="cat-skeleton"><view v-for="n in 4" :key="n" class="cat-skeleton__block" /></view><view v-else-if="!nightStoreId" class="cat-retry card" @tap="goNightBuildings"><text class="cat-retry__title">选择你的夜宵楼栋</text><text class="muted">查看本楼商品与购物车</text></view><NightProductShelf v-else @detail-change="selectedNightCatalogId = $event" :products="nightProducts" :store-id="nightStoreId" :building-id="nightBuildingId" :building-name="nightBuildingName" :open="nightOpen" /></template><template v-else><view class="search card"
+    ><!-- 道哥 2026-11-09：夜场店头身份卡删除，与首页同口径 -->
+    <template v-if="nightMode"><view v-if="nightNoAddress" class="cat-retry card" role="button" @tap="goNightAddress"><text class="cat-retry__title">先完善收货地址</text><text class="muted">添加本楼寝室地址后，自动进入本楼夜宵店</text></view><view v-else-if="!nightNoAddress && nightMissing" class="cat-retry card" role="button" @tap="goRecruitNight"><text class="cat-retry__title">{{ nightBuildingName }}·夜宵店筹备中</text><text class="muted">本楼夜宵店正在招募楼长，点击了解报名</text></view><view v-else-if="error" class="cat-retry card" role="button" @tap="loadNight"><text class="cat-retry__title">夜宵商品加载失败</text><text class="muted">点击重试，已保留购物车</text></view><view v-else-if="loading" class="cat-skeleton"><view v-for="n in 4" :key="n" class="cat-skeleton__block" /></view><NightProductShelf v-else-if="nightStoreId" @detail-change="selectedNightCatalogId = $event" :products="nightProducts" :store-id="nightStoreId" :building-id="nightBuildingId" :building-name="nightBuildingName" :open="nightOpen" /></template><template v-else><view class="search card"
       ><view class="search__field"
         ><input
           v-model="draft"
@@ -1245,38 +1258,7 @@ const open = (id: string) => {
     opacity: 0.55;
   }
 }
-/* ==================== IKSW1F 夜宵模式：店头 + 购物车条 ==================== */
-.night-head {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  padding: 22rpx 28rpx;
-  background: linear-gradient(135deg, #10381f, #0d6b3a);
-  border-radius: 20rpx;
-  color: #fff;
-  margin-bottom: 18rpx;
-}
-.night-head__name {
-  font-size: 30rpx;
-  font-weight: 800;
-  flex: 1;
-}
-.night-head__badge {
-  font-size: 22rpx;
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 999rpx;
-  padding: 6rpx 18rpx;
-}
-.night-head__badge--open {
-  background: #ffd75e;
-  color: #7a4d00;
-  font-weight: 700;
-}
-.night-head__link {
-  font-size: 24rpx;
-  color: #ffe9a8;
-  text-decoration: underline;
-}
+/* ==================== IKTZ7J 夜宵模式：货架 + 购物车条（店头卡已删） ==================== */
 .night-cartbar {
   position: fixed;
   left: 24rpx;

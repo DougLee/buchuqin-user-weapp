@@ -3,7 +3,6 @@ import { ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { nightApi } from "../../api/night";
-import BusinessModeTabs from "../../components/BusinessModeTabs.vue";
 import { resolveBusinessType, type BusinessType } from "../../utils/businessContext";
 import { fenToYuan } from "../../utils/money";
 import type { Coupon, UserCouponStatus } from "../../types";
@@ -15,7 +14,7 @@ const businessType = ref<BusinessType>("day");
 let requestedType: unknown;
 let generation = 0;
 onLoad((query) => { requestedType = query?.businessType; });
-function selectBusiness(type: BusinessType) { requestedType = type; void load(); }
+/** IKTZ7J：日夜双 Tab 移除——渠道唯一来源=服务端当前业务态（onShow 判定），深链 businessType 仍显式生效 */
 const claimable = ref<CouponCard[]>([]),
   mine = ref<Holding[]>([]),
   claiming = ref(""),
@@ -106,7 +105,7 @@ async function claim(coupon: CouponCard) {
 </script>
 <template>
   <view class="page"
-    ><BusinessModeTabs :model-value="businessType" :disabled="loading || !!claiming" @change="selectBusiness" /><view v-if="error" class="cp-retry card" @tap="load()"
+    ><view v-if="error" class="cp-retry card" @tap="load()"
       ><text class="cp-retry__title">优惠券加载失败</text
       ><text class="muted">网络异常，点击重试</text></view
     ><view v-else-if="loading" class="cp-skeleton"
@@ -170,7 +169,7 @@ async function claim(coupon: CouponCard) {
         ><!-- IKA57M：右侧只显示按钮；不可用置灰 + 按钮文字显状态；
              异业券（IKDCVO）不参与下单，可用态按钮「到店出示」 --><button
           v-if="usable(c) && !isPartner(c.coupon)"
-          @tap="businessType === 'night' ? uni.navigateTo({ url: '/pages/night/buildings' }) : uni.switchTab({ url: '/pages/category/index' })"
+          @tap="businessType === 'night' ? uni.switchTab({ url: '/pages/index/index' }) : uni.switchTab({ url: '/pages/category/index' })"
         >
           去使用
         </button>

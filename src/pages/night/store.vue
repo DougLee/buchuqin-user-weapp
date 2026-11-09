@@ -20,8 +20,8 @@ import NightProductShelf from "../../components/NightProductShelf.vue";
  * - resting：店头显示「XX:00 开门营业」，商品可浏览、加购/结算禁用；
  * - open：商品平铺卡片流 + 底部购物车条（本地暂存车）+ 店内领券。
  * 页面形态独立简洁：店头（楼栋名+状态+公告）+ 平铺商品 + 购物车条，
- * 不做分类侧栏（商品量 10~30）。分享带店铺参数，接收者落楼栋选择页
- * 过楼栋确认后才进店。
+ * 不做分类侧栏（商品量 10~30）。分享带店铺参数，接收者按自己地址定店
+ * （IKTZ7J），链接不授予配送资格（服务端校区/本楼校验兜底）。
  */
 const cart = useNightCartStore();
 const session = useSessionStore();
@@ -96,7 +96,8 @@ async function loadCoupons() {
 onLoad((q) => {
   if (q?.businessType === "night") {
     shareLanding.value = true;
-    uni.redirectTo({ url: nightStoreLink({ campusId: String(q.campus || ""), buildingId: String(q.buildingId || ""), catalogProductId: String(q.catalogProductId || "") }) });
+    // IKTZ7J：夜宵深链落首页（地址定店），楼栋/商品参数弃用
+    uni.switchTab({ url: "/pages/index/index" });
     return;
   }
   catalogProductId.value = String(q?.catalogProductId || "");
@@ -155,7 +156,7 @@ onShareAppMessage(() => {
   <view class="page night-store"
     ><view v-if="error" class="retry card" @tap="load"
       ><text class="retry__title">店铺加载失败</text
-      ><text class="muted">店铺不可访问或网络异常，点击重试</text><button class="primary-btn" @tap.stop="uni.redirectTo({ url: '/pages/night/buildings' })">重新选择楼栋</button></view
+      ><text class="muted">店铺不可访问或网络异常，点击重试</text><button class="primary-btn" @tap.stop="uni.switchTab({ url: '/pages/index/index' })">回首页</button></view
     ><view v-else-if="loading && !store" class="skeleton"
       ><view class="skeleton__head" /><view class="skeleton__grid"
         ><view v-for="n in 4" :key="n" class="skeleton__card" /></view

@@ -142,7 +142,7 @@ const remarkOf = (order: NightOrder) =>
     ><view v-else-if="!orders.length" class="empty"
       ><text class="empty__mark">🌙</text
       ><text class="empty__title">还没有夜宵订单</text
-      ><text class="muted">深夜饿了，去夜宵店逛逛</text><button class="primary-btn" @tap="uni.navigateTo({ url: '/pages/night/buildings' })">逛逛夜宵店</button></view
+      ><text class="muted">深夜饿了，去夜宵店逛逛</text><button class="primary-btn" @tap="uni.switchTab({ url: '/pages/index/index' })">逛逛夜宵店</button></view
     ><template v-else
     ><view
       v-for="order in orders"

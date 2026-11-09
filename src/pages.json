@@ -83,10 +83,6 @@
       }
     },
     {
-      "path": "pages/night/buildings",
-      "style": { "navigationBarTitleText": "夜宵店" }
-    },
-    {
       "path": "pages/night/store",
       "style": { "navigationBarTitleText": "夜宵店" }
     },

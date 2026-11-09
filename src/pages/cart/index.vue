@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { readNightBuilding, clearNightBuilding, resolveBusinessType, createBusinessRequestScope } from "../../utils/businessContext";
+import { resolveNightBuildingId, resolveBusinessType, createBusinessRequestScope } from "../../utils/businessContext";
 import { useVisibleNow } from "../../utils/visibleNow";
 import { nightCartIssue } from "../../utils/nightCartValidation";
 import type { NightCartLine } from "../../stores/nightCart";
@@ -75,25 +75,34 @@ function goNightCheckout() {
   });
 }
 function goNightStore() {
-  if (!nightStoreId.value) { uni.navigateTo({ url: "/pages/night/buildings" }); return; }
+  // IKTZ7J：无店可逛时回首页（地址定楼自动进店/引导），不再有选楼页
+  if (!nightStoreId.value) { uni.switchTab({ url: "/pages/index/index" }); return; }
   uni.navigateTo({
     url: `/pages/night/store?storeId=${nightStoreId.value}&buildingId=${nightBuildingId.value}`,
   });
 }
-/** 夜宵分支装载：解析楼栋记忆 → 店态 + 本店商品（库存上限用）；
+/** 夜宵分支装载：地址定楼 → 店态 + 本店商品（库存上限用）；
  *  失败容忍本地快照行继续展示（结算页服务端全量重验兜底） */
 async function loadNight() {
   const current = nightLoadScope.begin();
   booted.value = true;
-  const memo = readNightBuilding();
+  const memo = await resolveNightBuildingId();
   try {
+    if (!memo) {
+      // IKTZ7J：无地址——引导回首页添加地址，无店无货架
+      nightStoreId.value = "";
+      nightBuildingName.value = "";
+      nightProducts.value = [];
+      nightOpen.value = false;
+      return;
+    }
     const bundle = await nightApi.stores(memo);
     if (!current()) { if (current.isLatest()) throw new Error("身份或校区已变化，请重试"); return; }
     const row = bundle.stores.find((r) => r.buildingId === memo);
     if (!row || !row.storeId) {
-      clearNightBuilding();
+      // 该楼无店（招募中）：筹备态，不再有选楼页
       nightStoreId.value = "";
-      nightBuildingName.value = "请选择楼栋";
+      nightBuildingName.value = row?.buildingName || "";
       nightProducts.value = [];
       nightOpen.value = false;
       return;

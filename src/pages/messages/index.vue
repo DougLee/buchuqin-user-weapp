@@ -3,7 +3,6 @@ import { ref } from "vue";
 import { onLoad, onReachBottom, onShow } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import type { Notification } from "../../types";
-import BusinessModeTabs from "../../components/BusinessModeTabs.vue";
 import { businessUrl, resolveBusinessType, type BusinessType } from "../../utils/businessContext";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
@@ -12,7 +11,7 @@ const items = ref<Notification[]>([]), loading = ref(true), error = ref(false),
   businessType = ref<BusinessType>("day"), marking = ref(false);
 let requestedType: unknown, generation = 0;
 onLoad(query => { requestedType = query?.businessType; });
-function selectBusiness(type: BusinessType) { requestedType = type; void load(); }
+/** IKTZ7J：日夜双 Tab 移除——渠道唯一来源=服务端当前业务态（onShow 判定），深链 businessType 仍显式生效 */
 async function load(reset = true) {
   if (!reset && (loading.value || loadingMore.value || items.value.length >= total.value)) return;
   const current = reset ? ++generation : generation;
@@ -64,7 +63,7 @@ function messageTime(iso: string) {
 </script>
 <template>
   <view class="page"
-    ><BusinessModeTabs :model-value="businessType" :disabled="loading || marking" @change="selectBusiness" /><view v-if="error" class="msg-retry card" @tap="load()"
+    ><view v-if="error" class="msg-retry card" @tap="load()"
       ><text class="msg-retry__title">消息加载失败</text
       ><text class="muted">网络异常，点击重试</text></view
     ><view v-else-if="loading" class="msg-skeleton"

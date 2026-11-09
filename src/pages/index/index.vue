@@ -15,16 +15,14 @@ import ProductCard from "../../components/ProductCard.vue";
 import WheelPanel from "../../components/WheelPanel.vue";
 import WelcomeGift from "../../components/WelcomeGift.vue";
 import PhoneGate from "../../components/PhoneGate.vue";
-// IKSW1F 夜宵入口横幅：自持 /night/entry 拉取与显隐（inNightSession 才渲染）
-import NightEntryBanner from "../../components/NightEntryBanner.vue";
-import { nightStoreLink, nightTimelineQuery } from "../../utils/nightLink";
 import { usableSignupGifts, scopedUiKey, type SignupGiftRow } from "../../utils/signupGifts";
-import NightHomeMode from "../../components/NightHomeMode.vue";
 import { nightApi } from "../../api/night";
 import { useCartStore } from "../../stores/cart";
+import { useNightCartStore } from "../../stores/nightCart";
 import { useCampusStore } from "../../stores/campus";
 import { useSessionStore } from "../../stores/session";
 import { bannerClickable, openBannerTarget } from "../../utils/bannerLink";
+import { resolveNightBuildingId } from "../../utils/businessContext";
 import { pickCurrentAddress } from "../../utils/currentAddress";
 import { categoryImage } from "../../utils/categoryImage";
 import { fenToYuan } from "../../utils/money";
@@ -36,6 +34,7 @@ import type {
   HomePromotion,
   Product,
 } from "../../types";
+import type { NightProduct, NightStoreRow } from "../../types/night";
 
 const session = useSessionStore(); // IKE3HT 强授权门模板绑定
 /** IKG1C 打烊停单：闭店态随 /home 同批到位（campusStore.apply 不加请求） */
@@ -45,9 +44,138 @@ const campusStore = useCampusStore();
 const nightMode = ref(false);
 const homeError = ref(false);
 let homeGeneration = 0;
-/** 夜宵组件句柄：onShow 回首页时触发 reload（v-show 不重挂载，记忆楼栋
- *  变更后必须手动 load——否则选楼栋返回首页永远停留引导态） */
-const nightHomeRef = ref<InstanceType<typeof NightHomeMode>>();
+/* ---------- IKTZ7J 夜宵店区（地址定楼）：店头/货架/购物车条 ---------- */
+const nightCart = useNightCartStore();
+const nightStoreId = ref(""),
+  nightBuildingId = ref(""),
+  nightBuildingName = ref("");
+const nightDetail = ref<NightStoreRow>();
+const nightProducts = ref<NightProduct[]>([]);
+const nightNoAddress = ref(false),
+  nightMissing = ref(false),
+  nightError = ref(false),
+  nightLoading = ref(false);
+const nightOpen = computed(() => nightDetail.value?.state === "open");
+/** IKTZ7J 道哥 2026-11-09：夜场推荐网格与白天同款 ProductCard——
+ *  NightProduct 行映射为卡片视图（键=楼栋行 id，下单口径不变），
+ *  加删走夜宵购物车（秒杀/限购/库存上限口径同货架 change） */
+const nightCardMap = new Map<string, NightProduct>();
+/** IKTU033 道哥 2026-11-09：首页推荐=楼长勾选（楼栋行 featured 优先，服务端
+ *  storeProducts 已按此排序），未勾满时其余商品补齐；≤18 与白天推荐位对齐 */
+const nightCards = computed<Product[]>(() => {
+  nightCardMap.clear();
+  return nightProducts.value.slice(0, 18).map((p) => {
+    const onSeckill = !!p.asSeckill && !!p.seckill;
+    const view = {
+      id: p.id,
+      name: p.name,
+      subtitle: p.subtitle || "",
+      price: onSeckill && p.seckill ? p.seckill.price : p.price,
+      originalPrice: p.originalPrice ?? 0,
+      stock: p.stock,
+      image: p.image,
+    } as Product;
+    nightCardMap.set(p.id, p);
+    return view;
+  });
+});
+const nightQty = (id: string) => {
+  const p = nightCardMap.get(id);
+  if (!p) return 0;
+  return nightCart.quantityOf(
+    nightStoreId.value,
+    p.id,
+    !!p.asSeckill,
+    p.asSeckill ? p.seckill?.id : undefined,
+  );
+};
+const nightCap = (p: NightProduct) =>
+  Math.min(p.stock, p.asSeckill ? 1 : 999, p.purchaseLimitMeta?.qty ?? 999);
+function addNight(p: Product) {
+  const np = nightCardMap.get(p.id);
+  if (!np) return;
+  if (session.needsPhone) {
+    pendingProduct = p;
+    phoneGateOpen.value = true;
+    return;
+  }
+  if (!nightOpen.value) {
+    uni.showToast({ title: "店铺休息中，开门后再来选购", icon: "none" });
+    return;
+  }
+  if (np.soldOut || nightQty(p.id) >= nightCap(np)) {
+    uni.showToast({
+      title: np.stock ? "已达到可购数量" : "这件商品暂时售罄",
+      icon: "none",
+    });
+    return;
+  }
+  const result = nightCart.setQuantity(
+    { id: nightStoreId.value, buildingId: nightBuildingId.value, buildingName: nightBuildingName.value },
+    np,
+    nightQty(p.id) + 1,
+  );
+  if (result === false) uni.showToast({ title: "请先处理购物车中的该商品", icon: "none" });
+}
+function removeNight(p: Product) {
+  const np = nightCardMap.get(p.id);
+  if (!np) return;
+  void nightCart.setQuantity(
+    { id: nightStoreId.value, buildingId: nightBuildingId.value, buildingName: nightBuildingName.value },
+    np,
+    nightQty(p.id) - 1,
+  );
+}
+/** 夜商品无独立详情页（资料在货架详情弹层），卡片点击不跳转（分类页同口径） */
+function openNight(_p: Product) {}
+/** 解析并加载当前地址楼栋的夜宵店（地址事实源，接口失败回缓存）。
+ *  alive=loadHome 代际守卫，晚到响应不落位。 */
+async function loadNightStore(alive: () => boolean) {
+  nightError.value = false;
+  nightNoAddress.value = false;
+  nightMissing.value = false;
+  nightLoading.value = true;
+  nightStoreId.value = "";
+  nightProducts.value = [];
+  nightDetail.value = undefined;
+  try {
+    await useSessionStore().ensureLogin();
+    if (!alive()) return;
+    const buildingId = await resolveNightBuildingId();
+    if (!alive()) return;
+    if (!buildingId) {
+      nightNoAddress.value = true;
+      return;
+    }
+    const bundle = await nightApi.stores(buildingId);
+    if (!alive()) return;
+    const row = bundle.stores.find((r) => r.buildingId === buildingId);
+    if (!row || !row.storeId) {
+      nightMissing.value = true;
+      nightBuildingName.value = row?.buildingName || "";
+      return;
+    }
+    const [detail, goods] = await Promise.all([
+      nightApi.storeDetail(row.storeId),
+      nightApi.storeProducts(row.storeId),
+    ]);
+    if (!alive()) return;
+    nightStoreId.value = row.storeId;
+    nightBuildingId.value = row.buildingId;
+    nightBuildingName.value = row.buildingName;
+    nightDetail.value = detail;
+    nightProducts.value = goods;
+    nightCart.refreshProducts(row.storeId, goods);
+  } catch {
+    if (alive()) nightError.value = true;
+  } finally {
+    if (alive()) nightLoading.value = false;
+  }
+}
+/** 筹备态（本楼无店）：去楼长招募报名 */
+function goNightRecruit() {
+  uni.navigateTo({ url: "/pages/recruit/index?intent=night" });
+}
 /** IKS0W7：栏目名称（校区级可配，空回落默认）——首页栏目与分类页侧栏同源 */
 const homeFeaturedName = computed(
   () => campusStore.homeFeaturedLabel || "为你推荐",
@@ -90,10 +218,8 @@ onLoad((q) => {
     // 校区门在列表返回后才读键（本行必然已执行），预选才能落到分享校区
     setSharedCampusId(c);
   }
-  if (q?.businessType === 'night') {
-    uni.navigateTo({ url: nightStoreLink({ campusId: c, buildingId: String(q?.buildingId || ''), catalogProductId: String(q?.catalogProductId || '') }) });
-    return;
-  }
+  // IKTZ7J：夜宵分享深链不再转选楼页——留在首页按当前地址自动定店
+  //（buildingId/catalogProductId 参数弃用，以接收者地址为准）
   const cat = String(q?.cat || "");
   if (cat) {
     uni.setStorageSync("categoryPick", cat);
@@ -116,12 +242,14 @@ async function loadHome() {
   const entry = await nightApi.entry();
   if (current !== homeGeneration) return;
   nightMode.value = entry.inNightSession === true;
-  // 夜场中每次回首页都重拉本店数据（选楼栋返回/店页返回的刷新入口）
-  if (nightMode.value) nightHomeRef.value?.load();
   const [home, addresses] = await Promise.all([api.home(nightMode.value ? "night" : "day"), nightApi.addresses()]);
   if (current !== homeGeneration) return;
   // 当前地址统一走 pickCurrentAddress（道哥 2026-09-09：切地址后首页跟随）
   defaultAddress.value = pickCurrentAddress(addresses);
+  // IKTZ7J：夜场按当前地址定店（复用刚拉的地址列表，避免二次请求）；
+  // IKTU033：首页排序=楼长推荐优先（服务端 storeProducts 排序），前端 ≤18
+  if (nightMode.value) await loadNightStore(() => current === homeGeneration);
+  if (current !== homeGeneration) return;
   campus.value = home.campus.name;
   notice.value = home.notice ?? "";
   // IKG1C：闭店五字段并入共享 campus 状态（详情/分类页从这里取，避免各自再拉）
@@ -165,7 +293,9 @@ async function loadHomeBlocks(generation: number, night: boolean) {
   homeBlocksError.value = false; signupLoaded.value = false;
   const current = () => generation === homeGeneration && night === nightMode.value;
   try {
-    const active = night ? false : (await api.wheel()).active;
+    // IKTZ7J 道哥 2026-11-09：双卡视觉与白天一致——夜场同样按转盘配置渲染，
+    // 不再强制隐藏抽奖卡（点击仍受 P08 夜场抽奖未开放约束，见 goWheel）
+    const active = (await api.wheel()).active;
     if (current()) wheelActive.value = active;
   } catch { if (current()) wheelActive.value = false; }
   try {
@@ -210,10 +340,16 @@ function goBrowseFromGroup() {
   groupOpen.value = false;
   uni.switchTab({ url: "/pages/category/index" });
 }
-/** IKDB7W：点击入口原地弹层抽奖（不跳转）；pages/wheel 薄壳仅作分享落地 */
+/** IKDB7W：点击入口原地弹层抽奖（不跳转）；pages/wheel 薄壳仅作分享落地。
+ *  IKTZ7J：视觉与白天一致后，夜场点击仍不开放抽奖（P08：夜场抽奖未开放，
+ *  且转盘发白天渠道券，夜场抽取会「抽到看不见」） */
 const wheelOpen = ref(false);
 function goWheel() {
   if (!wheelActive.value) return;
+  if (nightMode.value) {
+    uni.showToast({ title: "转盘白天开放，欢迎白天来玩", icon: "none" });
+    return;
+  }
   wheelOpen.value = true;
 }
 /* ---------- 促销模块卡（IKAHFG/ADR-0006）：秒杀/临期各一块，倒计时走秒级跳动 ---------- */
@@ -314,16 +450,19 @@ const onPhoneBound = () => {
   if (pendingProduct) {
     const p = pendingProduct;
     pendingProduct = undefined;
-    cart.set(p, cart.quantity(p.id) + 1);
+    // IKTZ7J：夜场补执行走夜车分流，白天仍走服务端购物车
+    if (nightMode.value) addNight(p);
+    else cart.set(p, cart.quantity(p.id) + 1);
   }
 };
 /** 分享（IKC7V6）：默认分享——微信自动截当前页为分享图，落地首页；
  *  IKGZSU：path 带分享者校区，新用户点开静默落同校区 */
 onShareAppMessage(() => {
   track("share", "index"); // IKRGLV
+  // IKTZ7J：夜场分享落首页（businessType=night），接收者按自己地址定店
   if (nightMode.value) {
-    const target = nightHomeRef.value?.shareTarget();
-    return { title: target?.name || '本楼夜宵店，好物送到寝室', path: nightStoreLink({ campusId: session.user?.campusId, buildingId: target?.buildingId, catalogProductId: target?.catalogProductId }) };
+    const c = session.user?.campusId;
+    return { title: "本楼夜宵店，好物送到寝室", path: c ? `/pages/index/index?campus=${c}&businessType=night` : "/pages/index/index?businessType=night" };
   }
   const c = session.user?.campusId;
   return {
@@ -333,8 +472,8 @@ onShareAppMessage(() => {
 });
 onShareTimeline(() => {
   if (nightMode.value) {
-    const target = nightHomeRef.value?.shareTarget();
-    return { title: target?.name || '本楼夜宵店，好物送到寝室', query: nightTimelineQuery({ campusId: session.user?.campusId, buildingId: target?.buildingId, catalogProductId: target?.catalogProductId }) };
+    const c = session.user?.campusId;
+    return { title: "本楼夜宵店，好物送到寝室", query: c ? `campus=${c}&businessType=night` : "businessType=night" };
   }
   return { title: '不出寝，零食送到寝室' };
 });
@@ -377,8 +516,13 @@ const open = (id: string) =>
 const goCategory = () => uni.switchTab({ url: "/pages/category/index" });
 /** 促销版块入口（IKBW0K）：整卡跳分类页「限时秒杀」特殊分类——点击秒杀商品
  *  /版块都进专区列表（switchTab 不支持 query，走 storage 传递）；
- *  临期版块暂无专区，直接进分类页。 */
+ *  临期版块暂无专区，直接进分类页。
+ *  IKTZ7J：夜场分类页无专区语义（平铺货架），直接进分类页逛。 */
 function goPromoCategory(type: string) {
+  if (nightMode.value) {
+    goCategory();
+    return;
+  }
   if (type === "seckill") uni.setStorageSync("categoryPick", "seckill");
   goCategory();
 }
@@ -415,23 +559,19 @@ function search() {
     >
     <view v-if="homeError" class="home-error card">
       <text>首页暂时没加载出来</text>
-      <text class="home-error__hint">请检查网络后重试，楼栋选择和购物车已保留</text>
+      <text class="home-error__hint">请检查网络后重试，购物车已保留</text>
       <button @tap="loadHome">重新加载</button>
     </view>
     <view v-if="loading" class="card" style="padding: 32px; text-align: center">正在准备店铺信息…</view>
     <view v-show="!homeError && !loading">
     <view v-if="homeBlocksError" class="card" style="padding: 16px; margin-bottom: 16px"><text>优惠券暂时加载失败，购物车已保留</text><button @tap="loadHome">重新加载优惠信息</button></view>
-    <NightHomeMode v-show="nightMode" ref="nightHomeRef"></NightHomeMode>
-    <view v-show="!nightMode">
-    <!-- IKG1C 打烊横幅：closedNow 服务端判定，文案随闭店原因切换（手动/时间窗） -->
-    <view v-if="campusStore.closedNow" class="closed-banner"
+    <!-- IKTZ7J 打烊横幅：夜场由店头承担身份与营业状态，打烊横幅仅白天渲染 -->
+    <view v-if="!nightMode && campusStore.closedNow" class="closed-banner"
       ><text class="closed-banner__dot">●</text
       ><text class="closed-banner__text">{{
         campusStore.closedBanner
       }}</text></view
-    ><!-- IKSW1F 夜宵入口横幅：/night/entry inNightSession=true 才渲染（白天零占位），点击进夜宵流程 -->
-    <NightEntryBanner />
-    </view><!-- ↑ 白天专属容器到这为止：打烊横幅/夜宵入口横幅 -->
+    >
     <!-- IKSW1F 通用区块（公告条/banner/双卡售后群）夜场同样显示，白天顺序一位不动（道哥 2026-11-06 反馈找回） -->
     <!-- IKHM1P 公告条：小喇叭+文字，超宽滚动（双份文本无缝循环），空=隐藏 -->
     <view v-if="notice" class="notice-bar"
@@ -454,7 +594,7 @@ function search() {
         ></view
       ></view
     >
-    <view v-show="!nightMode" class="search"
+    <view class="search"
       ><text class="search__glass">⌕</text
       ><input
         v-model="keyword"
@@ -585,7 +725,7 @@ function search() {
     <!-- 促销模块卡（IKAHFG/ADR-0006）：秒杀/临期分组，横滑，无活动不占位。
          IKBW0K：倒计时移除（多活动结束时间不一，单一倒计时失真）；整卡改为
          分类页「限时秒杀」入口——点击秒杀商品/版块均跳分类页特殊分类 -->
-    <view v-show="!nightMode"
+    <view
     ><view
       v-for="g in promoGroups"
       :key="g.type"
@@ -645,14 +785,50 @@ function search() {
         ></scroll-view
       ></view
     >
-    <view v-show="!nightMode" class="section-title"
+    <view class="section-title"
       ><text class="section-title__main">{{ homeFeaturedName }}</text
       ><text class="section-title__sub" @tap="goCategory"
         ><!-- IK9VQ3：chevron 形状即 >，改 chip 暗示可点 -->
         <text class="link-chip">更多</text></text
       ></view
     >
-    <view v-show="!nightMode">
+    <!-- IKTZ7J 夜宵店区（地址定楼）：店头引导态 / 店头身份+夜货架；
+         白天仍为推荐网格，日夜结构一一对应 -->
+    <template v-if="nightMode">
+      <view v-if="nightError" class="nhm__guide card"
+        ><text class="nhm__guide-title">夜宵好物暂时没加载出来</text
+        ><text class="nhm__guide-sub">保留了你的购物车</text
+        ><button class="nhm__guide-btn" @tap="loadHome">重新加载</button></view
+      >
+      <view v-else-if="nightNoAddress" class="nhm__guide card"
+        ><text class="nhm__guide-title">先完善收货地址</text
+        ><text class="nhm__guide-sub">添加本楼寝室地址后，自动进入本楼夜宵店</text
+        ><button class="nhm__guide-btn" @tap="goAddress">添加地址</button></view
+      >
+      <view v-else-if="nightMissing" class="nhm__guide card"
+        ><text class="nhm__guide-title">{{ nightBuildingName }}·夜宵店筹备中</text
+        ><text class="nhm__guide-sub">本楼夜宵店正在招募楼长，开业后即可下单送到寝室</text
+        ><button class="nhm__guide-btn" @tap="goNightRecruit">了解楼长招募</button></view
+      >
+      <view v-else-if="nightLoading || !nightStoreId" class="nhm__guide card"
+        ><text class="nhm__guide-sub">正在准备今晚的好物…</text></view
+      >
+      <!-- 道哥 2026-11-09：夜场推荐网格与白天同款 ProductCard（店头卡/独立货架/常驻车条全部去除） -->
+      <view v-else-if="!nightCards.length" class="grid-empty"
+        ><text class="muted">货架暂时空着，去「商品」页逛逛</text></view
+      >
+      <view v-else class="grid"
+        ><ProductCard
+          v-for="p in nightCards"
+          :key="p.id"
+          :product="p"
+          :quantity="nightQty(p.id)"
+          @add="addNight"
+          @remove="removeNight"
+          @open="openNight"
+      /></view>
+    </template>
+    <view v-else>
     <view v-if="loading" class="grid"
       ><view v-for="n in 4" :key="n" class="skeleton" /></view
     ><view v-else-if="!products.length" class="grid-empty"
@@ -668,7 +844,7 @@ function search() {
         @open="open"
     /></view>
   </view>
-  </view><!-- ↑ IKSW1F 白天专属容器（促销/栏目标题/货架）到此为止 -->
+  </view><!-- ↑ IKTZ7J 首页日夜同构完成：区块/卡片/交互完全一致，仅数据源按渠道 -->
   </view>
 
   <!-- 进群弹窗（IKD6FA 复用 IKAJSZ）：show-menu-by-longpress 长按识别；
@@ -740,7 +916,7 @@ function search() {
     </view>
   </view>
   <TabBar :current="0" />
-  <CartOverlay v-if="!nightMode && !homeError" /><!-- IKSW1F 夜场由 NightHomeMode 夜宵购物车条接管 -->
+  <CartOverlay v-if="!nightMode && !homeError" /><!-- IKTZ7J 夜场无常驻车条（与白天一致），购物车走 Tab -->
 
 <!-- IKQYUD 每日福利群弹窗：居中大卡，长按识别进群 -->
 <view v-if="groupAdOpen" class="gad-mask" @tap="groupAdOpen = false">
@@ -1687,9 +1863,36 @@ function search() {
 </style>
 
 <style scoped>
+/* IKTZ7J 道哥 2026-11-09：双卡视觉与白天完全一致——夜场换肤 CSS 已移除；
+   仅保留底部补偿（夜宵购物车条悬浮留空间） */
 .home--night { padding-bottom: calc(260rpx + env(safe-area-inset-bottom)); }
 .homeblocks--single { grid-template-columns: minmax(0, 1fr); }
-.home--night .homeblocks__card--group { min-height: 156rpx; background: radial-gradient(circle at 95% 0%, rgba(223, 194, 121, .18), transparent 50%), #eff3e9; border-color: #d8e2cd; box-shadow: 0 4px 14px rgba(31, 67, 44, .04); }
-.home--night .homeblocks__card--group .homeblocks__title, .home--night .homeblocks__card--group .homeblocks__cta { color: #285238; }
-.home--night .homeblocks__card--group .homeblocks__sub { color: #65745f; }
+
+.nhm__guide {
+  padding: 60rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  align-items: center;
+  text-align: center;
+}
+.nhm__guide-title {
+  font-size: 32rpx;
+  font-weight: 800;
+}
+.nhm__guide-sub {
+  font-size: 24rpx;
+  color: #999;
+}
+.nhm__guide-btn {
+  margin-top: 8rpx;
+  background: #0d6b3a;
+  color: #fff;
+  font-size: 28rpx;
+  border-radius: 999rpx;
+  padding: 8rpx 48rpx;
+}
+.nhm__guide-btn::after {
+  border: none;
+}
 </style>
