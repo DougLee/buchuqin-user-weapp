@@ -13,6 +13,8 @@ test('昵称以当前用户服务端资料为准，历史全局缓存不串账�
     if (name === '../utils/authSession') return { registerAuthSession() {} };
     if (name === 'pinia') return require('pinia');
     if (name === '../api') return { api: { updateProfile: async data => data } };
+    if (name === './campus') return { useCampusStore: () => ({ $reset() {} }) };
+    if (name === './business') return { useBusinessStore: () => ({ reset() {} }) };
     if (name === './cart') return { useCartStore: () => ({ setOwner() {} }) };
     if (name === './nightCart') return { useNightCartStore: () => ({ setOwner() {} }) };
     if (name === '../api/request' || name === '../utils/bootCampus') return {};

@@ -9,6 +9,7 @@ import {
 } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { setSharedCampusId } from "../../utils/bootCampus";
+import { useVisibleNow } from "../../utils/visibleNow";
 import { track } from "../../utils/track";
 import { APP_NAME } from "../../config/app";
 import ProductCard from "../../components/ProductCard.vue";
@@ -20,6 +21,7 @@ import { nightApi } from "../../api/night";
 import { useCartStore } from "../../stores/cart";
 import { useNightCartStore } from "../../stores/nightCart";
 import { useCampusStore } from "../../stores/campus";
+import { useBusinessStore } from "../../stores/business";
 import { useSessionStore } from "../../stores/session";
 import { bannerClickable, openBannerTarget } from "../../utils/bannerLink";
 import { resolveNightBuildingId } from "../../utils/businessContext";
@@ -39,6 +41,8 @@ import type { NightProduct, NightStoreRow } from "../../types/night";
 const session = useSessionStore(); // IKE3HT 强授权门模板绑定
 /** IKG1C 打烊停单：闭店态随 /home 同批到位（campusStore.apply 不加请求） */
 const campusStore = useCampusStore();
+/** IKU0KH：业务渠道 store（entry 60s TTL，过期等待刷新），切页零等待 */
+const businessStore = useBusinessStore();
 /** IKSW1F 夜宵模式（道哥 2026-11-05）：夜宵场次中首页整体切换夜宵店形态，
  *  白天商品流/搜索/推荐全部隐藏；场次外恢复白天形态零痕迹 */
 const nightMode = ref(false);
@@ -93,7 +97,7 @@ const nightCap = (p: NightProduct) =>
   Math.min(p.stock, p.asSeckill ? 1 : 999, p.purchaseLimitMeta?.qty ?? 999);
 function addNight(p: Product) {
   const np = nightCardMap.get(p.id);
-  if (!np) return;
+  if (!np || homeError.value || loading.value || nightError.value || nightLoading.value) return;
   if (session.needsPhone) {
     pendingProduct = p;
     phoneGateOpen.value = true;
@@ -119,32 +123,38 @@ function addNight(p: Product) {
 }
 function removeNight(p: Product) {
   const np = nightCardMap.get(p.id);
-  if (!np) return;
+  if (!np || homeError.value || loading.value || nightError.value || nightLoading.value) return;
   void nightCart.setQuantity(
     { id: nightStoreId.value, buildingId: nightBuildingId.value, buildingName: nightBuildingName.value },
     np,
     nightQty(p.id) - 1,
   );
 }
-/** 夜商品无独立详情页（资料在货架详情弹层），卡片点击不跳转（分类页同口径） */
-function openNight(_p: Product) {}
-/** 解析并加载当前地址楼栋的夜宵店（地址事实源，接口失败回缓存）。
+/** 夜商品卡片点击 → 独立详情页（IKU0KZ，与白天详情体验一致） */
+function openNight(id: string) {
+  uni.navigateTo({
+    url: `/pages/night/product-detail?storeId=${nightStoreId.value}&buildingId=${nightBuildingId.value}&id=${encodeURIComponent(id)}`,
+  });
+}
+/** 解析并加载当前地址楼栋的夜宵店（地址事实源，失败提供重试）。
  *  alive=loadHome 代际守卫，晚到响应不落位。 */
-async function loadNightStore(alive: () => boolean) {
+async function loadNightStore(alive: () => boolean, buildingId: string) {
   nightError.value = false;
   nightNoAddress.value = false;
   nightMissing.value = false;
-  nightLoading.value = true;
-  nightStoreId.value = "";
-  nightProducts.value = [];
-  nightDetail.value = undefined;
+  const keep = buildingId === nightBuildingId.value && !!nightStoreId.value && nightProducts.value.length > 0;
+  nightLoading.value = !keep;
+  if (!keep) {
+    nightStoreId.value = "";
+    nightProducts.value = [];
+    nightDetail.value = undefined;
+    nightBuildingId.value = buildingId;
+  }
   try {
-    await useSessionStore().ensureLogin();
-    if (!alive()) return;
-    const buildingId = await resolveNightBuildingId();
-    if (!alive()) return;
     if (!buildingId) {
       nightNoAddress.value = true;
+      nightStoreId.value = "";
+      nightProducts.value = [];
       return;
     }
     const bundle = await nightApi.stores(buildingId);
@@ -227,28 +237,45 @@ onLoad((q) => {
   }
   track("page_view", "index"); // IKRGLV 转化漏斗
 });
+let homeOwner = "";
+function clearHomeData() {
+  nightCardMap.clear();
+  products.value = []; banners.value = []; promotions.value = []; categories.value = [];
+  defaultAddress.value = null;
+  nightStoreId.value = ""; nightBuildingId.value = "";
+  nightProducts.value = []; nightDetail.value = undefined;
+}
 async function loadHome() {
   const current = ++homeGeneration;
   closeHomeOverlays();
+  const owner = `${uni.getStorageSync("token") || ""}:${uni.getStorageSync("nightCartOwner") || ""}:${uni.getStorageSync("selectedAddressId") || ""}`;
+  if (owner !== homeOwner) { clearHomeData(); homeOwner = owner; }
   signupCoupons.value = []; signupLoaded.value = false;
   homeError.value = false;
-  loading.value = true;
+  // IKU0KH 道哥拍板 B 档延伸（数据层）：已有上次数据先渲染 + 后台静默刷新，
+  // 「正在准备店铺信息」只在冷启动首屏出现；刷新失败保留旧内容
+  const hasData = products.value.length > 0 || banners.value.length > 0;
+  loading.value = !hasData;
   try {
   // 道哥 2026-10-29：回到首页即清空搜索框（搜索词已带去分类页执行，
   // 首页框不留残留，避免二次点搜索重复跳转同词）
   keyword.value = "";
   await useSessionStore().ensureLogin();
-  // IKSW1F 夜宵模式判定：以服务端 entry 三元组为准（客户端不自算时钟）
-  const entry = await nightApi.entry();
-  if (current !== homeGeneration) return;
+  // IKSW1F 夜宵模式判定：以服务端 entry 三元组为准（客户端不自算时钟）；
+  // 只复用新鲜缓存，过期必须确认新渠道后加载商品
+  const identity = String(uni.getStorageSync("token") || "");
+  const alive = () => current === homeGeneration && identity === String(uni.getStorageSync("token") || "");
+  const entry = await businessStore.ensureEntry();
+  if (!alive()) return;
+  if (nightMode.value !== (entry.inNightSession === true)) clearHomeData();
   nightMode.value = entry.inNightSession === true;
   const [home, addresses] = await Promise.all([api.home(nightMode.value ? "night" : "day"), nightApi.addresses()]);
-  if (current !== homeGeneration) return;
+  if (!alive()) return;
   // 当前地址统一走 pickCurrentAddress（道哥 2026-09-09：切地址后首页跟随）
   defaultAddress.value = pickCurrentAddress(addresses);
   // IKTZ7J：夜场按当前地址定店（复用刚拉的地址列表，避免二次请求）；
   // IKTU033：首页排序=楼长推荐优先（服务端 storeProducts 排序），前端 ≤18
-  if (nightMode.value) await loadNightStore(() => current === homeGeneration);
+  if (nightMode.value) await loadNightStore(alive, await resolveNightBuildingId(addresses));
   if (current !== homeGeneration) return;
   campus.value = home.campus.name;
   notice.value = home.notice ?? "";
@@ -258,7 +285,8 @@ async function loadHome() {
   banners.value = home.banners;
   products.value = home.hotProducts;
   promotions.value = home.promotions ?? [];
-  if (!nightMode.value) await cart.load();
+  // IKU0KH：购物车红点后台刷新不阻塞首屏（旧数量先渲染，返回即更新）
+  if (!nightMode.value) void cart.load().catch(() => {});
   if (current !== homeGeneration) return;
   loading.value = false;
   // IKD6FA：双版块数据静默拉取；IKDETO 迎新礼包内容同批拉取后判定弹窗
@@ -354,9 +382,7 @@ function goWheel() {
 }
 /* ---------- 促销模块卡（IKAHFG/ADR-0006）：秒杀/临期各一块，倒计时走秒级跳动 ---------- */
 /** 倒计时心跳：模块卡存在才渲染时间，秒级刷新；页面卸载即清 */
-const now = ref(Date.now());
-const promoTicker = setInterval(() => (now.value = Date.now()), 1000);
-onUnmounted(() => clearInterval(promoTicker));
+const now = useVisibleNow();
 /** 按 type 分组渲染（同组共用标题），组倒计时取最早结束的活动。
  *  IKB3NR：条目/分组按剩余时间过滤——归零那一秒本地即回落，不等下次 onShow。 */
 const promoGroups = computed(() => {
@@ -403,8 +429,14 @@ const seckillWindow = computed(() => {
 function nextSeckillBatch() {
   seckillOffset.value += SECKILL_PAGE_SIZE;
 }
-const seckillTicker = setInterval(nextSeckillBatch, SECKILL_ROTATE_MS);
-onUnmounted(() => clearInterval(seckillTicker));
+let seckillTicker: ReturnType<typeof setInterval> | undefined;
+function stopSeckillRotation() {
+  if (seckillTicker !== undefined) clearInterval(seckillTicker);
+  seckillTicker = undefined;
+}
+onShow(() => { stopSeckillRotation(); seckillTicker = setInterval(nextSeckillBatch, SECKILL_ROTATE_MS); });
+onHide(stopSeckillRotation);
+onUnmounted(stopSeckillRotation);
 /** Banner 主题：预置键映射渐变，自定义 hex 走内联底色。 */
 const BANNER_THEMES: Record<string, string> = {
   green: "linear-gradient(120deg, #07883b 0%, #25b95a 60%, #41ce69 100%)",
@@ -562,8 +594,8 @@ function search() {
       <text class="home-error__hint">请检查网络后重试，购物车已保留</text>
       <button @tap="loadHome">重新加载</button>
     </view>
-    <view v-if="loading" class="card" style="padding: 32px; text-align: center">正在准备店铺信息…</view>
-    <view v-show="!homeError && !loading">
+    <!-- IKU0KH 对齐配送端骨架屏标准：加载态=页内结构骨架（非文案卡） -->
+    <view v-show="!homeError">
     <view v-if="homeBlocksError" class="card" style="padding: 16px; margin-bottom: 16px"><text>优惠券暂时加载失败，购物车已保留</text><button @tap="loadHome">重新加载优惠信息</button></view>
     <!-- IKTZ7J 打烊横幅：夜场由店头承担身份与营业状态，打烊横幅仅白天渲染 -->
     <view v-if="!nightMode && campusStore.closedNow" class="closed-banner"
@@ -810,7 +842,10 @@ function search() {
         ><text class="nhm__guide-sub">本楼夜宵店正在招募楼长，开业后即可下单送到寝室</text
         ><button class="nhm__guide-btn" @tap="goNightRecruit">了解楼长招募</button></view
       >
-      <view v-else-if="nightLoading || !nightStoreId" class="nhm__guide card"
+      <view v-else-if="nightLoading" class="grid"
+        ><view v-for="n in 4" :key="n" class="skeleton" /></view
+      >
+      <view v-else-if="!nightStoreId" class="nhm__guide card"
         ><text class="nhm__guide-sub">正在准备今晚的好物…</text></view
       >
       <!-- 道哥 2026-11-09：夜场推荐网格与白天同款 ProductCard（店头卡/独立货架/常驻车条全部去除） -->

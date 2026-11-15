@@ -72,7 +72,7 @@ export const useCampusStore = defineStore("campus", {
       this.close = { ...campus };
       // IKHMF1：客服电话同批落（campus 行字段，两来源都有）
       const phone = (campus as { servicePhone?: string }).servicePhone;
-      if (phone) this.servicePhone = phone;
+      if (phone !== undefined) this.servicePhone = phone || "";
       const qrcode = (campus as { serviceQrcode?: string }).serviceQrcode;
       if (qrcode !== undefined) this.serviceQrcode = qrcode || "";
       // IKQXSD：售后福利群二维码（空=售后页不渲染）

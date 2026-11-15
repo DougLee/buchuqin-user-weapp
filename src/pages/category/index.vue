@@ -23,7 +23,7 @@ import { onShareAppMessage, onShareTimeline } from "@dcloudio/uni-app";
  *  switchTab 回本页并选中该分类）；all/秒杀回落默认品牌分享。
  *  imageUrl 用分类图（无图不传，微信截流首屏）。 */
 onShareAppMessage(() => {
-  if (nightMode.value) return { title: nightProducts.value.find(product => product.catalogProductId === selectedNightCatalogId.value)?.name || `${nightBuildingName.value}夜宵店`, path: nightStoreLink({ campusId: useSessionStore().user?.campusId, buildingId: nightBuildingId.value, catalogProductId: selectedNightCatalogId.value }) };
+  if (nightMode.value) return { title: `${nightBuildingName.value}夜宵店`, path: nightStoreLink({ campusId: useSessionStore().user?.campusId }) };
   const id = active.value;
   track("share", id === "all" || id === "seckill" ? "category" : id); // IKRGLV
   const cat =
@@ -47,7 +47,7 @@ onShareAppMessage(() => {
 /** IKQXK6 朋友圈分享：tab 页朋友圈落地=小程序首页+query 拼接——首页
  *  onLoad 的 ?cat= 消费逻辑天然兼容，query 同款即可。 */
 onShareTimeline(() => {
-  if (nightMode.value) return { title: nightProducts.value.find(product => product.catalogProductId === selectedNightCatalogId.value)?.name || `${nightBuildingName.value}夜宵店`, query: nightTimelineQuery({ campusId: useSessionStore().user?.campusId, buildingId: nightBuildingId.value, catalogProductId: selectedNightCatalogId.value }) };
+  if (nightMode.value) return { title: `${nightBuildingName.value}夜宵店`, query: nightTimelineQuery({ campusId: useSessionStore().user?.campusId }) };
   const id = active.value;
   const cat =
     id !== "all" && id !== "seckill"
@@ -117,7 +117,6 @@ let pendingInvocation = 0;
 let contextGeneration = 0;
 const nightLoadScope = createBusinessRequestScope();
 const nightStoreId = ref("");
-const selectedNightCatalogId = ref("");
 const nightBuildingId = ref("");
 const nightBuildingName = ref("");
 const nightOpen = ref(false);
@@ -135,6 +134,9 @@ const addDisabled = computed(() =>
 /** 夜宵使用与首页一致的商品货架；白天的渐进分类流保持独立。 */
 async function loadNight() {
   const current = nightLoadScope.begin();
+  // 地址或身份尚未确认时不允许沿用上一楼栋的货架。
+  nightOpen.value = false; nightProducts.value = [];
+  nightStoreId.value = ""; nightBuildingId.value = "";
   loading.value = true;
   error.value = false;
   nightNoAddress.value = false;
@@ -165,19 +167,18 @@ async function loadNight() {
       nightOpen.value = false;
       return;
     }
-    nightStoreId.value = row.storeId;
-    nightBuildingId.value = row.buildingId;
     const [detail, goods] = await Promise.all([
       nightApi.storeDetail(row.storeId),
       nightApi.storeProducts(row.storeId),
     ]);
     if (!current()) return;
+    nightStoreId.value = row.storeId;
+    nightBuildingId.value = row.buildingId;
     nightBuildingName.value = row.buildingName;
     nightOpen.value = detail.state === "open";
     nightProducts.value = goods;
     nightCart.refreshProducts(row.storeId, goods);
   } catch {
-    // 网络抖动不清楼栋记忆（首页夜宵形态同口径）：保留选择下次 onShow 重试
     if (current.isLatest()) error.value = true;
   } finally {
     if (current.isLatest()) { if (!current()) error.value = true; loading.value = false; if (!nightMode.value) void ensureScrollable(); }
@@ -470,9 +471,12 @@ let userPickedCat = false;
 onShow(enterPage);
 async function enterPage() {
   const invocation = ++pendingInvocation;
-  contextPending.value = true;
+  // IKU0KH 道哥拍板 B 档延伸（数据层）：已有上次数据先渲染 + 后台静默刷新，
+  // 整页占位只在冷启动首屏出现；刷新失败保留旧内容（无旧数据才进错误态）
+  const hasData = sections.value.length > 0 || !!nightStoreId.value;
+  contextPending.value = !hasData;
   try { await loadCategoryPage(); }
-  catch { if (invocation === pendingInvocation) contextError.value = true; }
+  catch { if (invocation === pendingInvocation && !hasData) contextError.value = true; }
   finally { if (invocation === pendingInvocation) contextPending.value = false; }
 }
 async function loadCategoryPage() {
@@ -772,10 +776,10 @@ const open = (id: string) => {
 </script>
 <template>
   <view v-if="contextError" class="page"><view class="cat-retry card" @tap="enterPage"><text class="cat-retry__title">店铺信息加载失败</text><text class="muted">点击重试</text></view><TabBar :current="1" /></view>
-  <view v-else-if="contextPending" class="page"><view class="cat-retry card"><text class="muted">正在核对店铺信息…</text></view><TabBar :current="1" /></view>
+  <view v-else-if="contextPending" class="page"><view class="card cat-skeleton" style="padding: 20rpx"><view class="cat-skeleton__bar" /><view v-for="n in 4" :key="n" class="cat-skeleton__block" /></view><TabBar :current="1" /></view>
   <view v-else class="page"
     ><!-- 道哥 2026-11-09：夜场店头身份卡删除，与首页同口径 -->
-    <template v-if="nightMode"><view v-if="nightNoAddress" class="cat-retry card" role="button" @tap="goNightAddress"><text class="cat-retry__title">先完善收货地址</text><text class="muted">添加本楼寝室地址后，自动进入本楼夜宵店</text></view><view v-else-if="!nightNoAddress && nightMissing" class="cat-retry card" role="button" @tap="goRecruitNight"><text class="cat-retry__title">{{ nightBuildingName }}·夜宵店筹备中</text><text class="muted">本楼夜宵店正在招募楼长，点击了解报名</text></view><view v-else-if="error" class="cat-retry card" role="button" @tap="loadNight"><text class="cat-retry__title">夜宵商品加载失败</text><text class="muted">点击重试，已保留购物车</text></view><view v-else-if="loading" class="cat-skeleton"><view v-for="n in 4" :key="n" class="cat-skeleton__block" /></view><NightProductShelf v-else-if="nightStoreId" @detail-change="selectedNightCatalogId = $event" :products="nightProducts" :store-id="nightStoreId" :building-id="nightBuildingId" :building-name="nightBuildingName" :open="nightOpen" /></template><template v-else><view class="search card"
+    <template v-if="nightMode"><view v-if="nightNoAddress" class="cat-retry card" role="button" @tap="goNightAddress"><text class="cat-retry__title">先完善收货地址</text><text class="muted">添加本楼寝室地址后，自动进入本楼夜宵店</text></view><view v-else-if="!nightNoAddress && nightMissing" class="cat-retry card" role="button" @tap="goRecruitNight"><text class="cat-retry__title">{{ nightBuildingName }}·夜宵店筹备中</text><text class="muted">本楼夜宵店正在招募楼长，点击了解报名</text></view><view v-else-if="error" class="cat-retry card" role="button" @tap="loadNight"><text class="cat-retry__title">夜宵商品加载失败</text><text class="muted">点击重试，已保留购物车</text></view><view v-else-if="loading" class="cat-skeleton"><view v-for="n in 4" :key="n" class="cat-skeleton__block" /></view><NightProductShelf v-else-if="nightStoreId" :products="nightProducts" :store-id="nightStoreId" :building-id="nightBuildingId" :building-name="nightBuildingName" :open="nightOpen" /></template><template v-else><view class="search card"
       ><view class="search__field"
         ><input
           v-model="draft"
@@ -1245,6 +1249,13 @@ const open = (id: string) => {
   font-weight: 900;
   color: $primary-dark;
   margin-bottom: 8rpx;
+}
+.cat-skeleton__bar {
+  height: 48px;
+  border-radius: 24rpx;
+  margin-bottom: 18rpx;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: cat-pulse 1.2s infinite;
 }
 .cat-skeleton__block {
   height: 190rpx;

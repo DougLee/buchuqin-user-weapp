@@ -1,6 +1,6 @@
-import { nightApi } from '../api/night';
 import { fetchAddresses } from '../api/addresses';
 import { pickCurrentAddress } from './currentAddress';
+import { useBusinessStore } from '../stores/business';
 import type { Address } from '../types';
 
 export type BusinessType = 'day' | 'night';
@@ -22,9 +22,14 @@ export function createBusinessResolver(source: {
   };
 }
 
+/**
+ * IKU0KH 道哥拍板 B 档：渠道判定走业务渠道 store（60s TTL，过期等待刷新），
+ * 切页命中缓存零等待零闪烁；无缓存（首次/换身份）实拉失败仍进保守错误态。
+ * 资金前置校验（night/checkout 营业窗口）不走此缓存，保持每次实拉。
+ */
 export const resolveBusinessType = createBusinessResolver({
   identity: () => String(uni.getStorageSync('token') || ''),
-  entry: () => nightApi.entry(),
+  entry: () => useBusinessStore().ensureEntry(),
 });
 
 export function businessUrl(path: string, type: BusinessType) {
@@ -51,18 +56,13 @@ export function clearNightBuilding() {
 /**
  * IKTZ7J 道哥 2026-11-09：地址定楼栋——不再有选楼页，当前收货地址的
  * buildingId 是夜宵店唯一事实源（选中 → isDefault → 第一条，与全 App
- * 「当前地址」同源）；storage 楼栋记忆降级为缓存，仅在地址接口失败时
- * 兜底（失败不授权换渠道，也不清缓存留待下次 onShow 重试）。
+ * 「当前地址」同源）；storage 楼栋记忆仅供展示缓存；地址接口失败上抛，不能授权沿用旧楼栋。
  * 返回空串 = 当前校区无地址 / 地址缺楼栋（旧数据），调用方引导添加地址。
  */
 export async function resolveNightBuildingId(pre?: Address[]): Promise<string> {
   let list: Address[] = pre ?? [];
   if (!pre) {
-    try {
-      list = await fetchAddresses();
-    } catch {
-      return readNightBuilding();
-    }
+    list = await fetchAddresses();
   }
   const current = pickCurrentAddress(list);
   const buildingId = current?.buildingId || '';

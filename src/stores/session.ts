@@ -1,7 +1,9 @@
 import { registerAuthSession } from "../utils/authSession";
 import { defineStore } from "pinia";
 import { api } from "../api";
+import { useCampusStore } from "./campus";
 import { useCartStore } from "./cart";
+import { useBusinessStore } from "./business";
 import { useNightCartStore } from "./nightCart";
 import { uploadImage } from "../api/request";
 import {
@@ -98,9 +100,14 @@ export const useSessionStore = defineStore("session", {
     },
     /** 写入会话用户并完成初始化（登录 / token 换取资料两条路径共用） */
     applyUser(user: SessionUser) {
-      if (this.user?.id !== user.id || this.user?.campusId !== user.campusId) this.signupCouponsByScope = {};
+      if (this.user?.id !== user.id || this.user?.campusId !== user.campusId) {
+        this.signupCouponsByScope = {};
+        useCampusStore().$reset();
+      }
       useNightCartStore().setOwner(user.id, user.campusId);
       useCartStore().setOwner(user.id, user.campusId);
+      // IKU0KH：换号/换校区即失效业务渠道缓存（entry 绑定身份，下轮 ensureEntry 实拉）
+      useBusinessStore().reset();
       this.user = user;
       this.needsNickname =
         (!user.nickname || user.nickname === "微信用户");

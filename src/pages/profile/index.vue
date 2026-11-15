@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onShow, onHide } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { nightApi } from "../../api/night";
 import { businessUrl, resolveBusinessType, type BusinessType } from "../../utils/businessContext";
@@ -44,10 +44,27 @@ const roomSummary = computed(() =>
     : "",
 );
 onShow(loadProfile);
+onHide(() => { loadGeneration++; serviceOpen.value = false; groupOpen.value = false; });
+let loadedOwner = "";
+const serviceContact = ref({ phone: "", qrcode: "", kfUrl: "", corpId: "" });
 async function loadProfile() {
   const generation = ++loadGeneration;
-  loaded.value = false; contextError.value = false; contextPending.value = true; partialError.value = false; couponReady.value = false; orderReady.value = false;
+  // IKU0KH 道哥拍板 B 档延伸（数据层）：已有上次数据先渲染 + 后台静默刷新，
+  // 「正在核对店铺信息」占位只在冷启动首屏出现；刷新失败保留旧内容
+  const ownerKey = `${uni.getStorageSync("token") || ""}:${uni.getStorageSync("nightCartOwner") || ""}`;
+  if (loadedOwner !== ownerKey) {
+    loadedOwner = ownerKey; loaded.value = false;
+    addresses.value = []; campusName.value = ""; group.value = "";
+    usableCouponCount.value = 0; claimableCouponCount.value = 0; orderCount.value = 0;
+  }
+  const hasData = loaded.value;
+  contextPending.value = !hasData;
+  contextError.value = false;
+  partialError.value = false;
+  if (!hasData) { couponReady.value = false; orderReady.value = false; }
   serviceOpen.value = false; groupOpen.value = false;
+  serviceContact.value = { phone: "", qrcode: "", kfUrl: "", corpId: "" };
+  group.value = "";
   try {
   await session.ensureLogin();
   const identity = uni.getStorageSync("token");
@@ -65,13 +82,19 @@ async function loadProfile() {
   ]);
   if (generation !== loadGeneration || identity !== uni.getStorageSync("token")) return;
   businessType.value = type;
+  couponReady.value = false; orderReady.value = false;
   usableCouponCount.value = 0;
   claimableCouponCount.value = 0;
   orderCount.value = 0;
-  if (a.status === "fulfilled") addresses.value = a.value;
-  if (c.status === "fulfilled") campusName.value = c.value.name;
+  addresses.value = a.status === "fulfilled" ? a.value : [];
+  campusName.value = c.status === "fulfilled" ? c.value.name : "";
   // IKQXSD 统一：进群码=校区售后福利群（campus store 随 currentCampus 刷新）
-  group.value = campusStore.afterSalesGroupQrcode;
+  if (c.status === "fulfilled") {
+    campusStore.$reset();
+    campusStore.apply(c.value);
+    group.value = campusStore.afterSalesGroupQrcode;
+    serviceContact.value = { phone: campusStore.servicePhone, qrcode: campusStore.qrcode, kfUrl: campusStore.serviceKfUrl, corpId: campusStore.serviceKfCorpId };
+  }
   partialError.value = [a, b, o, c].some(result => result.status === "rejected");
   if (b.status === "fulfilled") {
     couponReady.value = true;
@@ -127,7 +150,14 @@ async function onGetPhone(e: { detail: { code?: string } }) {
 </script>
 <template>
   <view v-if="contextError" class="page"><view class="card" style="padding: 32px; text-align: center"><text>店铺信息加载失败，请重试</text><button @tap="loadProfile">重新加载</button></view></view>
-  <view v-else-if="contextPending" class="page"><view class="card" style="padding: 32px; text-align: center">正在核对店铺信息…</view></view>
+  <view v-else-if="contextPending" class="page">
+    <!-- IKU0KH 对齐配送端骨架屏标准：头部+统计三格+列表块（替代文案卡） -->
+    <view class="card prof-skeleton__head" />
+    <view class="prof-skeleton__stats"
+      ><view v-for="n in 3" :key="n" class="prof-skeleton__stat"
+    /></view>
+    <view v-for="n in 3" :key="`r${n}`" class="card prof-skeleton__row" />
+  </view>
   <view v-else class="page profile"
     ><view class="profile__top"
       ><view class="avatar" @tap="goSettings"
@@ -265,7 +295,7 @@ async function onGetPhone(e: { detail: { code?: string } }) {
   >
   <TabBar :current="3" />
   <CartOverlay v-if="businessType === 'day' && !contextError && !contextPending" />
-  <ServiceSheet :visible="serviceOpen" @close="serviceOpen = false" />
+  <ServiceSheet :visible="serviceOpen" :contact="serviceContact" @close="serviceOpen = false" />
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
@@ -467,5 +497,35 @@ async function onGetPhone(e: { detail: { code?: string } }) {
 }
 .group-pop__close::after {
   border: none;
+}
+/* ---------- IKU0KH 对齐配送端骨架屏标准：冷启动首屏占位（替代文案卡） ---------- */
+.prof-skeleton__head {
+  height: 200rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: prof-pulse 1.2s infinite;
+}
+.prof-skeleton__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14rpx;
+  margin-top: 22rpx;
+}
+.prof-skeleton__stat {
+  height: 120rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: prof-pulse 1.2s infinite;
+}
+.prof-skeleton__row {
+  height: 130rpx;
+  margin-top: 22rpx;
+  background: linear-gradient(90deg, #edf2ed, #fff, #edf2ed);
+  animation: prof-pulse 1.2s infinite;
+}
+@keyframes prof-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 </style>

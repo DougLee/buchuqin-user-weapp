@@ -87,6 +87,10 @@
       "style": { "navigationBarTitleText": "夜宵店" }
     },
     {
+      "path": "pages/night/product-detail",
+      "style": { "navigationBarTitleText": "商品详情" }
+    },
+    {
       "path": "pages/night/checkout",
       "style": { "navigationBarTitleText": "确认订单" }
     },

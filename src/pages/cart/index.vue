@@ -223,7 +223,11 @@ function onClearCart() {
 </script>
 <template>
   <view v-if="contextError" class="page"><view class="card" style="padding: 32px; text-align: center"><text>店铺信息加载失败，请重试</text><button @tap="loadPage">重新加载</button></view></view>
-  <view v-else-if="contextPending" class="page"><view class="card" style="padding: 32px; text-align: center">正在核对店铺信息…</view></view>
+  <!-- IKU0KH 对齐配送端骨架屏标准：冷启动占位复用行卡骨架（同白天加载态） -->
+  <view v-else-if="contextPending" class="page"
+    ><view class="cart-list card"
+      ><view v-for="n in 3" :key="n" class="cart-skeleton__line" /></view
+  ></view>
   <view v-else class="page cart-page"
     ><!-- IKSW1F 夜宵模式：夜场整页换夜宵购物车（本地暂存车行编辑+去结算），
          白天购物车 v-show 隐藏零改动 -->
