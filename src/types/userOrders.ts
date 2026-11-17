@@ -14,6 +14,7 @@ export interface UserOrderRow {
   items: Array<{ id: string; name: string; image: string; quantity: number }>;
 }
 export interface UserOrderPage {
+  nightVisible: boolean;
   items: UserOrderRow[];
   total: number;
   page: number;

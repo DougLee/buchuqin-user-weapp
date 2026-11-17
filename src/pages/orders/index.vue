@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { onShow, onHide, onReachBottom, onPullDownRefresh } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { useCartStore } from "../../stores/cart";
@@ -13,6 +13,8 @@ import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
 const session = useSessionStore();
 const orders = ref<UserOrderRow[]>([]), active = ref("all"), channel = ref("all");
+const nightVisible = ref(false);
+const channels = computed(() => nightVisible.value ? [['all','全部订单'],['day','白天单'],['night','夜宵单']] : []);
 const paying = ref(""), loading = ref(true), error = ref(false), moreError = ref(false), loadingMore = ref(false);
 const partial = ref<string[]>([]), page = ref(1), total = ref(0);
 const now = useVisibleNow();
@@ -20,7 +22,7 @@ let generation = 0, displayIdentity = "";
 const identity = () => `${String(uni.getStorageSync('token') || '')}:${String(uni.getStorageSync('nightCartOwner') || '')}`;
 function bindIdentity() {
   const next = identity();
-  if (displayIdentity !== next) { orders.value = []; total.value = 0; partial.value = []; page.value = 1; displayIdentity = next; }
+  if (displayIdentity !== next) { orders.value = []; total.value = 0; partial.value = []; page.value = 1; nightVisible.value = false; channel.value = 'all'; displayIdentity = next; }
 }
 const tabs = [["all", "全部"], ["pending-payment", "待支付"], ["delivering", "配送中"], ["completed", "已完成"], ["cancelled", "已取消"], ["refunded", "退款"], ["exception", "异常"]];
 async function load(status = active.value, append = false) {
@@ -41,6 +43,8 @@ async function load(status = active.value, append = false) {
     if (ticket !== generation) return;
     if (owner !== identity()) throw Error('身份已变化，请重试');
     if (!Array.isArray(result.errors)) throw Error('订单服务未就绪，请重试');
+    nightVisible.value = result.nightVisible === true;
+    if (!nightVisible.value) channel.value = 'all';
     orders.value = append ? [...orders.value, ...result.items.filter(row => !orders.value.some(old => old.key === row.key))] : result.items;
     partial.value = result.errors; total.value = result.total; page.value = next;
   } catch {
@@ -85,15 +89,15 @@ onPullDownRefresh(async () => { try { await load(); } finally { uni.stopPullDown
 </script>
 <template>
   <view class="page">
-    <view class="order-channels"><button v-for="c in [['all','全部订单'],['day','白天单'],['night','夜宵单']]" :key="c[0]" :class="{ selected: channel === c[0] }" @tap="selectChannel(c[0]!)">{{ c[1] }}</button></view>
+    <view v-if="nightVisible" class="order-channels"><button v-for="c in channels" :key="c[0]" :class="{ selected: channel === c[0] }" @tap="selectChannel(c[0]!)">{{ c[1] }}</button></view>
     <scroll-view scroll-x class="tabs"><view class="tabs__inner"><view v-for="t in tabs" :key="t[0]" class="tab" :class="{ 'tab--active': active === t[0] }" @tap="selectStatus(t[0]!)">{{ t[1] }}</view></view></scroll-view>
     <view v-if="partial.length" class="order-warning"><text>{{ partial.map(c => c === 'night' ? '夜宵' : '白天').join('、') }}订单加载失败，当前列表不完整</text><button @tap="load()">重新加载</button></view>
     <view v-if="error" class="empty" @tap="load()"><text class="empty__mark">!</text><text class="empty__title">订单加载失败</text><text class="muted">点击重试，订单不会丢失</text></view>
     <view v-else-if="loading" class="orders-skeleton"><view v-for="n in 3" :key="n" class="skeleton-block" /></view>
-    <view v-else-if="!orders.length && !partial.length" class="empty"><text class="empty__title">这里还没有订单</text><text class="muted">白天与夜宵订单都会显示在这里</text></view>
+    <view v-else-if="!orders.length && !partial.length" class="empty"><text class="empty__title">这里还没有订单</text><text class="muted">{{ nightVisible ? '白天与夜宵订单都会显示在这里' : '下单后可在这里查看订单进度' }}</text></view>
     <template v-else>
       <view v-for="order in orders" :key="order.key" class="order card" @tap="open(order)">
-        <view class="order__head"><view><text class="order-channel" :class="{ night: order.businessType === 'night' }">{{ order.businessType === 'night' ? '夜宵单' : '白天单' }}</text><text>订单 {{ order.orderNo.slice(-8) }}</text></view><text class="order__status">{{ order.statusText }}</text></view>
+        <view class="order__head"><view><text v-if="nightVisible" class="order-channel" :class="{ night: order.businessType === 'night' }">{{ order.businessType === 'night' ? '夜宵单' : '白天单' }}</text><text>订单 {{ order.orderNo.slice(-8) }}</text></view><text class="order__status">{{ order.statusText }}</text></view>
         <view class="order__goods"><image v-for="(line, index) in order.items.slice(0, 3)" :key="`${line.id}:${index}`" :src="line.image" mode="aspectFit" /><text class="muted">共 {{ order.items.reduce((n, i) => n + i.quantity, 0) }} 件</text></view>
         <text class="order-date">{{ new Date(order.createdAt).toLocaleString('zh-CN', { hour12: false }) }}</text>
         <view class="order__bottom"><text>{{ order.deliveryText }}</text><text class="order__price">{{ amountLabel(order) }} ¥{{ fenToYuan(order.payableAmount) }}</text></view>
