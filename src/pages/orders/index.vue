@@ -1,189 +1,108 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { onHide, onReachBottom, onShow, onUnload } from "@dcloudio/uni-app";
+import { onShow, onHide, onReachBottom, onPullDownRefresh } from "@dcloudio/uni-app";
 import { api } from "../../api";
 import { useCartStore } from "../../stores/cart";
-import { isRetryable } from "../../api/request";
+import { useSessionStore } from "../../stores/session";
 import { fenToYuan } from "../../utils/money";
 import { preloadPayTemplates, startPayFlow } from "../../utils/payment";
-import type { Order } from "../../types";
+import { startNightPayFlow } from "../../utils/nightPayment";
+import { useVisibleNow } from "../../utils/visibleNow";
+import type { UserOrderRow } from "../../types/userOrders";
 import { setupDefaultShare } from "../../utils/share";
 setupDefaultShare();
-/** 与后端支付超时关单保持一致（15 分钟，Cron + 懒执行） */
-const PAY_WINDOW_MS = 15 * 60 * 1000;
-const orders = ref<Order[]>([]),
-  active = ref("all"),
-  now = ref(Date.now()),
-  paying = ref(""),
-  ticker = ref<number>(),
-  /** 三态（IK9AWK）：加载骨架 + 错误重试，空态不再在加载期闪现 */
-  loading = ref(true),
-  error = ref(false),
-  /** 滚动分页（IK9AWO） */
-  page = ref(1),
-  total = ref(0),
-  loadingMore = ref(false);
-// tab 与后端 status 过滤参数直接对应；delivering 含全部履约中状态（含 delivered 已送达待确认）
-const tabs = [
-  ["all", "全部"],
-  ["pending-payment", "待支付"],
-  ["delivering", "配送中"],
-  ["completed", "已完成"],
-  ["cancelled", "已取消"],
-  ["refunded", "退款"],
-  ["exception", "异常"],
-];
-/** reset=true 切 tab/重试重置到第一页；false 为触底追加下一页 */
-async function load(status = "all", reset = true) {
+const session = useSessionStore();
+const orders = ref<UserOrderRow[]>([]), active = ref("all"), channel = ref("all");
+const paying = ref(""), loading = ref(true), error = ref(false), moreError = ref(false), loadingMore = ref(false);
+const partial = ref<string[]>([]), page = ref(1), total = ref(0);
+const now = useVisibleNow();
+let generation = 0, displayIdentity = "";
+const identity = () => `${String(uni.getStorageSync('token') || '')}:${String(uni.getStorageSync('nightCartOwner') || '')}`;
+function bindIdentity() {
+  const next = identity();
+  if (displayIdentity !== next) { orders.value = []; total.value = 0; partial.value = []; page.value = 1; displayIdentity = next; }
+}
+const tabs = [["all", "全部"], ["pending-payment", "待支付"], ["delivering", "配送中"], ["completed", "已完成"], ["cancelled", "已取消"], ["refunded", "退款"], ["exception", "异常"]];
+async function load(status = active.value, append = false) {
+  if (append && (loading.value || loadingMore.value || error.value || partial.value.length || orders.value.length >= total.value)) return;
+  const ticket = ++generation;
+  const previous = displayIdentity; bindIdentity();
+  if (previous !== displayIdentity) append = false;
   active.value = status;
-  if (reset) {
-    loading.value = true;
-    page.value = 1;
-  }
-  error.value = false;
+  if (append) loadingMore.value = true; else loading.value = true;
+  error.value = false; moreError.value = false;
   try {
-    const res = await api.ordersPage(status, page.value);
-    orders.value = reset ? res.items : [...orders.value, ...res.items];
-    total.value = res.total;
-  } catch (e) {
-    // ADR-0005(IKA00Q)：仅网络/服务故障进整页错误态，业务拒绝由 request 层 toast
-    if (isRetryable(e)) error.value = true;
-  } finally {
-    loading.value = false;
-  }
-}
-onReachBottom(async () => {
-  if (loadingMore.value || loading.value || error.value) return;
-  if (orders.value.length >= total.value) return;
-  loadingMore.value = true;
-  try {
-    page.value += 1;
-    await load(active.value, false);
-  } finally {
-    loadingMore.value = false;
-  }
-});
-function startTicker() {
-  // 定时刷新"待支付剩余时间"展示
-  if (!ticker.value)
-    ticker.value = setInterval(() => (now.value = Date.now()), 30_000);
-}
-function stopTicker() {
-  if (ticker.value) {
-    clearInterval(ticker.value);
-    ticker.value = undefined;
-  }
-}
-function countdownText(order: Order): string {
-  const remaining =
-    new Date(order.createdAt).getTime() + PAY_WINDOW_MS - now.value;
-  if (remaining <= 0) return "支付超时，订单即将关闭";
-  const minutes = Math.floor(remaining / 60_000),
-    seconds = Math.floor((remaining % 60_000) / 1000);
-  return `剩 ${minutes}:${String(seconds).padStart(2, "0")} 自动关闭`;
-}
-async function pay(order: Order) {
-  if (paying.value) return;
-  paying.value = order.id;
-  try {
-    const paid = await startPayFlow(order.id);
-    if (paid) {
-      uni.showToast({ title: "支付成功", icon: "success" });
-      // 支付成功清空本地购物车（IKA08U，服务端落账时已清）
-      useCartStore().clearLocal();
-      await load(active.value);
-    } else {
-      // 取消/失败：跳详情页提供"继续支付"入口，不留死路
-      uni.showToast({ title: "支付未完成，可继续支付", icon: "none" });
-      uni.navigateTo({ url: `/pages/orders/detail?id=${order.id}` });
-    }
+    await session.ensureLogin();
+    if (ticket !== generation) return;
+    const before = displayIdentity; bindIdentity();
+    if (before !== displayIdentity) append = false;
+    const owner = identity(), next = append ? page.value + 1 : 1;
+    const result = await api.userOrders(channel.value, status, next);
+    if (ticket !== generation) return;
+    if (owner !== identity()) throw Error('身份已变化，请重试');
+    if (!Array.isArray(result.errors)) throw Error('订单服务未就绪，请重试');
+    orders.value = append ? [...orders.value, ...result.items.filter(row => !orders.value.some(old => old.key === row.key))] : result.items;
+    partial.value = result.errors; total.value = result.total; page.value = next;
   } catch {
-    // 网络异常等：request 层已 toast，这里兜底防未处理 rejection
+    if (ticket === generation) { bindIdentity(); if (append) moreError.value = true; else error.value = true; }
   } finally {
-    paying.value = "";
+    if (ticket === generation) { loading.value = false; loadingMore.value = false; }
   }
 }
-onShow(() => {
-  void preloadPayTemplates();
-  startTicker();
-  load(active.value);
-});
-onHide(stopTicker);
-onUnload(stopTicker);
+function selectChannel(type: string) { channel.value = type; orders.value = []; void load(); }
+function selectStatus(status: string) { orders.value = []; void load(status); }
+function open(order: UserOrderRow) {
+  uni.navigateTo({ url: order.businessType === 'night' ? `/pages/night/order-detail?id=${encodeURIComponent(order.id)}` : `/pages/orders/detail?id=${encodeURIComponent(order.id)}` });
+}
+function amountLabel(order: UserOrderRow) {
+  return order.paidAt ? '实付' : order.status === 'pending-payment' ? '应付' : '未支付';
+}
+function countdownText(order: UserOrderRow) {
+  if (!order.timeoutAt) return '待支付';
+  const remaining = new Date(order.timeoutAt).getTime() - now.value;
+  if (remaining <= 0) return '支付超时，订单即将关闭';
+  return `剩 ${Math.floor(remaining / 60000)}:${String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0')} 自动关闭`;
+}
+async function pay(order: UserOrderRow) {
+  if (paying.value) return;
+  paying.value = order.key;
+  const owner = `${session.user?.id}:${session.user?.campusId}`;
+  try {
+    const paid = order.businessType === 'night' ? await startNightPayFlow(order.id, order.storeId) : await startPayFlow(order.id);
+    if (owner !== `${session.user?.id}:${session.user?.campusId}`) return;
+    if (paid) {
+      if (order.businessType === 'day') useCartStore().clearLocal();
+      uni.showToast({ title: '支付成功', icon: 'success' });
+      await load();
+    } else { uni.showToast({ title: '支付未完成，可继续支付', icon: 'none' }); open(order); }
+  } catch { /* 原支付流程提示错误，订单保留，可进入详情重试。 */ }
+  finally { paying.value = ''; }
+}
+onShow(() => { void preloadPayTemplates(); void load(); });
+onHide(() => { generation++; loading.value = false; loadingMore.value = false; });
+onReachBottom(() => { void load(active.value, true); });
+onPullDownRefresh(async () => { try { await load(); } finally { uni.stopPullDownRefresh(); } });
 </script>
 <template>
-  <view class="page"
-    ><scroll-view scroll-x class="tabs"
-      ><view class="tabs__inner"
-        ><view
-          v-for="t in tabs"
-          :key="t[0]"
-          class="tab"
-          :class="{ 'tab--active': active === t[0] }"
-          @tap="load(t[0])"
-          >{{ t[1] }}</view
-        ></view
-      ></scroll-view
-    ><view v-if="error" class="empty" @tap="load(active)"
-      ><text class="empty__mark">!</text
-      ><text class="empty__title">订单加载失败</text
-      ><text class="muted">网络异常，点击重试</text></view
-    ><view v-else-if="loading" class="orders-skeleton"
-      ><view v-for="n in 3" :key="n" class="skeleton-block" /></view
-    ><view v-else-if="!orders.length" class="empty"
-      ><text class="empty__mark">空</text
-      ><text class="empty__title">这里还没有订单</text
-      ><text class="muted">第一袋快乐，正在首页等你</text></view
-    ><template v-else
-    ><view
-      v-for="order in orders"
-      :key="order.id"
-      class="order card"
-      @tap="uni.navigateTo({ url: `/pages/orders/detail?id=${order.id}` })"
-      ><view class="order__head"
-        ><text>订单 {{ order.orderNo.slice(-8) }}</text
-        ><text class="order__status">{{ order.statusText }}</text></view
-      ><view class="order__goods"
-        ><image
-          v-for="line in order.items.slice(0, 3)"
-          :key="line.product.id"
-          :src="line.product.image"
-          mode="aspectFit"
-        /><text class="muted"
-          >共 {{ order.items.reduce((n, i) => n + i.quantity, 0) }} 件</text
-        ></view
-      ><view class="order__bottom"
-        ><text>{{ order.estimatedArrival }}</text
-        ><text class="order__price"
-          >{{ order.status === "pending-payment" ? "应付" : "实付" }} ¥{{
-            fenToYuan(order.payableAmount)
-          }}</text
-        ></view
-      ><view
-        v-if="order.status === 'pending-payment'"
-        class="order__pay"
-        @tap.stop
-        ><text class="order__countdown">{{ countdownText(order) }}</text
-        ><button
-          class="order__pay-btn"
-          :disabled="paying === order.id"
-          @tap="pay(order)"
-        >
-          {{ paying === order.id ? "正在支付…" : "去支付" }}
-        </button></view
-      ></view
-    ><view v-if="!loading && !error && orders.length" class="list-foot"
-      >{{
-        loadingMore
-          ? "加载中…"
-          : orders.length >= total
-            ? "没有更多了"
-            : "上拉加载更多"
-      }}</view
-    ></template
-    ></view
-  >
-  <CartOverlay />
+  <view class="page">
+    <view class="order-channels"><button v-for="c in [['all','全部订单'],['day','白天单'],['night','夜宵单']]" :key="c[0]" :class="{ selected: channel === c[0] }" @tap="selectChannel(c[0]!)">{{ c[1] }}</button></view>
+    <scroll-view scroll-x class="tabs"><view class="tabs__inner"><view v-for="t in tabs" :key="t[0]" class="tab" :class="{ 'tab--active': active === t[0] }" @tap="selectStatus(t[0]!)">{{ t[1] }}</view></view></scroll-view>
+    <view v-if="partial.length" class="order-warning"><text>{{ partial.map(c => c === 'night' ? '夜宵' : '白天').join('、') }}订单加载失败，当前列表不完整</text><button @tap="load()">重新加载</button></view>
+    <view v-if="error" class="empty" @tap="load()"><text class="empty__mark">!</text><text class="empty__title">订单加载失败</text><text class="muted">点击重试，订单不会丢失</text></view>
+    <view v-else-if="loading" class="orders-skeleton"><view v-for="n in 3" :key="n" class="skeleton-block" /></view>
+    <view v-else-if="!orders.length && !partial.length" class="empty"><text class="empty__title">这里还没有订单</text><text class="muted">白天与夜宵订单都会显示在这里</text></view>
+    <template v-else>
+      <view v-for="order in orders" :key="order.key" class="order card" @tap="open(order)">
+        <view class="order__head"><view><text class="order-channel" :class="{ night: order.businessType === 'night' }">{{ order.businessType === 'night' ? '夜宵单' : '白天单' }}</text><text>订单 {{ order.orderNo.slice(-8) }}</text></view><text class="order__status">{{ order.statusText }}</text></view>
+        <view class="order__goods"><image v-for="(line, index) in order.items.slice(0, 3)" :key="`${line.id}:${index}`" :src="line.image" mode="aspectFit" /><text class="muted">共 {{ order.items.reduce((n, i) => n + i.quantity, 0) }} 件</text></view>
+        <text class="order-date">{{ new Date(order.createdAt).toLocaleString('zh-CN', { hour12: false }) }}</text>
+        <view class="order__bottom"><text>{{ order.deliveryText }}</text><text class="order__price">{{ amountLabel(order) }} ¥{{ fenToYuan(order.payableAmount) }}</text></view>
+        <view v-if="order.status === 'pending-payment'" class="order__pay" @tap.stop><text class="order__countdown">{{ countdownText(order) }}</text><button class="order__pay-btn" :disabled="!!paying" @tap="pay(order)">{{ paying === order.key ? '正在支付…' : '去支付' }}</button></view>
+      </view>
+      <view v-if="moreError" class="order-warning" @tap="load(active, true)">加载更多失败，点击重试</view>
+      <view v-else-if="orders.length && !partial.length" class="list-foot">{{ loadingMore ? '加载中…' : orders.length >= total ? '没有更多了' : '上拉加载更多' }}</view>
+    </template>
+  </view>
 </template>
 <style scoped lang="scss">
 @import "../../styles/theme.scss";
@@ -330,4 +249,12 @@ onUnload(stopTicker);
   font-weight: 900;
   margin: 40rpx 0 10rpx;
 }
+.order-channels { display: flex; gap: 16rpx; margin-bottom: 22rpx; }
+.order-channels button { margin: 0; font-size: 25rpx; line-height: 64rpx; border-radius: 32rpx; background: #eaf1e8; color: #365e43; }
+.order-channels button.selected { background: #214e35; color: #fff; }
+.order-channel { display: inline-block; padding: 4rpx 12rpx; margin-right: 12rpx; border-radius: 12rpx; background: #e8f3e8; color: #315c3f; font-size: 22rpx; }
+.order-channel.night { background: #253f31; color: #ffe0a0; }
+.order-date { display: block; font-size: 22rpx; color: #849184; margin-bottom: 16rpx; }
+.order-warning { padding: 22rpx; background: #fff2d6; color: #725829; font-size: 24rpx; border-radius: 20rpx; margin-bottom: 20rpx; }
+.order-warning button { font-size: 24rpx; margin-top: 14rpx; }
 </style>

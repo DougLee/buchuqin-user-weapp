@@ -5,6 +5,7 @@ import { api } from "../../api";
 import { nightApi } from "../../api/night";
 import { businessUrl, resolveBusinessType, type BusinessType } from "../../utils/businessContext";
 const businessType = ref<BusinessType>("day");
+const channelKnown = ref(false);
 const contextError = ref(false), contextPending = ref(true), partialError = ref(false), couponReady = ref(false), orderReady = ref(false);
 /** IKTZ7J：日夜双 Tab 移除——渠道唯一来源=服务端当前业务态（onShow 判定） */
 let selectionOwner = "";
@@ -60,7 +61,7 @@ async function loadProfile() {
   const hasData = loaded.value;
   contextPending.value = !hasData;
   contextError.value = false;
-  partialError.value = false;
+  partialError.value = false; channelKnown.value = false; couponReady.value = false;
   if (!hasData) { couponReady.value = false; orderReady.value = false; }
   serviceOpen.value = false; groupOpen.value = false;
   serviceContact.value = { phone: "", qrcode: "", kfUrl: "", corpId: "" };
@@ -70,18 +71,26 @@ async function loadProfile() {
   const identity = uni.getStorageSync("token");
   const owner = String(uni.getStorageSync("nightCartOwner") || "");
   if (selectionOwner !== owner) { selectedBusiness = undefined; selectionOwner = owner; }
-  const type = await resolveBusinessType(selectedBusiness);
+  let type: BusinessType | undefined;
+  const couponsRequest = resolveBusinessType(selectedBusiness).then(async current => {
+    type = current;
+    return current === 'night' ? await nightApi.coupons() : await api.coupons();
+  });
   // 各请求独立容错（IK9AWK）：部分失败不清零其他栏位
   // （IK9SO5：消息中心入口已隐藏，notifications 不再拉取）
   const [a, b, o, c] = await Promise.allSettled([
     api.addresses(),
-    type === "night" ? nightApi.coupons() : api.coupons(),
-    type === "night" ? nightApi.orders().then(result => result.total) : api.ordersPage().then(result => result.total),
+    couponsRequest,
+    api.userOrders().then(result => {
+      if (!Array.isArray(result.errors) || result.errors.length) throw Error('订单列表不完整，请重试');
+      return result.total;
+    }),
     // IKAJT2：当前校区名（切换后 onShow 重拉即刷新）
     api.currentCampus(),
   ]);
   if (generation !== loadGeneration || identity !== uni.getStorageSync("token")) return;
-  businessType.value = type;
+  if (type) businessType.value = type;
+  channelKnown.value = !!type;
   couponReady.value = false; orderReady.value = false;
   usableCouponCount.value = 0;
   claimableCouponCount.value = 0;
@@ -115,9 +124,12 @@ async function loadProfile() {
 }
 const go = (url: string) => { if (!contextError.value && !contextPending.value) uni.navigateTo({ url }); };
 /** IKAHBQ：订单降级普通页（购物车让位 Tab），改 navigateTo 进栈可返回 */
-const goOrders = () => go(businessType.value === "night" ? "/pages/night/orders" : businessUrl("/pages/orders/index", "day"));
+const goOrders = () => uni.navigateTo({ url: "/pages/orders/index" });
 /** 优惠券/售后列表入口（IK9AWH：原为无入口孤儿页） */
-const goCoupons = () => go(businessUrl("/pages/coupons/index", businessType.value));
+const goCoupons = () => {
+  if (!channelKnown.value || !couponReady.value) { uni.showToast({ title: '优惠券信息暂不可用，请重试', icon: 'none' }); return; }
+  go(businessUrl("/pages/coupons/index", businessType.value));
+};
 const goSettings = () => go("/pages/profile/settings");
 /** 客服电话（IK9AWJ→IKHMF1）：校区自定义，store 无值回落本地常量 */
 const callService = () =>
@@ -294,7 +306,7 @@ async function onGetPhone(e: { detail: { code?: string } }) {
     ></view
   >
   <TabBar :current="3" />
-  <CartOverlay v-if="businessType === 'day' && !contextError && !contextPending" />
+  <CartOverlay v-if="channelKnown && businessType === 'day' && !contextError && !contextPending" />
   <ServiceSheet :visible="serviceOpen" :contact="serviceContact" @close="serviceOpen = false" />
 </template>
 <style scoped lang="scss">

@@ -28,7 +28,7 @@ export function nightUserPreviewLoginPlugin({ apiTarget, sessionPath = "/tmp/nig
 localStorage.setItem('token',${JSON.stringify(token)});
 localStorage.setItem('selectedCampusId','night-preview-campus');
 localStorage.setItem('nightBuildingId','night-preview-building');
-location.replace('/h5/user/m/#/pages/night/buildings');
+location.replace('/h5/user/m/#/pages/index/index');
 </script></body></html>`);
         } catch { res.statusCode = 503; res.end("请先启动3150独立夜宵预览API并准备用户夹具"); }
       });

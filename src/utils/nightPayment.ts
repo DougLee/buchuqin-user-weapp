@@ -1,3 +1,4 @@
+import { requestSubscribeAuth } from "./payment";
 import { nightApi } from "../api/night";
 import { useNightCartStore } from "../stores/nightCart";
 import type { WechatPayParams } from "../types";
@@ -30,7 +31,9 @@ function requestPayment(params: WechatPayParams): Promise<void> {
 export async function startNightPayFlow(
   orderId: string,
   storeId?: string,
+  subscribe = true,
 ): Promise<boolean> {
+  if (subscribe) requestSubscribeAuth();
   const consume = async () => {
     if (!storeId) return;
     try { const paidOrder = await nightApi.order(orderId); useNightCartStore().consumeOrder(storeId, orderId, paidOrder.items); }

@@ -22,7 +22,7 @@ function open(banner) {
 }
 test('夜宵运营券和订单入口落正确渠道', () => {
   assert.equal(open({ businessType: 'night', linkUrl: 'pages/coupons/index' })[0], '/pages/coupons/index?businessType=night');
-  assert.equal(open({ businessType: 'night', linkUrl: 'pages/orders/index' })[0], '/pages/night/orders');
+  assert.equal(open({ businessType: 'night', linkUrl: 'pages/orders/index' })[0], '/pages/orders/index');
 });
 test('夜宵商品/校区目标落分类页夜货架（地址定店），不再拦选楼页', () => {
   assert.equal(open({ businessType: 'night', linkUrl: 'pages/product/detail?id=day-sku' })[0], '/pages/category/index');

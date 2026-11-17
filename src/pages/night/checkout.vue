@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { preloadPayTemplates, requestSubscribeAuth } from "../../utils/payment";
 import { useVisibleNow } from "../../utils/visibleNow";
 import { nightCartIssue } from "../../utils/nightCartValidation";
 import { computed, ref } from "vue";
@@ -135,7 +136,7 @@ async function load() {
     await Promise.allSettled([
       nightApi.storeDetail(storeId.value),
       nightApi.storeProducts(storeId.value),
-      nightApi.entry(),
+      nightApi.entry(buildingId.value),
       nightApi.addresses(),
       nightApi.coupons(),
     ]);
@@ -176,6 +177,7 @@ function manageAddresses() {
   uni.navigateTo({ url: '/pages/address/index' });
 }
 onShow(async () => {
+  void preloadPayTemplates();
   try { await session.ensureLogin(); await load(); }
   catch { loading.value = false; error.value = true; }
 });
@@ -230,6 +232,7 @@ async function submit() {
     uni.showToast({ title: "购物车是空的", icon: "none" });
     return;
   }
+  requestSubscribeAuth();
   submitting.value = true;
   const intentKey = `nightCheckoutIntent:${cart.ownerId}:${storeId.value}`;
   try {
@@ -260,7 +263,7 @@ async function submit() {
     uni.removeStorageSync(intentKey);
     let paid = false;
     try {
-      paid = await startNightPayFlow(created.id, storeId.value);
+      paid = await startNightPayFlow(created.id, storeId.value, false);
     } catch {
       // 支付请求异常不吞掉订单：落到详情页继续支付，不留死路
     }

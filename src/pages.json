@@ -15,7 +15,8 @@
     },
     {
       "path": "pages/orders/index",
-      "style": { "navigationBarTitleText": "我的订单" }
+      "style": {
+        "enablePullDownRefresh": true, "navigationBarTitleText": "我的订单" }
     },
     { "path": "pages/profile/index", "style": { "navigationStyle": "custom" } },
     {

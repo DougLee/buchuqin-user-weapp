@@ -1,4 +1,5 @@
 import { request } from "./request";
+import { pickCurrentAddress } from '../utils/currentAddress';
 import { fetchAddresses } from './addresses';
 import type {
   NightCouponBundle,
@@ -17,7 +18,10 @@ import type { UserCoupon } from "../types";
  */
 export const nightApi = {
   /** 夜宵入口数据：入口横幅判定源（inNightSession 三元组） */
-  entry: () => request<NightEntry>("/night/entry"),
+  entry: async (buildingId?: string) => {
+    const building = buildingId ?? pickCurrentAddress(await fetchAddresses())?.buildingId;
+    return request<NightEntry>(`/night/entry${building ? '?buildingId=' + encodeURIComponent(building) : ''}`);
+  },
   /** 楼栋店铺列表（三态；buildingId 过滤=进本楼店前置校验） */
   stores: (buildingId?: string) =>
     request<{ session: NightStoreRow["session"]; stores: NightStoreRow[] }>(

@@ -237,6 +237,8 @@ export const api = {
   orders: async (status = "all") =>
     (await request<PageResult<Order>>(`/orders?status=${status}`)).items,
   /** 订单分页契约（IK9AWO）：滚动加载用，返回完整信封 {items,total,page,pageSize} */
+  userOrders: (channel = "all", status = "all", page = 1) =>
+    request<import("../types/userOrders").UserOrderPage>(`/orders?unified=true&businessType=${encodeURIComponent(channel)}&status=${encodeURIComponent(status)}&page=${page}&pageSize=20`),
   ordersPage: (status = "all", page = 1, pageSize = 20) =>
     request<PageResult<Order>>(
       `/orders?status=${status}&page=${page}&pageSize=${pageSize}`,

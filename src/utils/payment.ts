@@ -38,7 +38,7 @@ export async function preloadPayTemplates(): Promise<void> {
  * 必须在用户点按的同步链路里调用（微信手势上下文要求），所以放在 startPayFlow
  * 内所有 await 之前；用户拒绝或环境不支持一律静默，绝不阻塞支付。
  */
-function requestSubscribeAuth(): void {
+export function requestSubscribeAuth(): void {
   if (!cachedTemplateIds.length || typeof uni.requestSubscribeMessage !== "function") return;
   try { uni.requestSubscribeMessage({
     tmplIds: cachedTemplateIds.slice(0, 3),

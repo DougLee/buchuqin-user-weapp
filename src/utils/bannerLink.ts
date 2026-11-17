@@ -30,7 +30,7 @@ export function openBannerTarget(banner: Banner): void {
     let path = url.startsWith("/") ? url : `/${url}`;
     if (banner.businessType === 'night') {
       const target = path.split('?')[0];
-      if (target === '/pages/orders/index') path = '/pages/night/orders';
+      if (target === '/pages/orders/index' || target === '/pages/night/orders') path = '/pages/orders/index';
       else if (target === '/pages/coupons/index') path = '/pages/coupons/index?businessType=night';
       // IKTZ7J：地址定楼——校区/商品类 banner 落分类页（当前地址夜店货架），
       // 不再拦去选楼页

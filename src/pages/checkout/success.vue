@@ -115,7 +115,7 @@ function openCancel() {
         await (businessType.value === "night" ? nightApi.cancelOrder(order.value.id) : api.cancelOrder(order.value.id));
         uni.showToast({ title: "订单已取消", icon: "success" });
         // IKAHBQ：订单已非 tab 页，改 navigateTo
-        setTimeout(() => uni.navigateTo({ url: businessType.value === "night" ? "/pages/night/orders" : "/pages/orders/index" }), 600);
+        setTimeout(() => uni.navigateTo({ url: "/pages/orders/index" }), 600);
       } finally {
         cancelling.value = false;
       }
@@ -129,7 +129,7 @@ function openCancel() {
       ><view class="banner__check">✓</view
       ><text class="banner__title">{{ resultTitle }}</text
       ><text class="banner__sub"
-        >{{ order && !['pending-payment', 'cancelled'].includes(order.status) ? (businessType === "night" ? "订单已交给本楼夜宵店，请留意配送消息" : "订单已交给校园仓，请留意配送消息") : "请进入订单详情核对当前状态" }}</text
+        >{{ order && !['pending-payment', 'cancelled'].includes(order.status) ? (businessType === "night" ? "您的夜宵正在加急配送中" : "订单已交给校园仓，请留意配送消息") : "请进入订单详情核对当前状态" }}</text
       ></view
     ><!-- 订单卡骨架（2026-08-24）：三行同构占位 --><view
       v-if="loading"

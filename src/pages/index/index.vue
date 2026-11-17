@@ -265,7 +265,7 @@ async function loadHome() {
   // 只复用新鲜缓存，过期必须确认新渠道后加载商品
   const identity = String(uni.getStorageSync("token") || "");
   const alive = () => current === homeGeneration && identity === String(uni.getStorageSync("token") || "");
-  const entry = await businessStore.ensureEntry();
+  const entry = await businessStore.refresh();
   if (!alive()) return;
   if (nightMode.value !== (entry.inNightSession === true)) clearHomeData();
   nightMode.value = entry.inNightSession === true;

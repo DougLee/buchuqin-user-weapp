@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { preloadPayTemplates } from "../../utils/payment";
+import OrderSupportGroup from "../../components/OrderSupportGroup.vue";
 import { onUnmounted, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { ApiError } from "../../api/request";
@@ -37,6 +39,7 @@ onLoad((q) => {
   orderId.value = String(q?.id || "");
 });
 onShow(() => {
+  void preloadPayTemplates();
   refresh();
 });
 async function refresh() {
@@ -192,6 +195,7 @@ const canAfterSale = () =>
       <text>{{ order.refund.message || (order.refund.status === 'succeeded' ? '款项已按原支付路径退回' : '到账以渠道确认为准，请稍后刷新查看') }}</text>
       <button v-if="!['succeeded', 'failed'].includes(order.refund.status)" class="bar-btn bar-btn--soft" @tap="refresh">刷新退款进度</button>
     </view>
+    <OrderSupportGroup :qrcode="order.support?.groupQrcode" :tip="order.support?.groupTip" />
     <!-- 时间线：服务端 timeline 透传（submit/paid/accept/delivered/completed…） -->
     <view class="timeline card"
       ><view

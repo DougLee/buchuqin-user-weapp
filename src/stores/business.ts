@@ -12,7 +12,7 @@ let revision = 0;
 function currentIdentity() {
   return `${String(uni.getStorageSync("token") || "")} ${String(
     uni.getStorageSync("nightCartOwner") || "",
-  )}`;
+  )} ${String(uni.getStorageSync("selectedAddressId") || "")}`;
 }
 
 export const useBusinessStore = defineStore("business", {
