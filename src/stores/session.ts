@@ -62,7 +62,9 @@ export const useSessionStore = defineStore("session", {
       if (cached) {
         // 已有 token：静默换取用户信息即可，不再每次刷新都打登录接口（限流 10 次/分/IP）。
         // token 过期时 request 层会自动清 token 重登并重试本请求。
-        this.applyUser(await api.profile());
+        loginInFlight = api.profile().then(user => this.applyUser(user));
+        try { await loginInFlight; }
+        finally { loginInFlight = null; }
         return;
       }
       // 正式通道（ADR-0004）：微信登录；test-login 已随后端下线，
@@ -103,11 +105,11 @@ export const useSessionStore = defineStore("session", {
       if (this.user?.id !== user.id || this.user?.campusId !== user.campusId) {
         this.signupCouponsByScope = {};
         useCampusStore().$reset();
+        // 只有换号/换校区才失效渠道，资料更新不打断进行中的首页请求。
+        useBusinessStore().reset();
       }
       useNightCartStore().setOwner(user.id, user.campusId);
       useCartStore().setOwner(user.id, user.campusId);
-      // IKU0KH：换号/换校区即失效业务渠道缓存（entry 绑定身份，下轮 ensureEntry 实拉）
-      useBusinessStore().reset();
       this.user = user;
       this.needsNickname =
         (!user.nickname || user.nickname === "微信用户");
