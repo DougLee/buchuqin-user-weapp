@@ -203,6 +203,8 @@ export const api = {
       name: string;
       shortName: string;
       warehouseName: string;
+      /** Organization authorization and campus enrollment, combined by the server. */
+      nightEnabled?: boolean;
     } & CampusCloseState>("/campus/current"),
   /** 切换校区（IKAJT2）：返回换发 token（JWT 含新 campusId），会话按登录同款落库 */
   selectCampus: (campusId: string) =>

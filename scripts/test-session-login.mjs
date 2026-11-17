@@ -13,6 +13,7 @@ function setup() {
   const businessExports = {};
   vm.runInNewContext(compile('../src/stores/business.ts'), { exports: businessExports, uni, Date, Promise, require(name) {
     if (name === 'pinia') return pinia;
+    if (name === '../api') return { api: { currentCampus: async () => ({ nightEnabled: true }) } };
     if (name === '../api/night') return { nightApi: { entry: () => new Promise(resolve => entries.push(resolve)) } };
     throw Error(name);
   } });
@@ -44,10 +45,12 @@ test('App和首页同时恢复缓存登录，只请求一次资料，不重复�
 test('同一用户更新昵称，不打断正在加载的夜宵入口；换校区仍使旧请求失效', async () => {
   const f = setup(); f.session.applyUser(user);
   const entry = f.business.refresh();
+  await new Promise(setImmediate);
   f.session.applyUser({ ...user, nickname: '新昵称' });
   f.entries[0]({ inNightSession: true });
   assert.equal((await entry).inNightSession, true);
   const old = f.business.refresh();
+  await new Promise(setImmediate);
   f.session.applyUser({ ...user, campusId: 'campus-b' });
   f.entries[1]({ inNightSession: true });
   await assert.rejects(old, /身份或校区已变化/);
